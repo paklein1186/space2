@@ -1,0 +1,11 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+data/chroma_db/
+data/raw/
+data/*.sqlite3
+data/catalog.json
+.DS_Store
+.claude/
