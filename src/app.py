@@ -44,61 +44,6 @@ def _supabase_client():
     return st.session_state["supabase_client"]
 
 
-def _capture_magic_link_redirect() -> None:
-    """Supabase renvoie le token dans le FRAGMENT de l'URL (#access_token=...),
-    invisible côté serveur (Streamlit ne peut lire que la query string). Ce
-    script convertit le fragment en paramètres de requête puis recharge la
-    page — après quoi `st.query_params` peut les lire côté Python.
-
-    `st.components.v1.html` exécute ce script dans une iframe isolée : il
-    faut donc cibler `window.top` (la vraie fenêtre du navigateur), pas
-    `window.location` qui ne renverrait que la pseudo-URL de l'iframe
-    elle-même (toujours vide) — sans ça, rien ne se passait jamais."""
-    st.components.v1.html(
-        """
-        <script>
-        if (window.top.location.hash && window.top.location.hash.includes('access_token')) {
-            const params = new URLSearchParams(window.top.location.hash.substring(1));
-            const newUrl = window.top.location.pathname + '?' + params.toString();
-            window.top.location.replace(newUrl);
-        }
-        </script>
-        """,
-        height=0,
-    )
-
-
-def _consume_magic_link_query_params(client) -> None:
-    """Si l'URL contient access_token/refresh_token (déposés par le script
-    ci-dessus après le clic sur le lien magique), pose la session Supabase et
-    mémorise l'utilisateur dans st.session_state — AVANT de nettoyer l'URL.
-
-    Ordre important : `st.query_params.clear()` peut déclencher un rerun de
-    Streamlit avant même d'atteindre l'instruction suivante. Si l'id
-    utilisateur n'était pas déjà en session_state à ce moment-là, ce rerun
-    repartait du formulaire de connexion — la session Supabase était bien
-    établie côté client, mais Streamlit "l'oubliait" aussitôt, d'où la
-    boucle infinie."""
-    params = st.query_params
-    access_token = params.get("access_token")
-    refresh_token = params.get("refresh_token")
-    if not access_token or not refresh_token:
-        return
-    try:
-        result = client.auth.set_session(access_token, refresh_token)
-    except Exception as exc:
-        st.query_params.clear()
-        st.error(f"Le lien de connexion est invalide ou expiré : {exc}. Redemandez-en un nouveau ci-dessous.")
-        return
-    if not result.user:
-        st.query_params.clear()
-        st.error("La session n'a pas pu être établie (réponse Supabase sans utilisateur). Redemandez un lien.")
-        return
-    st.session_state["user_id"] = result.user.id  # mémorisé AVANT le clear()
-    st.query_params.clear()
-    st.rerun()
-
-
 def auth_screen() -> str | None:
     """Renvoie l'identifiant utilisateur une fois authentifié, sinon None
     (et affiche l'écran de connexion)."""
@@ -123,19 +68,15 @@ def auth_screen() -> str | None:
         return None
 
     client = _supabase_client()
-    _capture_magic_link_redirect()
-    _consume_magic_link_query_params(client)
 
-    if "magic_link_sent_to" not in st.session_state:
-        with st.form("magic_link_form"):
+    if "otp_sent_to" not in st.session_state:
+        with st.form("otp_request_form"):
             email = st.text_input("Votre email")
-            submitted = st.form_submit_button("Recevoir le lien de connexion")
+            submitted = st.form_submit_button("Recevoir un code de connexion")
         if submitted and email:
-            redirect_to = os.environ.get("APP_BASE_URL")
-            options = {"email_redirect_to": redirect_to} if redirect_to else {}
             try:
-                client.auth.sign_in_with_otp({"email": email, "options": options})
-                st.session_state["magic_link_sent_to"] = email
+                client.auth.sign_in_with_otp({"email": email})
+                st.session_state["otp_sent_to"] = email
                 st.rerun()
             except Exception as exc:
                 message = str(exc)
@@ -147,14 +88,33 @@ def auth_screen() -> str | None:
                         "une seule fois."
                     )
                 else:
-                    st.error(f"Échec de l'envoi du lien de connexion : {message}")
+                    st.error(f"Échec de l'envoi du code de connexion : {message}")
         return None
 
-    st.write(f"Un lien de connexion a été envoyé à **{st.session_state['magic_link_sent_to']}**.")
-    st.caption("Cliquez sur le lien reçu par email — il vous ramènera directement ici, connecté.")
-    if st.button("Changer d'email"):
-        del st.session_state["magic_link_sent_to"]
+    st.write(f"Un code a été envoyé à **{st.session_state['otp_sent_to']}**.")
+    with st.form("otp_verify_form"):
+        code = st.text_input("Code reçu par email")
+        col1, col2 = st.columns(2)
+        with col1:
+            verify = st.form_submit_button("Valider")
+        with col2:
+            change_email = st.form_submit_button("Changer d'email")
+    if change_email:
+        del st.session_state["otp_sent_to"]
         st.rerun()
+    if verify and code:
+        try:
+            result = client.auth.verify_otp({
+                "email": st.session_state["otp_sent_to"], "token": code.strip(), "type": "email",
+            })
+        except Exception as exc:
+            st.error(f"Code invalide ou expiré : {exc}")
+            return None
+        if result.user:
+            st.session_state["user_id"] = result.user.id
+            st.rerun()
+        else:
+            st.error("Code invalide ou expiré.")
     return None
 
 
