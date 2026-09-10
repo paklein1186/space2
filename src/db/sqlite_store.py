@@ -10,7 +10,7 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-from .store import Contributeur, LieuDerive, SessionEntretien, Store, TiersLieu
+from .store import CampagnePrioritaire, Contributeur, LieuDerive, SessionEntretien, Store, TiersLieu
 
 DDL = """
 create table if not exists tiers_lieux (
@@ -66,7 +66,24 @@ create table if not exists lieu_derive (
     corrections_manuelles text,
     lien_externe text,
     photo_url text,
+    inclus_portfolio integer not null default 0,
+    campagne_texte text,
+    campagne_objectif text,
+    campagne_contact text,
     genere_le text not null default (datetime('now'))
+);
+create table if not exists admins (
+    user_id text primary key
+);
+create table if not exists campagnes_prioritaires (
+    id text primary key,
+    titre text not null,
+    description text,
+    champ_ids text not null default '[]',
+    date_debut text not null,
+    date_fin text not null,
+    cree_par text,
+    cree_le text not null default (datetime('now'))
 );
 create table if not exists llm_calls (
     id text primary key,
@@ -281,6 +298,10 @@ class SqliteStore(Store):
             if data["corrections_manuelles"] else None,
             lien_externe=data["lien_externe"],
             photo_url=data["photo_url"],
+            inclus_portfolio=bool(data["inclus_portfolio"]),
+            campagne_texte=data["campagne_texte"],
+            campagne_objectif=data["campagne_objectif"],
+            campagne_contact=data["campagne_contact"],
             genere_le=data["genere_le"],
         )
 
@@ -301,4 +322,68 @@ class SqliteStore(Store):
             "cout_estime) values (?, ?, ?, ?, ?, ?, ?)",
             (str(uuid.uuid4()), type_appel, tiers_lieu_id, model, tokens_in, tokens_out, cout_estime),
         )
+        self.conn.commit()
+
+    # -- administration --------------------------------------------------
+
+    def is_admin(self, user_id: str) -> bool:
+        row = self.conn.execute("select 1 from admins where user_id = ?", (user_id,)).fetchone()
+        return row is not None
+
+    def add_admin_by_email(self, email: str) -> bool:
+        # Pas de vraie table auth.users en local : l'email EST l'identifiant
+        # utilisateur en mode développement (cf. LOCAL_DEV_AUTOLOGIN / mode dev
+        # sans Supabase), donc toujours "trouvé".
+        self.conn.execute("insert or ignore into admins (user_id) values (?)", (email,))
+        self.conn.commit()
+        return True
+
+    def list_admin_emails(self) -> list:
+        return [r["user_id"] for r in self.conn.execute("select user_id from admins").fetchall()]
+
+    def update_portfolio_entry(self, tiers_lieu_id: str, inclus_portfolio: bool,
+                                campagne_texte: Optional[str], campagne_objectif: Optional[str],
+                                campagne_contact: Optional[str]) -> None:
+        self.conn.execute(
+            "update lieu_derive set inclus_portfolio = ?, campagne_texte = ?, "
+            "campagne_objectif = ?, campagne_contact = ? where tiers_lieu_id = ?",
+            (int(inclus_portfolio), campagne_texte, campagne_objectif, campagne_contact, tiers_lieu_id),
+        )
+        self.conn.commit()
+
+    def list_lieux_portfolio(self) -> list:
+        rows = self.conn.execute(
+            "select tiers_lieu_id from lieu_derive where inclus_portfolio = 1"
+        ).fetchall()
+        ids = {r["tiers_lieu_id"] for r in rows}
+        return [lieu for lieu in self.list_tiers_lieux() if lieu.id in ids]
+
+    def save_campagne_prioritaire(self, campagne: CampagnePrioritaire) -> None:
+        self.conn.execute(
+            "insert into campagnes_prioritaires (id, titre, description, champ_ids, date_debut, "
+            "date_fin, cree_par) values (?, ?, ?, ?, ?, ?, ?) "
+            "on conflict(id) do update set titre = excluded.titre, description = excluded.description, "
+            "champ_ids = excluded.champ_ids, date_debut = excluded.date_debut, date_fin = excluded.date_fin",
+            (
+                campagne.id or str(uuid.uuid4()), campagne.titre, campagne.description,
+                json.dumps(campagne.champ_ids, ensure_ascii=False), campagne.date_debut,
+                campagne.date_fin, campagne.cree_par,
+            ),
+        )
+        self.conn.commit()
+
+    def list_campagnes_prioritaires(self) -> list:
+        rows = self.conn.execute("select * from campagnes_prioritaires").fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            result.append(CampagnePrioritaire(
+                id=d["id"], titre=d["titre"], description=d["description"],
+                champ_ids=json.loads(d["champ_ids"]), date_debut=d["date_debut"],
+                date_fin=d["date_fin"], cree_par=d["cree_par"], cree_le=d["cree_le"],
+            ))
+        return result
+
+    def delete_campagne_prioritaire(self, campagne_id: str) -> None:
+        self.conn.execute("delete from campagnes_prioritaires where id = ?", (campagne_id,))
         self.conn.commit()

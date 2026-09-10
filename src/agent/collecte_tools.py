@@ -20,7 +20,9 @@ from ..questionnaire.resolver import (
     resolve_section_fields,
     section_is_complete,
 )
-from ..questionnaire.schema import QUESTIONNAIRE, Role, get_module, get_section
+from ..questionnaire.schema import QUESTIONNAIRE, Role, get_field, get_module, get_section
+
+PRIORITY_MODULE_ID = "__priorite__"
 
 TOOL_DEFINITIONS = [
     {
@@ -105,6 +107,21 @@ class CollecteToolHandler:
         self._completed_section_ids: set = set(session.completed_sections or [])
         if self._module_id is None:
             self._enter_module(QUESTIONNAIRE[0].id, persist=False)
+        # Champs de campagnes prioritaires actives (recensement ciblé avec
+        # fenêtre temporelle, configuré par un admin) : proposés avant la
+        # progression normale du questionnaire, tant qu'il en reste
+        # d'inactif pour ce contributeur. Recalculé une fois par session
+        # (pas besoin de suivre l'évolution des campagnes en cours de route).
+        self._priority_field_ids: list = self._compute_priority_field_ids()
+        self._priority_active: bool = bool(self._priority_field_ids)
+
+    def _compute_priority_field_ids(self) -> list:
+        ids: list = []
+        for campagne in self.store.get_active_campagnes_prioritaires():
+            for champ_id in campagne.champ_ids:
+                if champ_id not in ids and get_field(champ_id) is not None:
+                    ids.append(champ_id)
+        return ids
 
     def _current_answers(self) -> dict:
         return self.store.get_answers(self.tiers_lieu_id, self.contributeur_id)
@@ -131,13 +148,66 @@ class CollecteToolHandler:
         if persist:
             self._persist_progress()
 
+    def _priority_section(self) -> Optional[dict]:
+        """Section synthétique construite à la volée à partir des campagnes
+        prioritaires actives — pas une modification du schéma statique."""
+        answers = self._current_answers()
+        restants = [cid for cid in self._priority_field_ids if answers.get(cid) is None]
+        if not restants:
+            self._priority_active = False
+            return None
+        fields = []
+        for champ_id in restants:
+            f = get_field(champ_id)
+            if f is None or not f.allowed_for(self.role):
+                continue
+            fields.append({
+                "id": f.id, "label": f.label, "type": f.type.value,
+                "options": f.resolved_options(self._country_code()),
+                "required": f.required, "help_text": f.help_text, "max_choices": f.max_choices,
+            })
+        if not fields:
+            self._priority_active = False
+            return None
+        return {
+            "module_id": PRIORITY_MODULE_ID,
+            "module_title": "Collecte prioritaire",
+            "module_optional": False,
+            "section_id": PRIORITY_MODULE_ID,
+            "section_title": "Informations prioritaires du moment",
+            "intro": ("Un recensement ciblé est en cours en ce moment : ces informations sont "
+                      "particulièrement utiles à collecter en priorité."),
+            "fields": fields,
+        }
+
     def get_current_section(self, _input: dict) -> dict:
+        if self._priority_active:
+            section = self._priority_section()
+            if section is not None:
+                return section
         if self._section_id is None:
             return self._advance_module(self._module_id)
         module = get_module(self._module_id)
         section = get_section(self._module_id, self._section_id)
         answers = self._current_answers()
         resolved = resolve_section_fields(section, answers, self.role, self._country_code())
+        # Un champ déjà répondu (par ce contributeur, ou par un précédent —
+        # `answers` fusionne les deux) ne doit jamais être reproposé : l'agent
+        # ne voit ici que ce qui reste réellement à demander.
+        a_demander = [rf for rf in resolved if answers.get(rf.id) is None]
+        if not a_demander and section_is_complete(section, answers, self.role, self._country_code()):
+            # Tout est déjà répondu (reprise après interruption, ou lieu déjà
+            # documenté par quelqu'un d'autre) : on avance directement plutôt
+            # que de renvoyer une section sans aucune question à poser.
+            self._completed_section_ids.add(self._section_id)
+            next_section = next_incomplete_section(
+                module, answers, self.role, self._country_code(), self._completed_section_ids
+            )
+            if next_section:
+                self._section_id = next_section.id
+                self._persist_progress()
+                return self.get_current_section({})
+            return self._advance_module(self._module_id)
         return {
             "module_id": self._module_id,
             "module_title": module.title,
@@ -155,7 +225,7 @@ class CollecteToolHandler:
                     "help_text": rf.field.help_text,
                     "max_choices": rf.field.max_choices,
                 }
-                for rf in resolved
+                for rf in a_demander
             ],
         }
 
@@ -164,6 +234,13 @@ class CollecteToolHandler:
         valeur = tool_input["valeur"]
         confidentiel = bool(tool_input.get("confidentiel", False))
         self.store.save_answer(self.tiers_lieu_id, self.contributeur_id, champ_id, valeur, confidentiel)
+
+        if self._priority_active and champ_id in self._priority_field_ids:
+            section = self._priority_section()
+            result = {"saved": True, "champ_id": champ_id, "section_complete": section is None}
+            if section is None:
+                result["next_section"] = self.get_current_section({})
+            return result
 
         section = get_section(self._module_id, self._section_id)
         answers = self._current_answers()

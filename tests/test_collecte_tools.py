@@ -73,11 +73,19 @@ def main():
         contributeur_partenaire = store.get_or_create_contributeur("user-2", lieu.id, Role.PARTENAIRE.value)
         session_p = store.get_or_start_session(lieu.id, contributeur_partenaire.id)
         handler_p = CollecteToolHandler(store, lieu.id, contributeur_partenaire.id, session_p, Role.PARTENAIRE)
-        # Force la position sur la section RH pour le test
+        # Force la position sur la section RH pour le test : comme tous ses champs
+        # sont réservés à fondateur/équipe/steward, elle est entièrement inactive
+        # pour un partenaire -> get_current_section doit l'enjamber automatiquement
+        # plutôt que de renvoyer une section sans aucun champ à traiter.
         handler_p._module_id = "socle"
         handler_p._section_id = "ressources_humaines"
         section_rh = handler_p.get_current_section({})
-        check("Aucun champ RH interne visible pour le partenaire", len(section_rh["fields"]) == 0)
+        champs_rh_internes = {"etp_geres", "metiers_exerces", "part_femmes_equipe",
+                               "organisme_formation_lien", "qvt_equipe"}
+        check("Le partenaire est avancé au-delà de la section RH, entièrement inactive pour son rôle",
+              section_rh["section_id"] != "ressources_humaines")
+        check("Aucun champ RH interne ne fuite dans la section suivante",
+              not (champs_rh_internes & {f["id"] for f in section_rh["fields"]}))
 
         # --- Reprise de session interrompue : un nouveau handler reconstruit à partir
         # de la session persistée doit repartir exactement où le précédent s'est arrêté.

@@ -13,6 +13,7 @@ import os
 from anthropic import Anthropic
 from dotenv import load_dotenv
 
+from ..annuaire import field_label
 from ..db.factory import get_admin_store
 from ..questionnaire.schema import Role
 from .caching import apply_single_cache_breakpoint, cached_system, to_plain_content
@@ -58,6 +59,12 @@ Règles :
   ce résumé.
 - Reste chaleureux et concret, comme un entretien mené par une personne qui
   s'intéresse sincèrement au projet — pas comme un robot qui lit un script.
+- Si `get_current_section` renvoie `module_id` égal à "__priorite__", un
+  recensement ciblé ponctuel est en cours (configuré par un administrateur,
+  avec une fenêtre de temps limitée) : explique en une phrase que le réseau
+  mène une collecte ciblée en ce moment, puis traite ces questions avant de
+  revenir au fil normal de l'entretien — sans que ça paraisse pour autant
+  plus formel que le reste de la conversation.
 """
 
 
@@ -105,21 +112,61 @@ class CollecteAgent:
             self.messages.append({"role": "user", "content": tool_results})
 
 
-def opening_message(store, tiers_lieu_id: str) -> str:
-    """Message d'ouverture envoyé à l'agent pour démarrer la conversation.
-    Si une donnée dérivée existe déjà pour ce lieu (reprise en tant que
-    steward ou nouveau contributeur sur un lieu déjà avancé), on l'inclut
-    pour que l'agent restitue un micro-résumé avant d'enchaîner sur les
-    questions encore ouvertes plutôt que de repartir de zéro."""
+def opening_message(store, tiers_lieu_id: str, nom_lieu: str = "",
+                     contributeur_id: str | None = None, role_label: str = "") -> str:
+    """Message d'ouverture envoyé à l'agent pour démarrer la conversation —
+    jamais affiché tel quel au répondant, mais donne à l'agent de quoi
+    personnaliser son premier message (nom du lieu, éventuel résumé ou
+    reprise de session) plutôt que de dire un "Bonjour" générique.
+
+    Trois cas, du plus au moins renseigné :
+    1. Une synthèse LLM existe déjà (`lieu_derive`) : l'agent la restitue en
+       2-3 phrases avant d'enchaîner.
+    2. Pas de synthèse, mais ce contributeur a déjà des réponses enregistrées
+       (session interrompue) : un micro-résumé SANS appel LLM — simple mise
+       en forme des champs déjà répondus — est injecté pour que l'agent
+       rappelle où on en est sans redemander l'évident.
+    3. Tout premier échange pour ce lieu : personnalisation minimale (nom du
+       lieu, rôle) sans contenu à restituer.
+    """
+    identite = f"Le répondant s'occupe du lieu « {nom_lieu} »" if nom_lieu else "Le répondant"
+    if role_label:
+        identite += f", en tant que {role_label.lower()}"
+    identite += "."
+
     derive = store.get_lieu_derive(tiers_lieu_id)
     if derive and derive.donnees.get("resume"):
         return (
-            "Je reprends l'entretien sur un lieu déjà partiellement documenté. "
+            f"{identite} Tu reprends l'entretien sur un lieu déjà partiellement documenté. "
             f"Voici ce qu'on sait déjà : {derive.donnees['resume']}\n\n"
-            "Restitue ce résumé en 2-3 phrases pour le répondant afin qu'il sache d'où on "
-            "repart, puis enchaîne sur les informations encore manquantes."
+            "Salue le répondant en le nommant par le lieu qu'il représente (jamais de "
+            "'bienvenue' générique sans le nom du lieu), restitue ce résumé en 2-3 phrases "
+            "pour qu'il sache d'où on repart, puis enchaîne sur les informations encore "
+            "manquantes."
         )
-    return "Bonjour, je suis prêt à commencer l'entretien."
+
+    reponses_existantes = {}
+    if contributeur_id:
+        reponses_existantes = {
+            k: v for k, v in store.get_answers(tiers_lieu_id, contributeur_id).items()
+            if k != "nom_lieu" and v not in (None, "", [])
+        }
+    if reponses_existantes:
+        recap = "; ".join(f"{field_label(k)} : {v}" for k, v in list(reponses_existantes.items())[:6])
+        return (
+            f"{identite} La session avait été interrompue avec {len(reponses_existantes)} "
+            f"réponse(s) déjà enregistrée(s), par exemple : {recap}.\n\n"
+            "Salue le répondant en le nommant par le lieu, rappelle en 1-2 phrases (sans lister "
+            "tous les champs un par un) que l'entretien reprend là où il s'était arrêté, puis "
+            "enchaîne directement sur la suite via get_current_section — ne redemande jamais un "
+            "champ déjà répondu."
+        )
+
+    return (
+        f"{identite} Il s'agit du tout premier échange pour ce lieu. Salue chaleureusement le "
+        "répondant en le nommant explicitement par le lieu qu'il représente (pas de 'bienvenue' "
+        "générique), puis commence l'entretien."
+    )
 
 
 def build_agent(lieu_nom: str, pays: str, role_str: str, owner_user_id: str = "cli-user") -> CollecteAgent:
@@ -151,7 +198,10 @@ def main():
     print(f"Entretien démarré pour '{args.lieu}' ({args.pays}), rôle: {args.role}.")
     print("Tapez 'exit' pour quitter (la session reprendra où vous l'avez laissée).\n")
 
-    opening = agent.send(opening_message(agent.store, agent.tiers_lieu_id))
+    opening = agent.send(opening_message(
+        agent.store, agent.tiers_lieu_id, nom_lieu=args.lieu,
+        contributeur_id=agent.tool_handler.contributeur_id, role_label=args.role,
+    ))
     print(f"Agent: {opening}\n")
 
     while True:

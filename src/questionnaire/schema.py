@@ -34,6 +34,11 @@ ROLES_INTERNES = [Role.FONDATEUR, Role.EQUIPE, Role.STEWARD]
 # Rôles pouvant voir/répondre à peu près à tout le reste.
 TOUS_ROLES = [Role.FONDATEUR, Role.EQUIPE, Role.PARTENAIRE, Role.USAGER, Role.STEWARD, Role.AUTRE]
 
+# Catégories de classification d'un lieu (attribuées par l'enrichissement LLM,
+# affichées/filtrables dans l'Annuaire) — source unique partagée par
+# `agent.enrichissement` et `annuaire`/`app` pour éviter toute divergence.
+CATEGORIES_POSSIBLES = ["Alimentaire", "Culturel", "Éducation", "Santé"]
+
 
 class FieldType(str, Enum):
     TEXT = "text"
@@ -613,3 +618,13 @@ def get_section(module_id: str, section_id: str) -> Optional[Section]:
     if not module:
         return None
     return next((s for s in module.sections if s.id == section_id), None)
+
+
+_FIELDS_BY_ID = {f.id: f for _, _, f in all_fields()}
+
+
+def get_field(champ_id: str) -> Optional[Field]:
+    """Lookup global d'un champ par id, indépendamment de sa section — utilisé
+    par les campagnes prioritaires (collecte_tools.py) qui référencent des
+    champs par id sans connaître leur module/section d'origine."""
+    return _FIELDS_BY_ID.get(champ_id)

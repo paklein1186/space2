@@ -56,7 +56,23 @@ class LieuDerive:
     corrections_manuelles: Optional[dict] = None
     lien_externe: Optional[str] = None
     photo_url: Optional[str] = None
+    inclus_portfolio: bool = False
+    campagne_texte: Optional[str] = None
+    campagne_objectif: Optional[str] = None
+    campagne_contact: Optional[str] = None
     genere_le: Optional[str] = None
+
+
+@dataclass
+class CampagnePrioritaire:
+    titre: str
+    champ_ids: list
+    date_debut: str
+    date_fin: str
+    id: str = ""  # vide = création (id généré par le store), sinon mise à jour
+    description: Optional[str] = None
+    cree_par: Optional[str] = None
+    cree_le: Optional[str] = None
 
 
 class Store(ABC):
@@ -116,3 +132,65 @@ class Store(ABC):
     @abstractmethod
     def log_llm_call(self, type_appel: str, model: str, tokens_in: int, tokens_out: int,
                       cout_estime: float, tiers_lieu_id: Optional[str] = None) -> None: ...
+
+    # -- administration --------------------------------------------------
+
+    @abstractmethod
+    def is_admin(self, user_id: str) -> bool: ...
+
+    @abstractmethod
+    def add_admin_by_email(self, email: str) -> bool:
+        """Ajoute un admin en le résolvant par email. Renvoie False si
+        l'utilisateur n'a pas été trouvé (aucun compte avec cet email)."""
+        ...
+
+    @abstractmethod
+    def list_admin_emails(self) -> list: ...
+
+    @abstractmethod
+    def update_portfolio_entry(self, tiers_lieu_id: str, inclus_portfolio: bool,
+                                campagne_texte: Optional[str], campagne_objectif: Optional[str],
+                                campagne_contact: Optional[str]) -> None: ...
+
+    @abstractmethod
+    def list_lieux_portfolio(self) -> list:
+        """Lieux avec inclus_portfolio=true, pour la page Portfolio publique."""
+        ...
+
+    @abstractmethod
+    def save_campagne_prioritaire(self, campagne: CampagnePrioritaire) -> None: ...
+
+    @abstractmethod
+    def list_campagnes_prioritaires(self) -> list: ...
+
+    @abstractmethod
+    def delete_campagne_prioritaire(self, campagne_id: str) -> None: ...
+
+    def get_active_campagnes_prioritaires(self) -> list:
+        """Campagnes dont la fenêtre [date_debut, date_fin] couvre maintenant.
+        Implémentation par défaut (filtre en Python) commune aux deux stores —
+        pas besoin de la redéfinir sauf optimisation spécifique."""
+        from datetime import datetime, timezone
+
+        now = datetime.now(timezone.utc)
+        actives = []
+        for c in self.list_campagnes_prioritaires():
+            debut = _parse_dt(c.date_debut)
+            fin = _parse_dt(c.date_fin)
+            if debut and fin and debut <= now <= fin:
+                actives.append(c)
+        return actives
+
+
+def _parse_dt(value):
+    from datetime import datetime, timezone
+
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    try:
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    except (ValueError, TypeError, AttributeError):
+        return None

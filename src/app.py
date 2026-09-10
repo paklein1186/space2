@@ -26,8 +26,9 @@ from src.annuaire import (
     lieux_avec_coordonnees,
     source_items_for_section,
 )
+from src.auth_session import clear_session_cookie, read_session_cookie, save_session_cookie
 from src.db.factory import get_admin_store, get_store
-from src.questionnaire.schema import Role
+from src.questionnaire.schema import QUESTIONNAIRE, CATEGORIES_POSSIBLES, Role, all_fields
 
 RAG_DISPONIBLE = bool(os.environ.get("VOYAGE_API_KEY"))
 
@@ -71,9 +72,15 @@ def auth_screen() -> str | None:
         st.session_state["use_admin_store"] = True
         return st.session_state["user_id"]
 
-    st.title("Lieux hybrides et territoires")
-
     if not SUPABASE_CONFIGURED:
+        # Mode dev sans Supabase : pas de vraie sécurité de toute façon, donc
+        # un cookie suffit à éviter de retaper son email à chaque visite.
+        saved_email = read_session_cookie()
+        if saved_email and "dev_cookie_declined" not in st.session_state:
+            st.session_state["user_id"] = saved_email
+            st.rerun()
+
+        st.title("Lieux hybrides et territoires")
         st.info(
             "Mode développement local : aucun projet Supabase configuré "
             "(`SUPABASE_URL`/`SUPABASE_KEY` absents de `.env`). L'identification "
@@ -85,10 +92,32 @@ def auth_screen() -> str | None:
             submitted = st.form_submit_button("Continuer")
         if submitted and email:
             st.session_state["user_id"] = email
+            save_session_cookie(email)
             st.rerun()
         return None
 
     client = _supabase_client()
+
+    # Restaure une session déjà ouverte (cookie posé lors d'une connexion
+    # précédente) avant d'afficher le moindre formulaire — évite de redemander
+    # un email à chaque visite. `cookie_restore_failed` empêche de reboucler
+    # indéfiniment si le refresh_token est expiré ou invalide.
+    if "otp_sent_to" not in st.session_state and "cookie_restore_failed" not in st.session_state:
+        refresh_token = read_session_cookie()
+        if refresh_token:
+            try:
+                result = client.auth.refresh_session(refresh_token)
+            except Exception:
+                result = None
+            if result and result.user:
+                st.session_state["user_id"] = result.user.id
+                if result.session and result.session.refresh_token:
+                    save_session_cookie(result.session.refresh_token)
+                st.rerun()
+            else:
+                st.session_state["cookie_restore_failed"] = True
+
+    st.title("Lieux hybrides et territoires")
 
     if "otp_sent_to" not in st.session_state:
         with st.form("otp_request_form"):
@@ -121,7 +150,7 @@ def auth_screen() -> str | None:
         with col2:
             change_email = st.form_submit_button("Changer d'email")
     if change_email:
-        del st.session_state["otp_sent_to"]
+        st.session_state.pop("otp_sent_to", None)
         st.rerun()
     if verify and code:
         try:
@@ -132,7 +161,10 @@ def auth_screen() -> str | None:
             st.error(f"Code invalide ou expiré : {exc}")
             return None
         if result.user:
+            st.session_state.pop("otp_sent_to", None)
             st.session_state["user_id"] = result.user.id
+            if result.session and result.session.refresh_token:
+                save_session_cookie(result.session.refresh_token)
             st.rerun()
         else:
             st.error("Code invalide ou expiré.")
@@ -191,11 +223,19 @@ def entretien_tab(store, user_id: str, nom_lieu: str, role: str):
     if session_key not in st.session_state:
         tiers_lieu = store.get_or_create_tiers_lieu(user_id, nom_lieu)
         contributeur = store.get_or_create_contributeur(user_id, tiers_lieu.id, role)
+        # Le nom du lieu est déjà connu (saisi dans la barre latérale) : on le
+        # pré-remplit comme réponse pour que l'entretien ne redemande jamais
+        # "quel est le nom de votre lieu ?" en première question.
+        if store.get_answers(tiers_lieu.id, contributeur.id).get("nom_lieu") is None:
+            store.save_answer(tiers_lieu.id, contributeur.id, "nom_lieu", tiers_lieu.nom)
         session = store.get_or_start_session(tiers_lieu.id, contributeur.id)
         handler = CollecteToolHandler(store, tiers_lieu.id, contributeur.id, session, Role(role))
         agent = CollecteAgent(handler, store=store, tiers_lieu_id=tiers_lieu.id)
         st.session_state[session_key] = {"agent": agent, "history": []}
-        opening = agent.send(opening_message(store, tiers_lieu.id))
+        opening = agent.send(opening_message(
+            store, tiers_lieu.id, nom_lieu=tiers_lieu.nom,
+            contributeur_id=contributeur.id, role_label=ROLE_LABELS[role],
+        ))
         st.session_state[session_key]["history"].append(("assistant", opening))
 
     state = st.session_state[session_key]
@@ -212,107 +252,282 @@ def entretien_tab(store, user_id: str, nom_lieu: str, role: str):
         st.rerun()
 
 
-def _lancer_enrichissement(store, lieu) -> None:
-    if not os.environ.get("ANTHROPIC_API_KEY") or not RAG_DISPONIBLE:
-        st.error("ANTHROPIC_API_KEY et VOYAGE_API_KEY sont nécessaires pour enrichir un lieu.")
+def _auto_enrich_all(store, fiches) -> None:
+    """Ré-enrichissement automatique et silencieux : plus de bouton manuel.
+    `enrich_lieu` est idempotent (compare le hash des réponses source) donc
+    ne rappelle le LLM que si quelque chose a réellement changé depuis la
+    dernière synthèse — appeler ceci à chaque ouverture de l'Annuaire est
+    donc peu coûteux dans le cas courant (déjà à jour)."""
+    if not (os.environ.get("ANTHROPIC_API_KEY") and RAG_DISPONIBLE):
         return
     from src.agent.enrichissement import enrich_lieu
-    with st.spinner("Génération de la synthèse et du profil sémantique..."):
-        result, updated = enrich_lieu(store, lieu.id, force=True, nom_lieu=lieu.nom)
-    if result is None:
-        st.warning("Aucune réponse à synthétiser pour ce lieu.")
-    else:
-        st.success("Synthèse mise à jour." if updated else "Déjà à jour.")
-        st.rerun()
+    for fiche in fiches:
+        lieu = fiche["tiers_lieu"]
+        try:
+            enrich_lieu(store, lieu.id, force=False, nom_lieu=lieu.nom)
+        except Exception:
+            pass  # une synthèse en échec ne doit jamais bloquer l'affichage de l'Annuaire
 
 
-def _vignette_html(emoji: str, couleur: str) -> str:
+def _vignette_html(emoji: str, couleur: str, hauteur: str = "9rem") -> str:
     return (
-        f'<div style="width:100%;aspect-ratio:16/9;border-radius:8px;background:{couleur};'
-        f'display:flex;align-items:center;justify-content:center;font-size:2.5rem;">{emoji}</div>'
+        f'<div style="width:100%;height:{hauteur};border-radius:8px;background:{couleur};'
+        f'display:flex;align-items:center;justify-content:center;font-size:2.2rem;">{emoji}</div>'
     )
 
 
-def annuaire_tab(store):
+_CATEGORY_COLORS = {
+    "Alimentaire": "#C97A3D", "Culturel": "#8B4B6B", "Éducation": "#3D6E8C", "Santé": "#4F7A52",
+}
+
+
+def _category_chips_html(categories: list) -> str:
+    if not categories:
+        return ""
+    chips = "".join(
+        f'<span style="background:{_CATEGORY_COLORS.get(c, "#888")};color:#fff;font-size:0.72rem;'
+        f'padding:2px 8px;border-radius:10px;margin-right:4px;display:inline-block;'
+        f'margin-bottom:4px;">{c}</span>'
+        for c in categories
+    )
+    return f'<div style="margin:4px 0;">{chips}</div>'
+
+
+@st.dialog("Fiche du lieu", width="large")
+def _fiche_dialog(store, fiche, est_admin: bool):
+    lieu = fiche["tiers_lieu"]
+    derive = store.get_lieu_derive(lieu.id)
+    donnees = derive.donnees if derive else {}
+
+    col_vignette, col_info = st.columns([1, 2.5])
+    with col_vignette:
+        if derive and derive.photo_url:
+            st.image(derive.photo_url, use_container_width=True)
+        else:
+            emoji, couleur = default_visual(lieu.nom, donnees)
+            st.markdown(_vignette_html(emoji, couleur, hauteur="10rem"), unsafe_allow_html=True)
+    with col_info:
+        st.markdown(f"### {lieu.nom}")
+        st.caption(
+            f"{lieu.pays or 'pays non renseigné'} — {lieu.region or 'région non renseignée'} · "
+            f"{fiche['nombre_contributeurs']} contributeur(s)"
+        )
+        if donnees.get("categories"):
+            st.markdown(_category_chips_html(donnees["categories"]), unsafe_allow_html=True)
+        if derive:
+            st.write(donnees.get("resume", ""))
+            if derive.lien_externe:
+                st.markdown(f"[🔗 Fiche externe]({derive.lien_externe})")
+        else:
+            st.info("Pas encore de synthèse générée pour ce lieu — répondez à quelques questions "
+                     "dans l'onglet Entretien pour qu'elle apparaisse ici.")
+
+    if st.button("🌱 Revendiquer le suivi de ce lieu (steward)", key=f"nourrir_{lieu.id}"):
+        st.session_state["preselect_lieu"] = lieu.nom
+        st.session_state["preselect_role"] = "steward"
+        st.toast(f"« {lieu.nom} » sélectionné — rendez-vous dans l'onglet Entretien.", icon="🌱")
+
+    if derive:
+        st.divider()
+        cols = st.columns(3)
+        for i, (cle, titre) in enumerate(SECTIONS_SYNTHESE[1:]):  # sans "resume", déjà affiché
+            texte = donnees.get(cle) or "—"
+            with cols[i % 3]:
+                st.markdown(f"**{titre}**")
+                st.caption(texte)
+                sources = source_items_for_section(store, lieu.id, cle, derive)
+                if sources:
+                    with st.popover("Sources", use_container_width=True):
+                        for s in sources:
+                            st.markdown(f"**{s['label']}** : {s['valeur']}")
+
+        with st.expander("Modifier le lien externe / la photo"):
+            with st.form(f"liens_{lieu.id}"):
+                nouveau_lien = st.text_input("Lien externe (ex. fiche tiers-lieux.xyz)",
+                                              value=derive.lien_externe or "")
+                nouvelle_photo = st.text_input("URL de la photo",
+                                                value=derive.photo_url or "")
+                if st.form_submit_button("Enregistrer"):
+                    store.update_lieu_derive_liens(lieu.id, nouveau_lien or None, nouvelle_photo or None)
+                    st.rerun()
+
+    with st.expander("Voir toutes les réponses brutes et témoignages"):
+        for label, entries in fiche["par_champ"].items():
+            valeurs = ", ".join(str(e["valeur"]) for e in entries)
+            st.markdown(f"**{label}** : {valeurs}")
+        if fiche["temoignages"]:
+            st.markdown("**Témoignages libres**")
+            for t in fiche["temoignages"]:
+                st.markdown(f"> {t['texte']}")
+
+    if est_admin:
+        st.divider()
+        _admin_portfolio_form(store, lieu, derive)
+
+
+def annuaire_tab(store, est_admin: bool):
     st.subheader("Annuaire des lieux recensés")
     fiches = build_annuaire(store)
     if not fiches:
         st.info("Aucun lieu recensé pour l'instant.")
         return
 
+    if "annuaire_auto_enriched" not in st.session_state:
+        _auto_enrich_all(store, fiches)
+        st.session_state["annuaire_auto_enriched"] = True
+
     coords = lieux_avec_coordonnees(store)
     if coords:
         st.map(pd.DataFrame(coords))
 
-    for fiche in fiches:
-        lieu = fiche["tiers_lieu"]
-        derive = store.get_lieu_derive(lieu.id)
-        donnees = derive.donnees if derive else {}
+    filtre_categories = st.multiselect("Filtrer par catégorie", options=CATEGORIES_POSSIBLES)
 
-        with st.container(border=True):
-            col_vignette, col_info, col_actions = st.columns([1, 3, 1.3])
+    fiches_affichees = fiches
+    if filtre_categories:
+        fiches_affichees = [
+            f for f in fiches
+            if (lambda d: d and set(d.donnees.get("categories") or []) & set(filtre_categories))(
+                store.get_lieu_derive(f["tiers_lieu"].id)
+            )
+        ]
+    st.caption(f"{len(fiches_affichees)} lieu(x) affiché(s)")
 
-            with col_vignette:
-                if derive and derive.photo_url:
-                    st.image(derive.photo_url, use_container_width=True)
+    if "annuaire_open_lieu_id" in st.session_state:
+        lieu_id = st.session_state.pop("annuaire_open_lieu_id")
+        fiche_ouverte = next((f for f in fiches if f["tiers_lieu"].id == lieu_id), None)
+        if fiche_ouverte:
+            _fiche_dialog(store, fiche_ouverte, est_admin)
+
+    cols_par_ligne = 4
+    for i in range(0, len(fiches_affichees), cols_par_ligne):
+        cols = st.columns(cols_par_ligne)
+        for col, fiche in zip(cols, fiches_affichees[i:i + cols_par_ligne]):
+            lieu = fiche["tiers_lieu"]
+            derive = store.get_lieu_derive(lieu.id)
+            donnees = derive.donnees if derive else {}
+            with col:
+                with st.container(border=True):
+                    if derive and derive.photo_url:
+                        st.image(derive.photo_url, use_container_width=True)
+                    else:
+                        emoji, couleur = default_visual(lieu.nom, donnees)
+                        st.markdown(_vignette_html(emoji, couleur), unsafe_allow_html=True)
+                    if donnees.get("categories"):
+                        st.markdown(_category_chips_html(donnees["categories"]), unsafe_allow_html=True)
+                    if st.button(lieu.nom, key=f"open_{lieu.id}", use_container_width=True):
+                        st.session_state["annuaire_open_lieu_id"] = lieu.id
+                        st.rerun()
+                    st.caption(lieu.pays or "—")
+
+
+def _admin_portfolio_form(store, lieu, derive) -> None:
+    st.markdown("**Administration — Portfolio**")
+    if derive is None:
+        st.caption("Une synthèse doit d'abord être générée pour ce lieu avant de pouvoir "
+                    "l'inclure au Portfolio.")
+        return
+    with st.form(f"portfolio_{lieu.id}"):
+        inclus = st.checkbox("Inclure ce lieu dans le Portfolio public", value=bool(derive.inclus_portfolio))
+        campagne_texte = st.text_area("Texte de campagne (appel, contexte des besoins)",
+                                       value=derive.campagne_texte or "")
+        col1, col2 = st.columns(2)
+        with col1:
+            campagne_objectif = st.text_input("Objectif (ex. montant recherché)",
+                                                value=derive.campagne_objectif or "")
+        with col2:
+            campagne_contact = st.text_input("Contact", value=derive.campagne_contact or "")
+        if st.form_submit_button("Enregistrer"):
+            get_admin_store().update_portfolio_entry(
+                lieu.id, inclus, campagne_texte or None, campagne_objectif or None, campagne_contact or None,
+            )
+            st.success("Portfolio mis à jour.")
+            st.rerun()
+
+
+def _condition_text(condition) -> str | None:
+    if condition is None:
+        return None
+    op_labels = {"eq": "=", "ne": "≠", "in": "∈", "contains": "contient", "truthy": "renseigné"}
+    label = op_labels.get(condition.operator, condition.operator)
+    if condition.operator == "truthy":
+        return f"{condition.field_id} {label}"
+    return f"{condition.field_id} {label} {condition.value!r}"
+
+
+def administration_tab(store, user_id: str) -> None:
+    st.subheader("Administration")
+    admin_store = get_admin_store()
+
+    with st.expander("Comptes administrateurs", expanded=False):
+        emails = store.list_admin_emails()
+        st.write(", ".join(emails) if emails else "Aucun admin listé.")
+        with st.form("add_admin_form", clear_on_submit=True):
+            nouvel_email = st.text_input("Email à promouvoir administrateur")
+            if st.form_submit_button("Ajouter"):
+                if admin_store.add_admin_by_email(nouvel_email.strip()):
+                    st.success(f"{nouvel_email} est désormais administrateur.")
+                    st.rerun()
                 else:
-                    emoji, couleur = default_visual(lieu.nom, donnees)
-                    st.markdown(_vignette_html(emoji, couleur), unsafe_allow_html=True)
+                    st.error("Aucun compte trouvé avec cet email (l'utilisateur doit s'être déjà connecté "
+                              "au moins une fois).")
 
-            with col_info:
-                st.markdown(f"### {lieu.nom}")
-                st.caption(
-                    f"{lieu.pays or 'pays non renseigné'} — {lieu.region or 'région non renseignée'} · "
-                    f"{fiche['nombre_contributeurs']} contributeur(s)"
-                )
-                if derive:
-                    st.write(donnees.get("resume", ""))
-                    if derive.lien_externe:
-                        st.markdown(f"[🔗 Fiche externe]({derive.lien_externe})")
+    with st.expander("Campagnes prioritaires (recensement ciblé)", expanded=False):
+        st.caption("Pendant leur fenêtre active, les champs listés sont proposés en priorité dans "
+                    "l'entretien, avant la suite normale du questionnaire.")
+        campagnes = store.list_campagnes_prioritaires()
+        if campagnes:
+            for c in campagnes:
+                col1, col2 = st.columns([5, 1])
+                with col1:
+                    st.markdown(f"**{c.titre}** · {c.date_debut[:10]} → {c.date_fin[:10]} "
+                                f"· {len(c.champ_ids)} champ(s)")
+                    if c.description:
+                        st.caption(c.description)
+                with col2:
+                    if st.button("Supprimer", key=f"del_campagne_{c.id}"):
+                        admin_store.delete_campagne_prioritaire(c.id)
+                        st.rerun()
+        else:
+            st.caption("Aucune campagne prioritaire pour l'instant.")
+
+        tous_les_champs = {f.id: f"{f.id} — {f.label}" for _, _, f in all_fields()}
+        with st.form("nouvelle_campagne_form", clear_on_submit=True):
+            titre = st.text_input("Titre de la campagne")
+            description = st.text_area("Description (optionnel)")
+            champ_ids = st.multiselect("Champs prioritaires", options=list(tous_les_champs.keys()),
+                                        format_func=lambda cid: tous_les_champs[cid])
+            col1, col2 = st.columns(2)
+            with col1:
+                date_debut = st.date_input("Début")
+            with col2:
+                date_fin = st.date_input("Fin")
+            if st.form_submit_button("Créer la campagne"):
+                if not titre or not champ_ids:
+                    st.error("Titre et au moins un champ sont requis.")
                 else:
-                    st.info("Pas encore de synthèse générée pour ce lieu.")
+                    from src.db.store import CampagnePrioritaire
+                    admin_store.save_campagne_prioritaire(CampagnePrioritaire(
+                        titre=titre, description=description or None, champ_ids=champ_ids,
+                        date_debut=date_debut.isoformat(), date_fin=date_fin.isoformat(), cree_par=user_id,
+                    ))
+                    st.success("Campagne créée.")
+                    st.rerun()
 
-            with col_actions:
-                bouton_label = "Ré-enrichir" if derive else "Finaliser ce lieu"
-                if st.button(bouton_label, key=f"enrich_{lieu.id}", use_container_width=True):
-                    _lancer_enrichissement(store, lieu)
-                if st.button("Continuer à nourrir ce lieu", key=f"nourrir_{lieu.id}", use_container_width=True):
-                    st.session_state["preselect_lieu"] = lieu.nom
-                    st.session_state["preselect_role"] = "steward"
-                    st.toast(f"« {lieu.nom} » sélectionné — rendez-vous dans l'onglet Entretien.", icon="🌱")
-
-            if derive:
-                st.divider()
-                cols = st.columns(3)
-                for i, (cle, titre) in enumerate(SECTIONS_SYNTHESE[1:]):  # sans "resume", déjà affiché
-                    texte = donnees.get(cle) or "—"
-                    with cols[i % 3]:
-                        st.markdown(f"**{titre}**")
-                        st.caption(texte)
-                        sources = source_items_for_section(store, lieu.id, cle, derive)
-                        if sources:
-                            with st.popover("Sources", use_container_width=True):
-                                for s in sources:
-                                    st.markdown(f"**{s['label']}** : {s['valeur']}")
-
-                with st.expander("Modifier le lien externe / la photo"):
-                    with st.form(f"liens_{lieu.id}"):
-                        nouveau_lien = st.text_input("Lien externe (ex. fiche tiers-lieux.xyz)",
-                                                      value=derive.lien_externe or "")
-                        nouvelle_photo = st.text_input("URL de la photo",
-                                                        value=derive.photo_url or "")
-                        if st.form_submit_button("Enregistrer"):
-                            store.update_lieu_derive_liens(lieu.id, nouveau_lien or None, nouvelle_photo or None)
-                            st.rerun()
-
-            with st.expander("Voir toutes les réponses brutes et témoignages"):
-                for label, entries in fiche["par_champ"].items():
-                    valeurs = ", ".join(str(e["valeur"]) for e in entries)
-                    st.markdown(f"**{label}** : {valeurs}")
-                if fiche["temoignages"]:
-                    st.markdown("**Témoignages libres**")
-                    for t in fiche["temoignages"]:
-                        st.markdown(f"> {t['texte']}")
+    with st.expander("Schéma de l'entretien (lecture seule)", expanded=False):
+        for module in QUESTIONNAIRE:
+            st.markdown(f"#### {module.title} {'· optionnel' if module.optional else '· obligatoire'}")
+            for section in module.sections:
+                cond = _condition_text(section.condition)
+                titre_section = f"{section.title}" + (f" — actif si {cond}" if cond else "")
+                with st.expander(titre_section):
+                    for f in section.fields:
+                        roles = ", ".join(r.value for r in f.roles) if f.roles else "tous rôles"
+                        fcond = _condition_text(f.condition)
+                        ligne = f"`{f.id}` — {f.label} ({f.type.value}, {roles}"
+                        ligne += ", requis)" if f.required else ")"
+                        if fcond:
+                            ligne += f" — actif si {fcond}"
+                        st.markdown(ligne)
 
 
 def rag_tab(store):
@@ -360,15 +575,31 @@ def main():
     else:
         supabase_client = st.session_state.get("supabase_client") if SUPABASE_CONFIGURED else None
         store = get_store(client=supabase_client)
-    nom_lieu, role = sidebar_lieu_et_role(store, user_id)
 
-    tab_entretien, tab_rag, tab_annuaire = st.tabs(["Entretien", "Assistant RAG", "Annuaire"])
-    with tab_entretien:
+    if st.sidebar.button("Se déconnecter"):
+        clear_session_cookie()
+        for key in ("user_id", "otp_sent_to", "cookie_restore_failed", "use_admin_store", "supabase_client"):
+            st.session_state.pop(key, None)
+        st.rerun()
+
+    nom_lieu, role = sidebar_lieu_et_role(store, user_id)
+    # En LOCAL_DEV_AUTOLOGIN, le store est déjà admin (service_role) : pas de
+    # table `admins` à consulter, l'accès complet est déjà acquis par construction.
+    est_admin = bool(st.session_state.get("use_admin_store")) or store.is_admin(user_id)
+
+    onglets = ["Entretien", "Assistant RAG", "Annuaire"]
+    if est_admin:
+        onglets.append("Administration")
+    tabs = st.tabs(onglets)
+    with tabs[0]:
         entretien_tab(store, user_id, nom_lieu, role)
-    with tab_rag:
+    with tabs[1]:
         rag_tab(store)
-    with tab_annuaire:
-        annuaire_tab(store)
+    with tabs[2]:
+        annuaire_tab(store, est_admin)
+    if est_admin:
+        with tabs[3]:
+            administration_tab(store, user_id)
 
 
 if __name__ == "__main__":

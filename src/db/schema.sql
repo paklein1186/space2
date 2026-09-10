@@ -68,7 +68,30 @@ create table if not exists lieu_derive (
     corrections_manuelles jsonb,
     lien_externe text,               -- renseigné manuellement (ex. fiche tiers-lieux.xyz)
     photo_url text,                  -- renseigné manuellement
+    inclus_portfolio boolean not null default false,  -- sélection admin pour la vitrine publique
+    campagne_texte text,             -- appel/campagne de besoins (Portfolio public)
+    campagne_objectif text,
+    campagne_contact text,
     genere_le timestamptz not null default now()
+);
+
+-- Comptes admin (global, pas lié à un lieu) : peuvent nommer d'autres admins,
+-- curer le Portfolio, gérer les campagnes prioritaires.
+create table if not exists admins (
+    user_id uuid primary key references auth.users(id),
+    cree_le timestamptz not null default now()
+);
+
+-- Campagnes de collecte ciblée (fenêtre temporelle), définies par un admin.
+create table if not exists campagnes_prioritaires (
+    id uuid primary key default gen_random_uuid(),
+    titre text not null,
+    description text,
+    champ_ids jsonb not null default '[]'::jsonb,
+    date_debut timestamptz not null,
+    date_fin timestamptz not null,
+    cree_par uuid references auth.users(id),
+    cree_le timestamptz not null default now()
 );
 
 -- Traçabilité et suivi des coûts de chaque appel LLM.
@@ -100,6 +123,22 @@ alter table reponses enable row level security;
 alter table notes_libres enable row level security;
 alter table lieu_derive enable row level security;
 alter table llm_calls enable row level security;
+alter table admins enable row level security;
+alter table campagnes_prioritaires enable row level security;
+
+create policy "chacun voit s'il est admin" on admins for select using (user_id = auth.uid());
+
+create policy "lecture publique campagnes" on campagnes_prioritaires for select using (true);
+create policy "authentifie gere campagnes" on campagnes_prioritaires
+    for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+
+-- Observatoire et Portfolio sont des pages publiques (sans connexion) : lecture
+-- ouverte à tous sur tiers_lieux/lieu_derive (contenu déjà pensé comme une
+-- synthèse partageable), et sur reponses uniquement si non confidentiel.
+create policy "lecture publique tiers_lieux" on tiers_lieux for select using (true);
+create policy "lecture publique lieu_derive" on lieu_derive for select using (true);
+create policy "lecture publique reponses non confidentielles" on reponses
+    for select using (confidentiel = false);
 
 create policy "lecture publique des lieux" on tiers_lieux
     for select using (auth.role() = 'authenticated');

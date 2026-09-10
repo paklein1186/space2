@@ -86,7 +86,7 @@ def _load_catalog() -> dict:
     return {"datasets": {}, "geodata": {}}
 
 
-def _reponses_long_dataframe(store: Store) -> pd.DataFrame:
+def reponses_long_dataframe(store: Store) -> pd.DataFrame:
     """Vue longue et interrogeable des réponses collectées par l'agent
     d'entretien : une ligne par (lieu, contributeur, champ, valeur)."""
     rows = []
@@ -106,7 +106,7 @@ def _reponses_long_dataframe(store: Store) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def _lieux_enrichis_dataframe(store: Store) -> pd.DataFrame:
+def lieux_enrichis_dataframe(store: Store) -> pd.DataFrame:
     """Vue plate des données dérivées (1 ligne par lieu) : utile pour filtrer
     par mots-clés/enjeux/activités sans passer par la recherche vectorielle."""
     rows = []
@@ -158,9 +158,9 @@ class RagToolHandler:
 
     def _load_dataframe(self, dataset_name: str) -> Optional[pd.DataFrame]:
         if dataset_name == "reponses_tiers_lieux":
-            return _reponses_long_dataframe(self.store)
+            return reponses_long_dataframe(self.store)
         if dataset_name == "lieux_enrichis":
-            return _lieux_enrichis_dataframe(self.store)
+            return lieux_enrichis_dataframe(self.store)
         catalog = _load_catalog()
         entry = catalog.get("datasets", {}).get(dataset_name)
         if not entry:

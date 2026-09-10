@@ -21,21 +21,22 @@ from anthropic import Anthropic
 
 from ..annuaire import field_label
 from ..db.store import LieuDerive, Store
+from ..questionnaire.schema import CATEGORIES_POSSIBLES
 from .embeddings import VoyageEmbedder
 from .usage import log_usage
 from .vectorstore import ChromaStore
 
 MODEL = "claude-haiku-4-5"
-PROMPT_VERSION = "enrichissement-v2"
+PROMPT_VERSION = "enrichissement-v3"
 
 CHAMPS_DERIVES = [
     "resume", "activites", "publics", "territoire", "gouvernance", "ressources",
     "besoins", "modele_economique", "partenaires", "competences", "projets",
-    "enjeux", "mots_cles",
+    "enjeux", "mots_cles", "categories",
 ]
-# Sections soumises à la longueur homogène (résumé et mots-clés en sont exclus :
-# nature différente, pas comparable section à section dans l'Annuaire).
-CHAMPS_LONGUEUR_CIBLE = [c for c in CHAMPS_DERIVES if c not in ("resume", "mots_cles")]
+# Sections soumises à la longueur homogène (resume/mots_cles/categories en sont
+# exclus : nature différente, pas comparable section à section dans l'Annuaire).
+CHAMPS_LONGUEUR_CIBLE = [c for c in CHAMPS_DERIVES if c not in ("resume", "mots_cles", "categories")]
 LONGUEUR_CIBLE_MIN = 150
 LONGUEUR_CIBLE_MAX = 220
 
@@ -63,8 +64,12 @@ NOTES LIBRES (identifiées note_0, note_1...) :
 - projets : projets en cours ou à venir mentionnés
 - enjeux : enjeux ou défis principaux identifiés
 - mots_cles : liste de 5-10 mots-clés pertinents pour la recherche
+- categories : liste (0 à {nb_categories} éléments) parmi EXACTEMENT ces valeurs :
+  {categories_possibles} — uniquement celles qui correspondent clairement aux activités du
+  lieu (un lieu peut en avoir plusieurs, ou aucune si rien ne correspond). N'utilise aucune
+  autre valeur que celles listées.
 
-Pour LES 11 SECTIONS ci-dessus SAUF resume et mots_cles : vise impérativement une longueur
+Pour LES 11 SECTIONS ci-dessus SAUF resume, mots_cles et categories : vise impérativement une longueur
 homogène de {longueur_min} à {longueur_max} caractères chacune (ni plus court, ni plus long) —
 ces synthèses seront affichées côte à côte dans des cartes de taille identique, l'homogénéité
 compte plus que l'exhaustivité. Si une section manque d'information, dis-le en une phrase courte
@@ -140,6 +145,8 @@ def enrich_lieu(store: Store, tiers_lieu_id: str, force: bool = False, nom_lieu:
         notes_texte=_format_notes(notes),
         longueur_min=LONGUEUR_CIBLE_MIN,
         longueur_max=LONGUEUR_CIBLE_MAX,
+        nb_categories=len(CATEGORIES_POSSIBLES),
+        categories_possibles=", ".join(CATEGORIES_POSSIBLES),
     )
     client = Anthropic()
     response = client.messages.create(
@@ -159,6 +166,9 @@ def enrich_lieu(store: Store, tiers_lieu_id: str, force: bool = False, nom_lieu:
     profil_texte = data.pop("profil_semantique_texte", "")
     sources = data.pop("sources", None)
     donnees = {k: data.get(k) for k in CHAMPS_DERIVES}
+    # Filtre défensif : ne garder que des catégories réellement dans la liste
+    # autorisée, au cas où le modèle en invente une malgré la consigne.
+    donnees["categories"] = [c for c in (donnees.get("categories") or []) if c in CATEGORIES_POSSIBLES]
 
     lieu_derive = LieuDerive(
         tiers_lieu_id=tiers_lieu_id,

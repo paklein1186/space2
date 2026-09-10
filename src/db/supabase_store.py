@@ -7,7 +7,7 @@ from typing import Optional
 
 from supabase import Client, create_client
 
-from .store import Contributeur, LieuDerive, SessionEntretien, Store, TiersLieu
+from .store import CampagnePrioritaire, Contributeur, LieuDerive, SessionEntretien, Store, TiersLieu
 
 
 def _to_dataclass(cls, row: dict):
@@ -194,3 +194,92 @@ class SupabaseStore(Store):
             "tokens_out": tokens_out,
             "cout_estime": cout_estime,
         }).execute()
+
+    # -- administration --------------------------------------------------
+    # add_admin_by_email nécessite l'API Admin Supabase (recherche par email)
+    # -> n'appeler ces méthodes de curation que sur un store construit via
+    # get_admin_store() (clé service_role), après avoir vérifié is_admin()
+    # côté appelant avec le store normal de l'utilisateur.
+
+    def is_admin(self, user_id: str) -> bool:
+        try:
+            result = self.client.table("admins").select("user_id").eq("user_id", user_id).execute()
+        except Exception:
+            # La table `admins` (migration_002) peut ne pas encore exister sur ce
+            # projet Supabase — dégrader en "pas admin" plutôt que de faire
+            # planter l'app pour TOUS les utilisateurs (cet appel est fait à
+            # chaque chargement de page, pas seulement pour les admins).
+            return False
+        return bool(result.data)
+
+    def add_admin_by_email(self, email: str) -> bool:
+        users = self.client.auth.admin.list_users()
+        match = next((u for u in users if (u.email or "").lower() == email.strip().lower()), None)
+        if not match:
+            return False
+        self.client.table("admins").upsert({"user_id": match.id}, on_conflict="user_id").execute()
+        return True
+
+    def list_admin_emails(self) -> list:
+        try:
+            admin_rows = self.client.table("admins").select("user_id").execute().data
+        except Exception:
+            return []
+        if not admin_rows:
+            return []
+        users = self.client.auth.admin.list_users()
+        by_id = {u.id: u.email for u in users}
+        return [by_id.get(r["user_id"], r["user_id"]) for r in admin_rows]
+
+    def update_portfolio_entry(self, tiers_lieu_id: str, inclus_portfolio: bool,
+                                campagne_texte: Optional[str], campagne_objectif: Optional[str],
+                                campagne_contact: Optional[str]) -> None:
+        self.client.table("lieu_derive").update({
+            "inclus_portfolio": inclus_portfolio,
+            "campagne_texte": campagne_texte,
+            "campagne_objectif": campagne_objectif,
+            "campagne_contact": campagne_contact,
+        }).eq("tiers_lieu_id", tiers_lieu_id).execute()
+
+    def list_lieux_portfolio(self) -> list:
+        try:
+            derive_rows = (
+                self.client.table("lieu_derive").select("tiers_lieu_id").eq("inclus_portfolio", True).execute()
+            )
+        except Exception:
+            # Colonne absente avant migration_002 : Portfolio vide plutôt qu'une
+            # page publique qui plante.
+            return []
+        ids = [r["tiers_lieu_id"] for r in derive_rows.data]
+        if not ids:
+            return []
+        result = self.client.table("tiers_lieux").select("*").in_("id", ids).execute()
+        return [_to_dataclass(TiersLieu, row) for row in result.data]
+
+    def save_campagne_prioritaire(self, campagne: CampagnePrioritaire) -> None:
+        payload = {
+            "titre": campagne.titre,
+            "description": campagne.description,
+            "champ_ids": campagne.champ_ids,
+            "date_debut": campagne.date_debut,
+            "date_fin": campagne.date_fin,
+            "cree_par": campagne.cree_par,
+        }
+        if campagne.id:
+            payload["id"] = campagne.id
+            self.client.table("campagnes_prioritaires").upsert(payload, on_conflict="id").execute()
+        else:
+            self.client.table("campagnes_prioritaires").insert(payload).execute()
+
+    def list_campagnes_prioritaires(self) -> list:
+        try:
+            result = self.client.table("campagnes_prioritaires").select("*").execute()
+        except Exception:
+            # Table absente avant migration_002 : dégrader en "aucune campagne"
+            # plutôt que de faire planter chaque session d'entretien (appelé à
+            # l'initialisation de CollecteToolHandler pour tout le monde).
+            return []
+        return [_to_dataclass(CampagnePrioritaire, row) for row in result.data]
+
+    def delete_campagne_prioritaire(self, campagne_id: str) -> None:
+        self.client.table("campagnes_prioritaires").delete().eq("id", campagne_id).execute()
