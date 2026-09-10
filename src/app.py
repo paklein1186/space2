@@ -68,24 +68,35 @@ def _capture_magic_link_redirect() -> None:
     )
 
 
-def _consume_magic_link_query_params(client) -> str | None:
+def _consume_magic_link_query_params(client) -> None:
     """Si l'URL contient access_token/refresh_token (déposés par le script
     ci-dessus après le clic sur le lien magique), pose la session Supabase et
-    renvoie l'id utilisateur. Nettoie l'URL ensuite pour ne pas garder le
-    token affiché ni le retraiter à chaque rerun."""
+    mémorise l'utilisateur dans st.session_state — AVANT de nettoyer l'URL.
+
+    Ordre important : `st.query_params.clear()` peut déclencher un rerun de
+    Streamlit avant même d'atteindre l'instruction suivante. Si l'id
+    utilisateur n'était pas déjà en session_state à ce moment-là, ce rerun
+    repartait du formulaire de connexion — la session Supabase était bien
+    établie côté client, mais Streamlit "l'oubliait" aussitôt, d'où la
+    boucle infinie."""
     params = st.query_params
     access_token = params.get("access_token")
     refresh_token = params.get("refresh_token")
     if not access_token or not refresh_token:
-        return None
+        return
     try:
         result = client.auth.set_session(access_token, refresh_token)
     except Exception as exc:
         st.query_params.clear()
         st.error(f"Le lien de connexion est invalide ou expiré : {exc}. Redemandez-en un nouveau ci-dessous.")
-        return None
+        return
+    if not result.user:
+        st.query_params.clear()
+        st.error("La session n'a pas pu être établie (réponse Supabase sans utilisateur). Redemandez un lien.")
+        return
+    st.session_state["user_id"] = result.user.id  # mémorisé AVANT le clear()
     st.query_params.clear()
-    return result.user.id if result.user else None
+    st.rerun()
 
 
 def auth_screen() -> str | None:
@@ -113,10 +124,7 @@ def auth_screen() -> str | None:
 
     client = _supabase_client()
     _capture_magic_link_redirect()
-    user_id = _consume_magic_link_query_params(client)
-    if user_id:
-        st.session_state["user_id"] = user_id
-        st.rerun()
+    _consume_magic_link_query_params(client)
 
     if "magic_link_sent_to" not in st.session_state:
         with st.form("magic_link_form"):
