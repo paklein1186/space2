@@ -23,13 +23,16 @@ class Role(str, Enum):
     EQUIPE = "equipe"
     PARTENAIRE = "partenaire"
     USAGER = "usager"
+    STEWARD = "steward"  # suit et continue à nourrir un lieu dans la durée
     AUTRE = "autre"
 
 
 # Rôles pouvant voir/répondre aux champs sensibles (finances, RH détaillée).
-ROLES_INTERNES = [Role.FONDATEUR, Role.EQUIPE]
+# Le steward a le même accès large que l'équipe : il reprend le lieu en main
+# et a besoin du contexte complet pour continuer à l'enrichir utilement.
+ROLES_INTERNES = [Role.FONDATEUR, Role.EQUIPE, Role.STEWARD]
 # Rôles pouvant voir/répondre à peu près à tout le reste.
-TOUS_ROLES = [Role.FONDATEUR, Role.EQUIPE, Role.PARTENAIRE, Role.USAGER, Role.AUTRE]
+TOUS_ROLES = [Role.FONDATEUR, Role.EQUIPE, Role.PARTENAIRE, Role.USAGER, Role.STEWARD, Role.AUTRE]
 
 
 class FieldType(str, Enum):

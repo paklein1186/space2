@@ -19,7 +19,7 @@ create table if not exists contributeurs (
     id uuid primary key default gen_random_uuid(),
     user_id uuid not null references auth.users(id),
     tiers_lieu_id uuid not null references tiers_lieux(id) on delete cascade,
-    role text not null check (role in ('fondateur', 'equipe', 'partenaire', 'usager', 'autre')),
+    role text not null check (role in ('fondateur', 'equipe', 'partenaire', 'usager', 'steward', 'autre')),
     cree_le timestamptz not null default now(),
     unique (user_id, tiers_lieu_id, role)
 );
@@ -59,12 +59,15 @@ create table if not exists notes_libres (
 create table if not exists lieu_derive (
     tiers_lieu_id uuid primary key references tiers_lieux(id) on delete cascade,
     donnees jsonb not null,
+    sources jsonb,                  -- {section: [champ_id, ...]} — provenance de chaque synthèse
     profil_semantique_texte text not null,
     prompt_version text not null,
     model text not null,
     source_hash text not null,
     valide_manuellement boolean not null default false,
     corrections_manuelles jsonb,
+    lien_externe text,               -- renseigné manuellement (ex. fiche tiers-lieux.xyz)
+    photo_url text,                  -- renseigné manuellement
     genere_le timestamptz not null default now()
 );
 

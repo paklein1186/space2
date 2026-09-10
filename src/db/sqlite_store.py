@@ -57,12 +57,15 @@ create table if not exists notes_libres (
 create table if not exists lieu_derive (
     tiers_lieu_id text primary key,
     donnees text not null,
+    sources text,
     profil_semantique_texte text not null,
     prompt_version text not null,
     model text not null,
     source_hash text not null,
     valide_manuellement integer not null default 0,
     corrections_manuelles text,
+    lien_externe text,
+    photo_url text,
     genere_le text not null default (datetime('now'))
 );
 create table if not exists llm_calls (
@@ -225,17 +228,22 @@ class SqliteStore(Store):
     # -- donnée dérivée (jamais dans reponses) --------------------------------------------------
 
     def save_lieu_derive(self, lieu_derive: LieuDerive) -> None:
+        # lien_externe/photo_url ne sont jamais touchés ici : ce sont des champs
+        # édités manuellement (voir update_lieu_derive_liens), indépendants du
+        # cycle de (ré)enrichissement automatique.
         self.conn.execute(
-            "insert into lieu_derive (tiers_lieu_id, donnees, profil_semantique_texte, "
+            "insert into lieu_derive (tiers_lieu_id, donnees, sources, profil_semantique_texte, "
             "prompt_version, model, source_hash, valide_manuellement, corrections_manuelles) "
-            "values (?, ?, ?, ?, ?, ?, ?, ?) "
+            "values (?, ?, ?, ?, ?, ?, ?, ?, ?) "
             "on conflict(tiers_lieu_id) do update set donnees = excluded.donnees, "
+            "sources = excluded.sources, "
             "profil_semantique_texte = excluded.profil_semantique_texte, "
             "prompt_version = excluded.prompt_version, model = excluded.model, "
             "source_hash = excluded.source_hash, genere_le = datetime('now')",
             (
                 lieu_derive.tiers_lieu_id,
                 json.dumps(lieu_derive.donnees, ensure_ascii=False),
+                json.dumps(lieu_derive.sources, ensure_ascii=False) if lieu_derive.sources else None,
                 lieu_derive.profil_semantique_texte,
                 lieu_derive.prompt_version,
                 lieu_derive.model,
@@ -257,6 +265,7 @@ class SqliteStore(Store):
         return LieuDerive(
             tiers_lieu_id=data["tiers_lieu_id"],
             donnees=json.loads(data["donnees"]),
+            sources=json.loads(data["sources"]) if data["sources"] else None,
             profil_semantique_texte=data["profil_semantique_texte"],
             prompt_version=data["prompt_version"],
             model=data["model"],
@@ -264,8 +273,18 @@ class SqliteStore(Store):
             valide_manuellement=bool(data["valide_manuellement"]),
             corrections_manuelles=json.loads(data["corrections_manuelles"])
             if data["corrections_manuelles"] else None,
+            lien_externe=data["lien_externe"],
+            photo_url=data["photo_url"],
             genere_le=data["genere_le"],
         )
+
+    def update_lieu_derive_liens(self, tiers_lieu_id: str, lien_externe: Optional[str],
+                                  photo_url: Optional[str]) -> None:
+        self.conn.execute(
+            "update lieu_derive set lien_externe = ?, photo_url = ? where tiers_lieu_id = ?",
+            (lien_externe, photo_url, tiers_lieu_id),
+        )
+        self.conn.commit()
 
     # -- suivi des coûts LLM --------------------------------------------------
 

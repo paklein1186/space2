@@ -150,9 +150,12 @@ class SupabaseStore(Store):
         return result.data
 
     def save_lieu_derive(self, lieu_derive: LieuDerive) -> None:
+        # lien_externe/photo_url ne sont jamais touchés ici : édités manuellement
+        # via update_lieu_derive_liens, indépendants du cycle d'enrichissement.
         self.client.table("lieu_derive").upsert({
             "tiers_lieu_id": lieu_derive.tiers_lieu_id,
             "donnees": lieu_derive.donnees,
+            "sources": lieu_derive.sources,
             "profil_semantique_texte": lieu_derive.profil_semantique_texte,
             "prompt_version": lieu_derive.prompt_version,
             "model": lieu_derive.model,
@@ -168,6 +171,13 @@ class SupabaseStore(Store):
         if not result.data:
             return None
         return _to_dataclass(LieuDerive, result.data[0])
+
+    def update_lieu_derive_liens(self, tiers_lieu_id: str, lien_externe: Optional[str],
+                                  photo_url: Optional[str]) -> None:
+        self.client.table("lieu_derive").update({
+            "lien_externe": lien_externe,
+            "photo_url": photo_url,
+        }).eq("tiers_lieu_id", tiers_lieu_id).execute()
 
     def log_llm_call(self, type_appel: str, model: str, tokens_in: int, tokens_out: int,
                       cout_estime: float, tiers_lieu_id: Optional[str] = None) -> None:

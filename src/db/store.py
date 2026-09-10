@@ -51,8 +51,11 @@ class LieuDerive:
     prompt_version: str
     model: str
     source_hash: str
+    sources: Optional[dict] = None  # {section: [champ_id, ...]} — provenance par section
     valide_manuellement: bool = False
     corrections_manuelles: Optional[dict] = None
+    lien_externe: Optional[str] = None
+    photo_url: Optional[str] = None
     genere_le: Optional[str] = None
 
 
@@ -102,6 +105,13 @@ class Store(ABC):
 
     @abstractmethod
     def get_lieu_derive(self, tiers_lieu_id: str) -> Optional[LieuDerive]: ...
+
+    @abstractmethod
+    def update_lieu_derive_liens(self, tiers_lieu_id: str, lien_externe: Optional[str],
+                                  photo_url: Optional[str]) -> None:
+        """Met à jour uniquement lien_externe/photo_url (édition manuelle depuis
+        l'Annuaire), sans toucher au reste de la donnée dérivée."""
+        ...
 
     @abstractmethod
     def log_llm_call(self, type_appel: str, model: str, tokens_in: int, tokens_out: int,

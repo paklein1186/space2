@@ -26,9 +26,15 @@ tiers-lieu — pas de faire remplir un formulaire.
 Règles :
 - Utilise le tool `get_current_section` pour savoir quelles questions poser, et
   seulement celles-ci. Ne les lis jamais telles quelles : reformule-les
-  naturellement, adapte le ton à ce que le répondant vient de dire, et
-  regroupe plusieurs petites questions dans un même message quand c'est
-  naturel de le faire.
+  naturellement, adapte le ton à ce que le répondant vient de dire.
+- UNE SEULE question à la fois, jamais plusieurs regroupées dans un même
+  message — même si `get_current_section` en renvoie plusieurs d'un coup.
+  Pose la première, attends la réponse, enchaîne sur la suivante.
+- Quand tu commences une nouvelle section (nouveau thème : activités,
+  gouvernance, foncier, modèle économique...), annonce brièvement le thème
+  avant la première question de cette section (une phrase, pas un
+  paragraphe) — ex. "Passons maintenant aux activités du lieu." Fais-le
+  uniquement au changement de section, pas à chaque question.
 - Un champ n'apparaissant pas dans `get_current_section` ne doit jamais être
   posé (il a été exclu car non pertinent pour ce rôle, ce pays, ou l'état
   actuel des réponses).
@@ -39,12 +45,17 @@ Règles :
   aucun champ précis (anecdote, ressenti, contexte), capture-le avec
   `save_free_text_note` sans interrompre le fil de la conversation.
 - Quand une section est terminée, enchaîne naturellement sur la suivante
-  sans redemander la permission à chaque fois.
+  (avec son annonce de thème) sans redemander la permission à chaque fois.
 - Quand un module optionnel est proposé (Impact ou Diagnostic), demande
   explicitement au répondant s'il souhaite continuer ; utilise
   `skip_optional_module` s'il décline.
 - Le répondant peut interrompre à tout moment ; ne redemande jamais une
   information déjà enregistrée précédemment.
+- Si un résumé de ce qui est déjà connu sur ce lieu t'est fourni en début de
+  conversation, commence par le restituer brièvement (2-3 phrases) pour que
+  le répondant sache d'où l'entretien repart, avant d'enchaîner sur la
+  section suivante — ne redemande jamais une information déjà présente dans
+  ce résumé.
 - Reste chaleureux et concret, comme un entretien mené par une personne qui
   s'intéresse sincèrement au projet — pas comme un robot qui lit un script.
 """
@@ -94,6 +105,23 @@ class CollecteAgent:
             self.messages.append({"role": "user", "content": tool_results})
 
 
+def opening_message(store, tiers_lieu_id: str) -> str:
+    """Message d'ouverture envoyé à l'agent pour démarrer la conversation.
+    Si une donnée dérivée existe déjà pour ce lieu (reprise en tant que
+    steward ou nouveau contributeur sur un lieu déjà avancé), on l'inclut
+    pour que l'agent restitue un micro-résumé avant d'enchaîner sur les
+    questions encore ouvertes plutôt que de repartir de zéro."""
+    derive = store.get_lieu_derive(tiers_lieu_id)
+    if derive and derive.donnees.get("resume"):
+        return (
+            "Je reprends l'entretien sur un lieu déjà partiellement documenté. "
+            f"Voici ce qu'on sait déjà : {derive.donnees['resume']}\n\n"
+            "Restitue ce résumé en 2-3 phrases pour le répondant afin qu'il sache d'où on "
+            "repart, puis enchaîne sur les informations encore manquantes."
+        )
+    return "Bonjour, je suis prêt à commencer l'entretien."
+
+
 def build_agent(lieu_nom: str, pays: str, role_str: str, owner_user_id: str = "cli-user") -> CollecteAgent:
     store = get_admin_store()
     tiers_lieu = store.get_or_create_tiers_lieu(owner_user_id, lieu_nom)
@@ -123,7 +151,7 @@ def main():
     print(f"Entretien démarré pour '{args.lieu}' ({args.pays}), rôle: {args.role}.")
     print("Tapez 'exit' pour quitter (la session reprendra où vous l'avez laissée).\n")
 
-    opening = agent.send("Bonjour, je suis prêt à commencer l'entretien.")
+    opening = agent.send(opening_message(agent.store, agent.tiers_lieu_id))
     print(f"Agent: {opening}\n")
 
     while True:
