@@ -21,7 +21,7 @@ from src.agent.collecte_agent import CollecteAgent, opening_message
 from src.agent.collecte_tools import CollecteToolHandler
 from src.annuaire import (
     SECTIONS_SYNTHESE,
-    build_annuaire,
+    build_fiche_lieu,
     default_visual,
     lieux_avec_coordonnees,
     source_items_for_section,
@@ -263,21 +263,20 @@ def entretien_tab(store, user_id: str, nom_lieu: str, role: str):
         st.rerun()
 
 
-def _auto_enrich_all(store, fiches) -> None:
-    """Ré-enrichissement automatique et silencieux : plus de bouton manuel.
-    `enrich_lieu` est idempotent (compare le hash des réponses source) donc
-    ne rappelle le LLM que si quelque chose a réellement changé depuis la
-    dernière synthèse — appeler ceci à chaque ouverture de l'Annuaire est
-    donc peu coûteux dans le cas courant (déjà à jour)."""
+def _auto_enrich_one(store, lieu) -> None:
+    """Ré-enrichissement automatique et silencieux d'UN SEUL lieu : plus de
+    bouton manuel. `enrich_lieu` est idempotent (compare le hash des réponses
+    source), donc peu coûteux dans le cas courant (déjà à jour) — appelé à
+    l'ouverture de la fiche d'un lieu, jamais pour toute la grille d'un coup
+    (24 lieux × 2 requêtes + hash à chaque affichage de l'Annuaire rendait la
+    page très lente)."""
     if not (os.environ.get("ANTHROPIC_API_KEY") and RAG_DISPONIBLE):
         return
     from src.agent.enrichissement import enrich_lieu
-    for fiche in fiches:
-        lieu = fiche["tiers_lieu"]
-        try:
-            enrich_lieu(store, lieu.id, force=False, nom_lieu=lieu.nom)
-        except Exception:
-            pass  # une synthèse en échec ne doit jamais bloquer l'affichage de l'Annuaire
+    try:
+        enrich_lieu(store, lieu.id, force=False, nom_lieu=lieu.nom)
+    except Exception:
+        pass  # une synthèse en échec ne doit jamais bloquer l'affichage de la fiche
 
 
 def _vignette_html(emoji: str, couleur: str, hauteur: str = "9rem") -> str:
@@ -307,6 +306,11 @@ def _category_chips_html(categories: list) -> str:
 @st.dialog("Fiche du lieu", width="large")
 def _fiche_dialog(store, fiche, est_admin: bool, user_id: str):
     lieu = fiche["tiers_lieu"]
+    if "fiche_enrichie" not in st.session_state:
+        st.session_state["fiche_enrichie"] = set()
+    if lieu.id not in st.session_state["fiche_enrichie"]:
+        _auto_enrich_one(store, lieu)
+        st.session_state["fiche_enrichie"].add(lieu.id)
     derive = store.get_lieu_derive(lieu.id)
     donnees = derive.donnees if derive else {}
 
@@ -451,14 +455,19 @@ def _historique_et_moderation(store, lieu, contributeurs_lieu: list, est_admin: 
 
 def annuaire_tab(store, est_admin: bool, user_id: str):
     st.subheader("Annuaire des lieux recensés")
-    fiches = build_annuaire(store)
-    if not fiches:
+    lieux = store.list_tiers_lieux()
+    if not lieux:
         st.info("Aucun lieu recensé pour l'instant.")
         return
 
-    if "annuaire_auto_enriched" not in st.session_state:
-        _auto_enrich_all(store, fiches)
-        st.session_state["annuaire_auto_enriched"] = True
+    # La grille n'a besoin que de list_tiers_lieux + un batch de lieu_derive
+    # (2 requêtes au total) — PAS de build_annuaire/build_fiche_lieu (qui
+    # ajoutait 2 requêtes par lieu, pour des réponses brutes/témoignages qui
+    # ne sont utiles que dans la fiche d'UN lieu ouvert, jamais dans la
+    # grille). C'est cette fiche complète, calculée pour 24+ lieux à chaque
+    # affichage, qui rendait l'Annuaire lent — elle n'est désormais calculée
+    # que pour le lieu réellement ouvert dans le popup.
+    derive_par_lieu = store.get_lieu_derive_batch([l.id for l in lieux])
 
     coords = lieux_avec_coordonnees(store)
     if coords:
@@ -466,28 +475,27 @@ def annuaire_tab(store, est_admin: bool, user_id: str):
 
     filtre_categories = st.multiselect("Filtrer par catégorie", options=CATEGORIES_POSSIBLES)
 
-    fiches_affichees = fiches
+    lieux_affiches = lieux
     if filtre_categories:
-        fiches_affichees = [
-            f for f in fiches
+        lieux_affiches = [
+            l for l in lieux
             if (lambda d: d and set(d.donnees.get("categories") or []) & set(filtre_categories))(
-                store.get_lieu_derive(f["tiers_lieu"].id)
+                derive_par_lieu.get(l.id)
             )
         ]
-    st.caption(f"{len(fiches_affichees)} lieu(x) affiché(s)")
+    st.caption(f"{len(lieux_affiches)} lieu(x) affiché(s)")
 
     if "annuaire_open_lieu_id" in st.session_state:
         lieu_id = st.session_state.pop("annuaire_open_lieu_id")
-        fiche_ouverte = next((f for f in fiches if f["tiers_lieu"].id == lieu_id), None)
-        if fiche_ouverte:
-            _fiche_dialog(store, fiche_ouverte, est_admin, user_id)
+        lieu_ouvert = next((l for l in lieux if l.id == lieu_id), None)
+        if lieu_ouvert:
+            _fiche_dialog(store, build_fiche_lieu(store, lieu_ouvert), est_admin, user_id)
 
     cols_par_ligne = 4
-    for i in range(0, len(fiches_affichees), cols_par_ligne):
+    for i in range(0, len(lieux_affiches), cols_par_ligne):
         cols = st.columns(cols_par_ligne)
-        for col, fiche in zip(cols, fiches_affichees[i:i + cols_par_ligne]):
-            lieu = fiche["tiers_lieu"]
-            derive = store.get_lieu_derive(lieu.id)
+        for col, lieu in zip(cols, lieux_affiches[i:i + cols_par_ligne]):
+            derive = derive_par_lieu.get(lieu.id)
             donnees = derive.donnees if derive else {}
             with col:
                 with st.container(border=True):

@@ -208,6 +208,12 @@ class SupabaseStore(Store):
             return None
         return _to_dataclass(LieuDerive, result.data[0])
 
+    def get_lieu_derive_batch(self, tiers_lieu_ids: list) -> dict:
+        if not tiers_lieu_ids:
+            return {}
+        result = self.client.table("lieu_derive").select("*").in_("tiers_lieu_id", tiers_lieu_ids).execute()
+        return {row["tiers_lieu_id"]: _to_dataclass(LieuDerive, row) for row in result.data}
+
     def update_lieu_derive_liens(self, tiers_lieu_id: str, lien_externe: Optional[str],
                                   photo_url: Optional[str]) -> None:
         self.client.table("lieu_derive").update({

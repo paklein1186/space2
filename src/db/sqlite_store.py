@@ -329,28 +329,16 @@ class SqliteStore(Store):
         row = self.conn.execute(
             "select * from lieu_derive where tiers_lieu_id = ?", (tiers_lieu_id,)
         ).fetchone()
-        if not row:
-            return None
-        data = dict(row)
-        return LieuDerive(
-            tiers_lieu_id=data["tiers_lieu_id"],
-            donnees=json.loads(data["donnees"]),
-            sources=json.loads(data["sources"]) if data["sources"] else None,
-            profil_semantique_texte=data["profil_semantique_texte"],
-            prompt_version=data["prompt_version"],
-            model=data["model"],
-            source_hash=data["source_hash"],
-            valide_manuellement=bool(data["valide_manuellement"]),
-            corrections_manuelles=json.loads(data["corrections_manuelles"])
-            if data["corrections_manuelles"] else None,
-            lien_externe=data["lien_externe"],
-            photo_url=data["photo_url"],
-            inclus_portfolio=bool(data["inclus_portfolio"]),
-            campagne_texte=data["campagne_texte"],
-            campagne_objectif=data["campagne_objectif"],
-            campagne_contact=data["campagne_contact"],
-            genere_le=data["genere_le"],
-        )
+        return _lieu_derive_from_row(dict(row)) if row else None
+
+    def get_lieu_derive_batch(self, tiers_lieu_ids: list) -> dict:
+        if not tiers_lieu_ids:
+            return {}
+        placeholders = ",".join("?" * len(tiers_lieu_ids))
+        rows = self.conn.execute(
+            f"select * from lieu_derive where tiers_lieu_id in ({placeholders})", tiers_lieu_ids
+        ).fetchall()
+        return {r["tiers_lieu_id"]: _lieu_derive_from_row(dict(r)) for r in rows}
 
     def update_lieu_derive_liens(self, tiers_lieu_id: str, lien_externe: Optional[str],
                                   photo_url: Optional[str]) -> None:
@@ -505,6 +493,28 @@ class SqliteStore(Store):
             "update litiges set statut = 'resolu', resolu_le = datetime('now') where id = ?", (litige_id,)
         )
         self.conn.commit()
+
+
+def _lieu_derive_from_row(data: dict) -> LieuDerive:
+    return LieuDerive(
+        tiers_lieu_id=data["tiers_lieu_id"],
+        donnees=json.loads(data["donnees"]),
+        sources=json.loads(data["sources"]) if data["sources"] else None,
+        profil_semantique_texte=data["profil_semantique_texte"],
+        prompt_version=data["prompt_version"],
+        model=data["model"],
+        source_hash=data["source_hash"],
+        valide_manuellement=bool(data["valide_manuellement"]),
+        corrections_manuelles=json.loads(data["corrections_manuelles"])
+        if data["corrections_manuelles"] else None,
+        lien_externe=data["lien_externe"],
+        photo_url=data["photo_url"],
+        inclus_portfolio=bool(data["inclus_portfolio"]),
+        campagne_texte=data["campagne_texte"],
+        campagne_objectif=data["campagne_objectif"],
+        campagne_contact=data["campagne_contact"],
+        genere_le=data["genere_le"],
+    )
 
 
 def _litige_from_row(row) -> Litige:

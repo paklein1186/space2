@@ -142,6 +142,14 @@ class Store(ABC):
     def get_lieu_derive(self, tiers_lieu_id: str) -> Optional[LieuDerive]: ...
 
     @abstractmethod
+    def get_lieu_derive_batch(self, tiers_lieu_ids: list) -> dict:
+        """Version batch de get_lieu_derive : une seule requête pour plusieurs
+        lieux à la fois (clé = tiers_lieu_id), au lieu de N appels séquentiels
+        — utilisée par les vues qui affichent tous les lieux d'un coup
+        (Annuaire) pour éviter un N+1 qui la rendrait perceptiblement lente."""
+        ...
+
+    @abstractmethod
     def update_lieu_derive_liens(self, tiers_lieu_id: str, lien_externe: Optional[str],
                                   photo_url: Optional[str]) -> None:
         """Met à jour uniquement lien_externe/photo_url (édition manuelle depuis
