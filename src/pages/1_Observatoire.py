@@ -17,9 +17,11 @@ from dotenv import load_dotenv
 from src.agent.rag_tools import lieux_enrichis_dataframe, reponses_long_dataframe
 from src.db.factory import get_store
 from src.questionnaire.schema import CATEGORIES_POSSIBLES
+from src.theme import inject_theme
 
 load_dotenv()
 st.set_page_config(page_title="Observatoire — Lieux hybrides et territoires", layout="wide")
+inject_theme()
 
 st.title("Observatoire des lieux hybrides et territoires")
 st.caption("Relevés statistiques, publics, sur l'ensemble des lieux recensés dans l'Annuaire.")

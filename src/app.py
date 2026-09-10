@@ -30,6 +30,7 @@ from src.auth_session import clear_session_cookie, read_session_cookie, save_ses
 from src.db.factory import get_admin_store, get_store
 from src.db.store import Litige
 from src.questionnaire.schema import QUESTIONNAIRE, CATEGORIES_POSSIBLES, Role, all_fields
+from src.theme import inject_theme
 
 ROLES_INTERNES = {"fondateur", "equipe", "steward"}
 
@@ -37,6 +38,7 @@ RAG_DISPONIBLE = bool(os.environ.get("VOYAGE_API_KEY"))
 
 load_dotenv()
 st.set_page_config(page_title="Lieux hybrides et territoires", layout="wide")
+inject_theme()
 
 # Contournement d'authentification STRICTEMENT réservé au développement local.
 # ⚠️ Ne JAMAIS définir LOCAL_DEV_AUTOLOGIN dans les secrets Streamlit Cloud (ou
@@ -337,7 +339,8 @@ def _fiche_dialog(store, fiche, est_admin: bool, user_id: str):
             st.info("Pas encore de synthèse générée pour ce lieu — répondez à quelques questions "
                      "dans l'onglet Entretien pour qu'elle apparaisse ici.")
 
-    if st.button("🌱 Revendiquer le suivi de ce lieu (steward)", key=f"nourrir_{lieu.id}"):
+    if st.button("🌱 Revendiquer le suivi de ce lieu (steward)", key=f"nourrir_{lieu.id}",
+                 use_container_width=True):
         st.session_state["preselect_lieu"] = lieu.nom
         st.session_state["preselect_role"] = "steward"
         st.toast(f"« {lieu.nom} » sélectionné — rendez-vous dans l'onglet Entretien.", icon="🌱")
@@ -677,7 +680,7 @@ def main():
         supabase_client = st.session_state.get("supabase_client") if SUPABASE_CONFIGURED else None
         store = get_store(client=supabase_client)
 
-    if st.sidebar.button("Se déconnecter"):
+    if st.sidebar.button("Se déconnecter", use_container_width=True):
         clear_session_cookie()
         for key in ("user_id", "otp_sent_to", "cookie_restore_failed", "use_admin_store", "supabase_client"):
             st.session_state.pop(key, None)
