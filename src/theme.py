@@ -127,10 +127,14 @@ def apply_theme() -> str:
     "light") si un appelant veut l'utiliser ailleurs (ex. couleurs de graphique)."""
     if "ui_theme" not in st.session_state:
         st.session_state["ui_theme"] = "dark"
-    mode = st.sidebar.radio(
+    # st.selectbox plutôt que st.radio/st.segmented_control/st.toggle : déjà
+    # utilisé ailleurs dans cette app (rôle/lieu en barre latérale), donc son
+    # chunk JS est déjà chargé de façon fiable — un widget jamais utilisé
+    # avant a fait planter toute l'app en production (chunk JS introuvable).
+    mode = st.sidebar.selectbox(
         "Thème", options=["dark", "light"],
         format_func=lambda m: "🌙 Sombre" if m == "dark" else "☀️ Clair",
-        horizontal=True, label_visibility="collapsed", key="ui_theme",
+        label_visibility="collapsed", key="ui_theme",
     )
     palette = _PALETTES.get(mode, _PALETTES["dark"])
     st.markdown(_CSS_TEMPLATE.format(**palette), unsafe_allow_html=True)
