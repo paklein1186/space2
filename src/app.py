@@ -172,12 +172,10 @@ def entretien_tab(store, user_id: str, nom_lieu: str, role: str):
     user_text = st.chat_input("Votre réponse...")
     if user_text:
         state["history"].append(("user", user_text))
-        with st.chat_message("user"):
-            st.write(user_text)
-        reply = state["agent"].send(user_text)
+        with st.spinner("L'agent réfléchit..."):
+            reply = state["agent"].send(user_text)
         state["history"].append(("assistant", reply))
-        with st.chat_message("assistant"):
-            st.write(reply)
+        st.rerun()
 
 
 def annuaire_tab(store):
@@ -256,12 +254,10 @@ def rag_tab(store):
     question = st.chat_input("Posez une question sur les lieux recensés ou les documents déposés...")
     if question:
         st.session_state["rag_history"].append(("user", question))
-        with st.chat_message("user"):
-            st.write(question)
-        reply = st.session_state["rag_agent"].send(question)
+        with st.spinner("Recherche en cours..."):
+            reply = st.session_state["rag_agent"].send(question)
         st.session_state["rag_history"].append(("assistant", reply))
-        with st.chat_message("assistant"):
-            st.write(reply)
+        st.rerun()
 
 
 def main():
