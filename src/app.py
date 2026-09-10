@@ -632,8 +632,17 @@ def rag_tab(store):
         from src.agent.rag_agent import RagAgent
         from src.agent.rag_tools import RagToolHandler
 
-        st.session_state["rag_agent"] = RagAgent(RagToolHandler(store))
-        st.session_state["rag_history"] = []
+        try:
+            st.session_state["rag_agent"] = RagAgent(RagToolHandler(store))
+            st.session_state["rag_history"] = []
+        except Exception as exc:
+            # L'initialisation de ChromaDB (index vectoriel local) peut échouer
+            # sur certains environnements (ex. état du disque après un reboot) —
+            # ne doit jamais faire planter tout le script (et donc les autres
+            # onglets, qui s'exécutent dans le même passage) pour un onglet
+            # secondaire.
+            st.error(f"Assistant RAG temporairement indisponible : {exc}")
+            return
 
     for speaker, text in st.session_state["rag_history"]:
         with st.chat_message(speaker):
@@ -675,15 +684,29 @@ def main():
     if est_admin:
         onglets.append("Administration")
     tabs = st.tabs(onglets)
+
+    # `st.tabs` ne crée pas de contextes d'exécution isolés : tous les onglets
+    # sont rendus dans le même passage de script. Un bug non intercepté dans
+    # UN SEUL onglet (ex. RAG) arrêterait sinon tout le script avant même
+    # d'atteindre les onglets suivants — l'Annuaire pourrait ainsi sembler
+    # "vide" alors que le vrai problème est ailleurs. Chaque onglet est donc
+    # rendu défensivement : une erreur y reste locale, affichée sur place,
+    # sans jamais empêcher les autres de s'afficher normalement.
+    def _rendre_isole(nom_onglet: str, fonction, *args) -> None:
+        try:
+            fonction(*args)
+        except Exception as exc:
+            st.error(f"L'onglet « {nom_onglet} » a rencontré une erreur : {exc}")
+
     with tabs[0]:
-        entretien_tab(store, user_id, nom_lieu, role)
+        _rendre_isole("Entretien", entretien_tab, store, user_id, nom_lieu, role)
     with tabs[1]:
-        rag_tab(store)
+        _rendre_isole("Assistant RAG", rag_tab, store)
     with tabs[2]:
-        annuaire_tab(store, est_admin, user_id)
+        _rendre_isole("Annuaire", annuaire_tab, store, est_admin, user_id)
     if est_admin:
         with tabs[3]:
-            administration_tab(store, user_id)
+            _rendre_isole("Administration", administration_tab, store, user_id)
 
 
 if __name__ == "__main__":
