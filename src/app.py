@@ -93,8 +93,10 @@ def auth_screen() -> str | None:
             "ci-dessous n'est pas vérifiée — pratique pour tester, à remplacer "
             "par le vrai flux Supabase en production."
         )
-        email = st.text_input("Votre email")
-        if st.button("Continuer", disabled=not email):
+        with st.form("dev_login_form"):
+            email = st.text_input("Votre email")
+            submitted = st.form_submit_button("Continuer")
+        if submitted and email:
             st.session_state["user_id"] = email
             st.rerun()
         return None
@@ -107,8 +109,10 @@ def auth_screen() -> str | None:
         st.rerun()
 
     if "magic_link_sent_to" not in st.session_state:
-        email = st.text_input("Votre email")
-        if st.button("Recevoir le lien de connexion", disabled=not email):
+        with st.form("magic_link_form"):
+            email = st.text_input("Votre email")
+            submitted = st.form_submit_button("Recevoir le lien de connexion")
+        if submitted and email:
             redirect_to = os.environ.get("APP_BASE_URL")
             options = {"email_redirect_to": redirect_to} if redirect_to else {}
             try:
