@@ -92,18 +92,24 @@ class SqliteStore(Store):
     # -- tiers_lieux --------------------------------------------------
 
     def get_or_create_tiers_lieu(self, owner_user_id: str, nom: str) -> TiersLieu:
+        # Recherche globale (tous propriétaires confondus), insensible à la
+        # casse et aux espaces superflus : un lieu est identifié par son nom,
+        # pas par qui l'a créé en premier — sinon un contributeur qui retape
+        # le nom d'un lieu existant (au lieu de le sélectionner dans la liste)
+        # crée un doublon vide au lieu de rejoindre le lieu déjà documenté.
+        nom_normalise = nom.strip()
         row = self.conn.execute(
-            "select * from tiers_lieux where owner_user_id = ? and nom = ?", (owner_user_id, nom)
+            "select * from tiers_lieux where trim(lower(nom)) = trim(lower(?))", (nom_normalise,)
         ).fetchone()
         if row:
             return TiersLieu(**dict(row))
         new_id = str(uuid.uuid4())
         self.conn.execute(
             "insert into tiers_lieux (id, owner_user_id, nom) values (?, ?, ?)",
-            (new_id, owner_user_id, nom),
+            (new_id, owner_user_id, nom_normalise),
         )
         self.conn.commit()
-        return TiersLieu(id=new_id, owner_user_id=owner_user_id, nom=nom)
+        return TiersLieu(id=new_id, owner_user_id=owner_user_id, nom=nom_normalise)
 
     def update_tiers_lieu(self, tiers_lieu_id: str, **fields) -> None:
         if not fields:

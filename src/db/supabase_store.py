@@ -25,18 +25,23 @@ class SupabaseStore(Store):
         self.client: Client = client or create_client(url, key)
 
     def get_or_create_tiers_lieu(self, owner_user_id: str, nom: str) -> TiersLieu:
+        # Recherche globale (tous propriétaires confondus), insensible à la
+        # casse : un lieu est identifié par son nom, pas par qui l'a créé en
+        # premier — sinon un contributeur qui retape le nom d'un lieu existant
+        # (au lieu de le sélectionner dans la liste) crée un doublon vide au
+        # lieu de rejoindre le lieu déjà documenté.
+        nom_normalise = nom.strip()
         existing = (
             self.client.table("tiers_lieux")
             .select("*")
-            .eq("owner_user_id", owner_user_id)
-            .eq("nom", nom)
+            .ilike("nom", nom_normalise)
             .execute()
         )
         if existing.data:
             return _to_dataclass(TiersLieu, existing.data[0])
         created = (
             self.client.table("tiers_lieux")
-            .insert({"owner_user_id": owner_user_id, "nom": nom})
+            .insert({"owner_user_id": owner_user_id, "nom": nom_normalise})
             .execute()
         )
         return _to_dataclass(TiersLieu, created.data[0])
