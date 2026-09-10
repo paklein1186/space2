@@ -48,14 +48,19 @@ def _capture_magic_link_redirect() -> None:
     """Supabase renvoie le token dans le FRAGMENT de l'URL (#access_token=...),
     invisible côté serveur (Streamlit ne peut lire que la query string). Ce
     script convertit le fragment en paramètres de requête puis recharge la
-    page — après quoi `st.query_params` peut les lire côté Python."""
+    page — après quoi `st.query_params` peut les lire côté Python.
+
+    `st.components.v1.html` exécute ce script dans une iframe isolée : il
+    faut donc cibler `window.top` (la vraie fenêtre du navigateur), pas
+    `window.location` qui ne renverrait que la pseudo-URL de l'iframe
+    elle-même (toujours vide) — sans ça, rien ne se passait jamais."""
     st.components.v1.html(
         """
         <script>
-        if (window.location.hash && window.location.hash.includes('access_token')) {
-            const params = new URLSearchParams(window.location.hash.substring(1));
-            const newUrl = window.location.pathname + '?' + params.toString();
-            window.location.replace(newUrl);
+        if (window.top.location.hash && window.top.location.hash.includes('access_token')) {
+            const params = new URLSearchParams(window.top.location.hash.substring(1));
+            const newUrl = window.top.location.pathname + '?' + params.toString();
+            window.top.location.replace(newUrl);
         }
         </script>
         """,
@@ -73,7 +78,12 @@ def _consume_magic_link_query_params(client) -> str | None:
     refresh_token = params.get("refresh_token")
     if not access_token or not refresh_token:
         return None
-    result = client.auth.set_session(access_token, refresh_token)
+    try:
+        result = client.auth.set_session(access_token, refresh_token)
+    except Exception as exc:
+        st.query_params.clear()
+        st.error(f"Le lien de connexion est invalide ou expiré : {exc}. Redemandez-en un nouveau ci-dessous.")
+        return None
     st.query_params.clear()
     return result.user.id if result.user else None
 
