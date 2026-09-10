@@ -10,7 +10,7 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-from .store import CampagnePrioritaire, Contributeur, LieuDerive, SessionEntretien, Store, TiersLieu
+from .store import CampagnePrioritaire, Contributeur, LieuDerive, Litige, SessionEntretien, Store, TiersLieu
 
 DDL = """
 create table if not exists tiers_lieux (
@@ -28,6 +28,9 @@ create table if not exists contributeurs (
     user_id text not null,
     tiers_lieu_id text not null,
     role text not null,
+    bloque integer not null default 0,
+    bloque_le text,
+    bloque_par text,
     unique (user_id, tiers_lieu_id, role)
 );
 create table if not exists sessions_entretien (
@@ -84,6 +87,25 @@ create table if not exists campagnes_prioritaires (
     date_fin text not null,
     cree_par text,
     cree_le text not null default (datetime('now'))
+);
+create table if not exists journal_modifications (
+    id text primary key,
+    tiers_lieu_id text not null,
+    contributeur_id text not null,
+    type text not null,
+    champ_id text,
+    valeur text,
+    cree_le text not null default (datetime('now'))
+);
+create table if not exists litiges (
+    id text primary key,
+    tiers_lieu_id text not null,
+    contributeur_vise_id text,
+    signale_par text not null,
+    description text not null,
+    statut text not null default 'ouvert',
+    cree_le text not null default (datetime('now')),
+    resolu_le text
 );
 create table if not exists llm_calls (
     id text primary key,
@@ -153,7 +175,7 @@ class SqliteStore(Store):
             (user_id, tiers_lieu_id, role),
         ).fetchone()
         if row:
-            return Contributeur(**dict(row))
+            return Contributeur(**{**dict(row), "bloque": bool(row["bloque"])})
         new_id = str(uuid.uuid4())
         self.conn.execute(
             "insert into contributeurs (id, user_id, tiers_lieu_id, role) values (?, ?, ?, ?)",
@@ -203,12 +225,31 @@ class SqliteStore(Store):
             "confidentiel = excluded.confidentiel",
             (tiers_lieu_id, contributeur_id, champ_id, json.dumps(valeur), int(confidentiel)),
         )
+        self._log_modification(tiers_lieu_id, contributeur_id, "reponse", champ_id, valeur)
         self.conn.commit()
+
+    def _log_modification(self, tiers_lieu_id: str, contributeur_id: str, type_: str,
+                           champ_id: Optional[str], valeur) -> None:
+        self.conn.execute(
+            "insert into journal_modifications (id, tiers_lieu_id, contributeur_id, type, champ_id, valeur) "
+            "values (?, ?, ?, ?, ?, ?)",
+            (str(uuid.uuid4()), tiers_lieu_id, contributeur_id, type_, champ_id,
+             json.dumps(valeur, ensure_ascii=False)),
+        )
+
+    def _contributeurs_non_bloques(self, tiers_lieu_id: str) -> set:
+        rows = self.conn.execute(
+            "select id from contributeurs where tiers_lieu_id = ? and bloque = 0", (tiers_lieu_id,)
+        ).fetchall()
+        return {r["id"] for r in rows}
 
     def get_answers(self, tiers_lieu_id: str, contributeur_id: Optional[str] = None) -> dict:
         """Vue fusionnée : toutes les réponses du lieu, celles du contributeur
         courant prenant le pas en cas de divergence — utilisée pour résoudre
-        les conditions du schéma pendant une session."""
+        les conditions du schéma pendant une session. Un contributeur bloqué
+        (modération) n'alimente plus cette vue (l'app empêche par ailleurs un
+        contributeur bloqué de démarrer une nouvelle session d'entretien)."""
+        actifs = self._contributeurs_non_bloques(tiers_lieu_id)
         rows = self.conn.execute(
             "select contributeur_id, champ_id, valeur from reponses where tiers_lieu_id = ? "
             "order by (contributeur_id = ?) asc",
@@ -216,16 +257,21 @@ class SqliteStore(Store):
         ).fetchall()
         merged = {}
         for r in rows:
+            if r["contributeur_id"] not in actifs:
+                continue
             merged[r["champ_id"]] = json.loads(r["valeur"]) if r["valeur"] is not None else None
         return merged
 
     def get_all_answers_by_contributeur(self, tiers_lieu_id: str) -> dict:
+        actifs = self._contributeurs_non_bloques(tiers_lieu_id)
         rows = self.conn.execute(
             "select contributeur_id, champ_id, valeur from reponses where tiers_lieu_id = ?",
             (tiers_lieu_id,),
         ).fetchall()
         result: dict = {}
         for r in rows:
+            if r["contributeur_id"] not in actifs:
+                continue
             result.setdefault(r["contributeur_id"], {})[r["champ_id"]] = (
                 json.loads(r["valeur"]) if r["valeur"] is not None else None
             )
@@ -240,6 +286,7 @@ class SqliteStore(Store):
             "values (?, ?, ?, ?, ?)",
             (str(uuid.uuid4()), tiers_lieu_id, contributeur_id, section_id, texte),
         )
+        self._log_modification(tiers_lieu_id, contributeur_id, "note", section_id, texte)
         self.conn.commit()
 
     def get_free_text_notes(self, tiers_lieu_id: str) -> list:
@@ -387,3 +434,83 @@ class SqliteStore(Store):
     def delete_campagne_prioritaire(self, campagne_id: str) -> None:
         self.conn.execute("delete from campagnes_prioritaires where id = ?", (campagne_id,))
         self.conn.commit()
+
+    # -- historique, stewardship, modération --------------------------------------------------
+
+    def list_contributeurs(self, tiers_lieu_id: str) -> list:
+        rows = self.conn.execute(
+            "select * from contributeurs where tiers_lieu_id = ?", (tiers_lieu_id,)
+        ).fetchall()
+        return [Contributeur(**{**dict(r), "bloque": bool(r["bloque"])}) for r in rows]
+
+    def set_contributeur_bloque(self, contributeur_id: str, bloque: bool,
+                                 bloque_par: Optional[str] = None) -> None:
+        if bloque:
+            self.conn.execute(
+                "update contributeurs set bloque = 1, bloque_le = datetime('now'), bloque_par = ? "
+                "where id = ?",
+                (bloque_par, contributeur_id),
+            )
+        else:
+            self.conn.execute(
+                "update contributeurs set bloque = 0, bloque_le = null, bloque_par = null where id = ?",
+                (contributeur_id,),
+            )
+        self.conn.commit()
+
+    def get_historique(self, tiers_lieu_id: str, limite: int = 100) -> list:
+        # `cree_le` (datetime('now')) n'a qu'une résolution à la seconde : pour
+        # des écritures rapprochées (plusieurs champs sauvegardés dans la même
+        # seconde), on départage par rowid (ordre d'insertion) pour un ordre
+        # chronologique réellement fiable.
+        rows = self.conn.execute(
+            "select j.*, c.role as contributeur_role, c.user_id as contributeur_user_id, "
+            "c.bloque as contributeur_bloque "
+            "from journal_modifications j join contributeurs c on c.id = j.contributeur_id "
+            "where j.tiers_lieu_id = ? order by j.cree_le desc, j.rowid desc limit ?",
+            (tiers_lieu_id, limite),
+        ).fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            d["valeur"] = json.loads(d["valeur"]) if d["valeur"] is not None else None
+            d["contributeur_bloque"] = bool(d["contributeur_bloque"])
+            result.append(d)
+        return result
+
+    def save_litige(self, litige: Litige) -> Litige:
+        litige_id = litige.id or str(uuid.uuid4())
+        self.conn.execute(
+            "insert into litiges (id, tiers_lieu_id, contributeur_vise_id, signale_par, description, statut) "
+            "values (?, ?, ?, ?, ?, ?) "
+            "on conflict(id) do update set description = excluded.description, statut = excluded.statut",
+            (litige_id, litige.tiers_lieu_id, litige.contributeur_vise_id, litige.signale_par,
+             litige.description, litige.statut),
+        )
+        self.conn.commit()
+        row = self.conn.execute("select * from litiges where id = ?", (litige_id,)).fetchone()
+        return _litige_from_row(row)
+
+    def list_litiges(self, tiers_lieu_id: Optional[str] = None) -> list:
+        if tiers_lieu_id:
+            rows = self.conn.execute(
+                "select * from litiges where tiers_lieu_id = ? order by cree_le desc", (tiers_lieu_id,)
+            ).fetchall()
+        else:
+            rows = self.conn.execute("select * from litiges order by cree_le desc").fetchall()
+        return [_litige_from_row(r) for r in rows]
+
+    def resoudre_litige(self, litige_id: str) -> None:
+        self.conn.execute(
+            "update litiges set statut = 'resolu', resolu_le = datetime('now') where id = ?", (litige_id,)
+        )
+        self.conn.commit()
+
+
+def _litige_from_row(row) -> Litige:
+    d = dict(row)
+    return Litige(
+        id=d["id"], tiers_lieu_id=d["tiers_lieu_id"], contributeur_vise_id=d["contributeur_vise_id"],
+        signale_par=d["signale_par"], description=d["description"], statut=d["statut"],
+        cree_le=d["cree_le"], resolu_le=d["resolu_le"],
+    )

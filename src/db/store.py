@@ -30,6 +30,9 @@ class Contributeur:
     user_id: str
     tiers_lieu_id: str
     role: str
+    bloque: bool = False
+    bloque_le: Optional[str] = None
+    bloque_par: Optional[str] = None
 
 
 @dataclass
@@ -73,6 +76,22 @@ class CampagnePrioritaire:
     description: Optional[str] = None
     cree_par: Optional[str] = None
     cree_le: Optional[str] = None
+
+
+@dataclass
+class Litige:
+    """Signalement d'un désaccord sur les contributions d'un lieu — ouvert par
+    un steward/fondateur/équipe de ce lieu ou par un admin, résolu uniquement
+    par un admin (arbitrage)."""
+
+    tiers_lieu_id: str
+    description: str
+    signale_par: str
+    id: str = ""  # vide = création
+    contributeur_vise_id: Optional[str] = None
+    statut: str = "ouvert"  # "ouvert" | "resolu"
+    cree_le: Optional[str] = None
+    resolu_le: Optional[str] = None
 
 
 class Store(ABC):
@@ -165,6 +184,39 @@ class Store(ABC):
 
     @abstractmethod
     def delete_campagne_prioritaire(self, campagne_id: str) -> None: ...
+
+    # -- historique, stewardship, modération --------------------------------------------------
+
+    @abstractmethod
+    def list_contributeurs(self, tiers_lieu_id: str) -> list:
+        """Tous les contributeurs (tous rôles) d'un lieu, avec leur statut de
+        blocage — pour l'écran d'historique/modération d'un lieu."""
+        ...
+
+    @abstractmethod
+    def set_contributeur_bloque(self, contributeur_id: str, bloque: bool,
+                                 bloque_par: Optional[str] = None) -> None:
+        """Bloque/débloque un contributeur : ses réponses sont exclues de la
+        lecture agrégée (get_answers/get_all_answers_by_contributeur), donc de
+        l'enrichissement et de l'Annuaire, sans supprimer la donnée brute
+        elle-même (traçabilité conservée)."""
+        ...
+
+    @abstractmethod
+    def get_historique(self, tiers_lieu_id: str, limite: int = 100) -> list:
+        """Journal d'écriture (append-only) des réponses/notes d'un lieu,
+        le plus récent en premier — indépendant de `reponses` (qui ne garde
+        que la valeur courante par champ)."""
+        ...
+
+    @abstractmethod
+    def save_litige(self, litige: Litige) -> Litige: ...
+
+    @abstractmethod
+    def list_litiges(self, tiers_lieu_id: Optional[str] = None) -> list: ...
+
+    @abstractmethod
+    def resoudre_litige(self, litige_id: str) -> None: ...
 
     def get_active_campagnes_prioritaires(self) -> list:
         """Campagnes dont la fenêtre [date_debut, date_fin] couvre maintenant.

@@ -28,7 +28,10 @@ from src.annuaire import (
 )
 from src.auth_session import clear_session_cookie, read_session_cookie, save_session_cookie
 from src.db.factory import get_admin_store, get_store
+from src.db.store import Litige
 from src.questionnaire.schema import QUESTIONNAIRE, CATEGORIES_POSSIBLES, Role, all_fields
+
+ROLES_INTERNES = {"fondateur", "equipe", "steward"}
 
 RAG_DISPONIBLE = bool(os.environ.get("VOYAGE_API_KEY"))
 
@@ -219,10 +222,18 @@ def entretien_tab(store, user_id: str, nom_lieu: str, role: str):
         st.error("ANTHROPIC_API_KEY n'est pas configuré (voir .env.example).")
         return
 
+    tiers_lieu = store.get_or_create_tiers_lieu(user_id, nom_lieu)
+    contributeur = store.get_or_create_contributeur(user_id, tiers_lieu.id, role)
+    if contributeur.bloque:
+        st.error(
+            "Votre contribution à ce lieu a été suspendue par un administrateur ou un steward "
+            "de ce lieu, suite à un signalement. Contactez l'équipe si vous pensez qu'il s'agit "
+            "d'une erreur."
+        )
+        return
+
     session_key = f"agent::{nom_lieu}::{role}"
     if session_key not in st.session_state:
-        tiers_lieu = store.get_or_create_tiers_lieu(user_id, nom_lieu)
-        contributeur = store.get_or_create_contributeur(user_id, tiers_lieu.id, role)
         # Le nom du lieu est déjà connu (saisi dans la barre latérale) : on le
         # pré-remplit comme réponse pour que l'entretien ne redemande jamais
         # "quel est le nom de votre lieu ?" en première question.
@@ -294,7 +305,7 @@ def _category_chips_html(categories: list) -> str:
 
 
 @st.dialog("Fiche du lieu", width="large")
-def _fiche_dialog(store, fiche, est_admin: bool):
+def _fiche_dialog(store, fiche, est_admin: bool, user_id: str):
     lieu = fiche["tiers_lieu"]
     derive = store.get_lieu_derive(lieu.id)
     donnees = derive.donnees if derive else {}
@@ -364,8 +375,81 @@ def _fiche_dialog(store, fiche, est_admin: bool):
         st.divider()
         _admin_portfolio_form(store, lieu, derive)
 
+    contributeurs_lieu = store.list_contributeurs(lieu.id)
+    mon_contributeur_interne = next(
+        (c for c in contributeurs_lieu if c.user_id == user_id and c.role in ROLES_INTERNES and not c.bloque),
+        None,
+    )
+    if est_admin or mon_contributeur_interne:
+        st.divider()
+        _historique_et_moderation(store, lieu, contributeurs_lieu, est_admin, user_id)
 
-def annuaire_tab(store, est_admin: bool):
+
+def _historique_et_moderation(store, lieu, contributeurs_lieu: list, est_admin: bool, user_id: str) -> None:
+    with st.expander("Historique & modération"):
+        st.markdown("**Contributeurs de ce lieu**")
+        for c in contributeurs_lieu:
+            col1, col2 = st.columns([4, 1])
+            with col1:
+                suffixe = " (vous)" if c.user_id == user_id else ""
+                statut = " · 🚫 bloqué" if c.bloque else ""
+                st.write(f"{ROLE_LABELS.get(c.role, c.role)} — `{c.user_id}`{suffixe}{statut}")
+            with col2:
+                if c.user_id == user_id:
+                    pass
+                elif c.bloque:
+                    if st.button("Débloquer", key=f"unblock_{c.id}"):
+                        get_admin_store().set_contributeur_bloque(c.id, False)
+                        st.rerun()
+                else:
+                    if st.button("Bloquer", key=f"block_{c.id}"):
+                        get_admin_store().set_contributeur_bloque(c.id, True, bloque_par=user_id)
+                        st.rerun()
+
+        st.markdown("**Signaler un litige**")
+        options_cible = [None] + [c.id for c in contributeurs_lieu]
+        labels_cible = {c.id: f"{ROLE_LABELS.get(c.role, c.role)} — {c.user_id}" for c in contributeurs_lieu}
+        with st.form(f"litige_{lieu.id}", clear_on_submit=True):
+            description = st.text_area("Description du désaccord")
+            cible = st.selectbox("Contributeur concerné (optionnel)", options=options_cible,
+                                  format_func=lambda cid: "—" if cid is None else labels_cible.get(cid, cid))
+            if st.form_submit_button("Signaler"):
+                if not description.strip():
+                    st.error("Décrivez le désaccord avant de signaler.")
+                else:
+                    get_admin_store().save_litige(Litige(
+                        tiers_lieu_id=lieu.id, description=description.strip(),
+                        signale_par=user_id, contributeur_vise_id=cible,
+                    ))
+                    st.success("Litige signalé.")
+                    st.rerun()
+
+        litiges = store.list_litiges(lieu.id)
+        if litiges:
+            st.markdown("**Litiges**")
+            for lit in litiges:
+                col1, col2 = st.columns([4, 1])
+                with col1:
+                    marque = "🟢 résolu" if lit.statut == "resolu" else "🔴 ouvert"
+                    st.write(f"{marque} — {lit.description}")
+                with col2:
+                    if est_admin and lit.statut == "ouvert":
+                        if st.button("Résoudre", key=f"resoudre_{lit.id}"):
+                            get_admin_store().resoudre_litige(lit.id)
+                            st.rerun()
+
+        st.markdown("**Historique récent**")
+        historique = store.get_historique(lieu.id, limite=30)
+        if not historique:
+            st.caption("Aucun historique pour l'instant.")
+        for h in historique:
+            role = h.get("contributeur_role") or "?"
+            champ = h.get("champ_id") or "note libre"
+            statut_contrib = " 🚫" if h.get("contributeur_bloque") else ""
+            st.caption(f"{h.get('cree_le', '')} — {role}{statut_contrib} — {champ} : {h.get('valeur')}")
+
+
+def annuaire_tab(store, est_admin: bool, user_id: str):
     st.subheader("Annuaire des lieux recensés")
     fiches = build_annuaire(store)
     if not fiches:
@@ -396,7 +480,7 @@ def annuaire_tab(store, est_admin: bool):
         lieu_id = st.session_state.pop("annuaire_open_lieu_id")
         fiche_ouverte = next((f for f in fiches if f["tiers_lieu"].id == lieu_id), None)
         if fiche_ouverte:
-            _fiche_dialog(store, fiche_ouverte, est_admin)
+            _fiche_dialog(store, fiche_ouverte, est_admin, user_id)
 
     cols_par_ligne = 4
     for i in range(0, len(fiches_affichees), cols_par_ligne):
@@ -596,7 +680,7 @@ def main():
     with tabs[1]:
         rag_tab(store)
     with tabs[2]:
-        annuaire_tab(store, est_admin)
+        annuaire_tab(store, est_admin, user_id)
     if est_admin:
         with tabs[3]:
             administration_tab(store, user_id)

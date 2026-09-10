@@ -20,6 +20,13 @@ create table if not exists contributeurs (
     user_id uuid not null references auth.users(id),
     tiers_lieu_id uuid not null references tiers_lieux(id) on delete cascade,
     role text not null check (role in ('fondateur', 'equipe', 'partenaire', 'usager', 'steward', 'autre')),
+    -- Modération : un contributeur bloqué (usurpation, contenu toxique) voit
+    -- ses réponses exclues des lectures agrégées sans que la donnée brute
+    -- soit supprimée (traçabilité conservée). Actionné par un admin ou un
+    -- contributeur interne (fondateur/équipe/steward) non bloqué du même lieu.
+    bloque boolean not null default false,
+    bloque_le timestamptz,
+    bloque_par uuid references auth.users(id),
     cree_le timestamptz not null default now(),
     unique (user_id, tiers_lieu_id, role)
 );
@@ -94,6 +101,33 @@ create table if not exists campagnes_prioritaires (
     cree_le timestamptz not null default now()
 );
 
+-- Journal d'écriture append-only (contrairement à `reponses`, qui ne garde
+-- que la valeur courante par champ) : historique consultable par un admin ou
+-- un contributeur interne du lieu concerné.
+create table if not exists journal_modifications (
+    id uuid primary key default gen_random_uuid(),
+    tiers_lieu_id uuid not null references tiers_lieux(id) on delete cascade,
+    contributeur_id uuid not null references contributeurs(id) on delete cascade,
+    type text not null,       -- 'reponse' | 'note'
+    champ_id text,
+    valeur jsonb,
+    cree_le timestamptz not null default now()
+);
+
+-- Signalement d'un désaccord sur les contributions d'un lieu (usurpation,
+-- contenu contesté). Ouvert par un admin ou un contributeur interne du lieu,
+-- résolu uniquement par un admin (arbitrage).
+create table if not exists litiges (
+    id uuid primary key default gen_random_uuid(),
+    tiers_lieu_id uuid not null references tiers_lieux(id) on delete cascade,
+    contributeur_vise_id uuid references contributeurs(id),
+    signale_par uuid not null references auth.users(id),
+    description text not null,
+    statut text not null default 'ouvert' check (statut in ('ouvert', 'resolu')),
+    cree_le timestamptz not null default now(),
+    resolu_le timestamptz
+);
+
 -- Traçabilité et suivi des coûts de chaque appel LLM.
 create table if not exists llm_calls (
     id uuid primary key default gen_random_uuid(),
@@ -109,6 +143,8 @@ create table if not exists llm_calls (
 create index if not exists idx_reponses_tiers_lieu on reponses(tiers_lieu_id);
 create index if not exists idx_notes_libres_tiers_lieu on notes_libres(tiers_lieu_id);
 create index if not exists idx_sessions_contributeur on sessions_entretien(contributeur_id);
+create index if not exists idx_journal_tiers_lieu on journal_modifications(tiers_lieu_id, cree_le desc);
+create index if not exists idx_litiges_tiers_lieu on litiges(tiers_lieu_id);
 
 -- Row Level Security.
 -- Principe : écriture réservée au propriétaire/contributeur concerné ; lecture
@@ -118,6 +154,8 @@ create index if not exists idx_sessions_contributeur on sessions_entretien(contr
 -- corpus, pas seulement les lieux de l'utilisateur courant.
 alter table tiers_lieux enable row level security;
 alter table contributeurs enable row level security;
+alter table journal_modifications enable row level security;
+alter table litiges enable row level security;
 alter table sessions_entretien enable row level security;
 alter table reponses enable row level security;
 alter table notes_libres enable row level security;
@@ -151,6 +189,24 @@ create policy "owner supprime ses lieux" on tiers_lieux
 
 create policy "utilisateur gere ses contributions" on contributeurs
     for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- Le blocage d'un AUTRE contributeur (modération) n'a délibérément aucune
+-- policy ici : la policy ci-dessus ne permet à chacun de modifier que ses
+-- propres lignes. Cette action passe exclusivement par le store service_role
+-- côté app, après vérification en Python (admin, ou contributeur interne non
+-- bloqué du même lieu) — même logique que la curation Portfolio.
+
+create policy "lecture authentifiee historique" on journal_modifications
+    for select using (auth.role() = 'authenticated');
+create policy "contributeur ecrit son historique" on journal_modifications
+    for insert with check (
+        contributeur_id in (select id from contributeurs where user_id = auth.uid())
+    );
+
+create policy "lecture authentifiee litiges" on litiges
+    for select using (auth.role() = 'authenticated');
+-- Écriture (ouverture/résolution) exclusivement via le store service_role,
+-- même principe que le blocage ci-dessus.
 
 create policy "utilisateur gere ses sessions" on sessions_entretien
     for all using (

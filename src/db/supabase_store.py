@@ -7,7 +7,7 @@ from typing import Optional
 
 from supabase import Client, create_client
 
-from .store import CampagnePrioritaire, Contributeur, LieuDerive, SessionEntretien, Store, TiersLieu
+from .store import CampagnePrioritaire, Contributeur, LieuDerive, Litige, SessionEntretien, Store, TiersLieu
 
 
 def _to_dataclass(cls, row: dict):
@@ -116,20 +116,48 @@ class SupabaseStore(Store):
             "valeur": valeur,
             "confidentiel": confidentiel,
         }, on_conflict="tiers_lieu_id,contributeur_id,champ_id").execute()
+        self._log_modification(tiers_lieu_id, contributeur_id, "reponse", champ_id, valeur)
+
+    def _log_modification(self, tiers_lieu_id: str, contributeur_id: str, type_: str,
+                           champ_id: Optional[str], valeur) -> None:
+        try:
+            self.client.table("journal_modifications").insert({
+                "tiers_lieu_id": tiers_lieu_id, "contributeur_id": contributeur_id,
+                "type": type_, "champ_id": champ_id, "valeur": valeur,
+            }).execute()
+        except Exception:
+            # Table absente avant la migration d'historique : ne jamais faire
+            # échouer une sauvegarde de réponse à cause du journal d'audit.
+            pass
+
+    def _contributeurs_non_bloques(self, tiers_lieu_id: str) -> set:
+        try:
+            rows = (
+                self.client.table("contributeurs").select("id")
+                .eq("tiers_lieu_id", tiers_lieu_id).eq("bloque", False).execute()
+            )
+        except Exception:
+            # Colonne `bloque` absente avant migration : personne n'est
+            # considéré bloqué (comportement identique à avant cette feature).
+            return None
+        return {r["id"] for r in rows.data}
 
     def get_answers(self, tiers_lieu_id: str, contributeur_id: Optional[str] = None) -> dict:
+        actifs = self._contributeurs_non_bloques(tiers_lieu_id)
         result = (
             self.client.table("reponses")
             .select("contributeur_id,champ_id,valeur")
             .eq("tiers_lieu_id", tiers_lieu_id)
             .execute()
         )
+        rows = result.data if actifs is None else [r for r in result.data if r["contributeur_id"] in actifs]
         # Les réponses du contributeur courant sont ré-appliquées en dernier pour primer
         # en cas de divergence (même logique que SqliteStore).
-        rows = sorted(result.data, key=lambda r: r["contributeur_id"] == contributeur_id)
+        rows = sorted(rows, key=lambda r: r["contributeur_id"] == contributeur_id)
         return {r["champ_id"]: r["valeur"] for r in rows}
 
     def get_all_answers_by_contributeur(self, tiers_lieu_id: str) -> dict:
+        actifs = self._contributeurs_non_bloques(tiers_lieu_id)
         result = (
             self.client.table("reponses")
             .select("contributeur_id,champ_id,valeur")
@@ -138,6 +166,8 @@ class SupabaseStore(Store):
         )
         out: dict = {}
         for r in result.data:
+            if actifs is not None and r["contributeur_id"] not in actifs:
+                continue
             out.setdefault(r["contributeur_id"], {})[r["champ_id"]] = r["valeur"]
         return out
 
@@ -149,6 +179,7 @@ class SupabaseStore(Store):
             "section_id": section_id,
             "texte": texte,
         }).execute()
+        self._log_modification(tiers_lieu_id, contributeur_id, "note", section_id, texte)
 
     def get_free_text_notes(self, tiers_lieu_id: str) -> list:
         result = self.client.table("notes_libres").select("*").eq("tiers_lieu_id", tiers_lieu_id).execute()
@@ -283,3 +314,75 @@ class SupabaseStore(Store):
 
     def delete_campagne_prioritaire(self, campagne_id: str) -> None:
         self.client.table("campagnes_prioritaires").delete().eq("id", campagne_id).execute()
+
+    # -- historique, stewardship, modération --------------------------------------------------
+
+    def list_contributeurs(self, tiers_lieu_id: str) -> list:
+        result = self.client.table("contributeurs").select("*").eq("tiers_lieu_id", tiers_lieu_id).execute()
+        return [_to_dataclass(Contributeur, row) for row in result.data]
+
+    def set_contributeur_bloque(self, contributeur_id: str, bloque: bool,
+                                 bloque_par: Optional[str] = None) -> None:
+        from datetime import datetime, timezone
+
+        payload = {
+            "bloque": bloque,
+            "bloque_par": bloque_par if bloque else None,
+            "bloque_le": datetime.now(timezone.utc).isoformat() if bloque else None,
+        }
+        self.client.table("contributeurs").update(payload).eq("id", contributeur_id).execute()
+
+    def get_historique(self, tiers_lieu_id: str, limite: int = 100) -> list:
+        try:
+            result = (
+                self.client.table("journal_modifications")
+                .select("*, contributeurs(role, user_id, bloque)")
+                .eq("tiers_lieu_id", tiers_lieu_id)
+                .order("cree_le", desc=True)
+                .limit(limite)
+                .execute()
+            )
+        except Exception:
+            return []
+        entries = []
+        for row in result.data:
+            contributeur = row.pop("contributeurs", None) or {}
+            row["contributeur_role"] = contributeur.get("role")
+            row["contributeur_user_id"] = contributeur.get("user_id")
+            row["contributeur_bloque"] = contributeur.get("bloque", False)
+            entries.append(row)
+        return entries
+
+    def save_litige(self, litige: Litige) -> Litige:
+        payload = {
+            "tiers_lieu_id": litige.tiers_lieu_id,
+            "contributeur_vise_id": litige.contributeur_vise_id,
+            "signale_par": litige.signale_par,
+            "description": litige.description,
+            "statut": litige.statut,
+        }
+        if litige.id:
+            payload["id"] = litige.id
+            result = self.client.table("litiges").upsert(payload, on_conflict="id").execute()
+        else:
+            result = self.client.table("litiges").insert(payload).execute()
+        return _to_dataclass(Litige, result.data[0])
+
+    def list_litiges(self, tiers_lieu_id: Optional[str] = None) -> list:
+        query = self.client.table("litiges").select("*").order("cree_le", desc=True)
+        if tiers_lieu_id:
+            query = query.eq("tiers_lieu_id", tiers_lieu_id)
+        try:
+            result = query.execute()
+        except Exception:
+            # Table absente avant migration : aucun litige plutôt qu'un plantage
+            # du panneau de modération dès qu'on l'ouvre.
+            return []
+        return [_to_dataclass(Litige, row) for row in result.data]
+
+    def resoudre_litige(self, litige_id: str) -> None:
+        from datetime import datetime, timezone
+
+        self.client.table("litiges").update(
+            {"statut": "resolu", "resolu_le": datetime.now(timezone.utc).isoformat()}
+        ).eq("id", litige_id).execute()
