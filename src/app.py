@@ -111,9 +111,21 @@ def auth_screen() -> str | None:
         if st.button("Recevoir le lien de connexion", disabled=not email):
             redirect_to = os.environ.get("APP_BASE_URL")
             options = {"email_redirect_to": redirect_to} if redirect_to else {}
-            client.auth.sign_in_with_otp({"email": email, "options": options})
-            st.session_state["magic_link_sent_to"] = email
-            st.rerun()
+            try:
+                client.auth.sign_in_with_otp({"email": email, "options": options})
+                st.session_state["magic_link_sent_to"] = email
+                st.rerun()
+            except Exception as exc:
+                message = str(exc)
+                if "security purposes" in message or "rate limit" in message.lower():
+                    st.warning(
+                        "Une demande a déjà été envoyée récemment pour cet email — "
+                        "Supabase impose un délai anti-spam d'environ 60 secondes entre "
+                        "deux demandes. Patientez une minute sans recliquer, puis réessayez "
+                        "une seule fois."
+                    )
+                else:
+                    st.error(f"Échec de l'envoi du lien de connexion : {message}")
         return None
 
     st.write(f"Un lien de connexion a été envoyé à **{st.session_state['magic_link_sent_to']}**.")
