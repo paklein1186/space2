@@ -15,11 +15,11 @@ from dotenv import load_dotenv
 
 from src.annuaire import default_visual
 from src.db.factory import get_store
-from src.theme import inject_theme
+from src.theme import apply_theme
 
 load_dotenv()
 st.set_page_config(page_title="Portfolio — Lieux hybrides et territoires", layout="wide")
-inject_theme()
+apply_theme()
 
 st.title("Portfolio")
 st.caption("Une sélection de lieux et de leurs campagnes de besoins actuelles.")

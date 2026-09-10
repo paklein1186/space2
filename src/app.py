@@ -30,7 +30,7 @@ from src.auth_session import clear_session_cookie, read_session_cookie, save_ses
 from src.db.factory import get_admin_store, get_store
 from src.db.store import Litige
 from src.questionnaire.schema import QUESTIONNAIRE, CATEGORIES_POSSIBLES, Role, all_fields
-from src.theme import inject_theme
+from src.theme import apply_theme
 
 ROLES_INTERNES = {"fondateur", "equipe", "steward"}
 
@@ -38,7 +38,7 @@ RAG_DISPONIBLE = bool(os.environ.get("VOYAGE_API_KEY"))
 
 load_dotenv()
 st.set_page_config(page_title="Lieux hybrides et territoires", layout="wide")
-inject_theme()
+apply_theme()
 
 # Contournement d'authentification STRICTEMENT réservé au développement local.
 # ⚠️ Ne JAMAIS définir LOCAL_DEV_AUTOLOGIN dans les secrets Streamlit Cloud (ou
@@ -382,7 +382,12 @@ def _fiche_dialog(store, fiche, est_admin: bool, user_id: str):
         st.divider()
         _admin_portfolio_form(store, lieu, derive)
 
-    contributeurs_lieu = store.list_contributeurs(lieu.id)
+    # RLS ne laisse un utilisateur authentifié voir que ses PROPRES lignes
+    # contributeurs (policy "user_id = auth.uid()") — list_contributeurs doit
+    # donc passer par le store service_role pour voir tous les contributeurs
+    # d'un lieu, sans quoi la liste de modération ne montrerait jamais que
+    # soi-même.
+    contributeurs_lieu = get_admin_store().list_contributeurs(lieu.id)
     mon_contributeur_interne = next(
         (c for c in contributeurs_lieu if c.user_id == user_id and c.role in ROLES_INTERNES and not c.bloque),
         None,
@@ -554,7 +559,11 @@ def administration_tab(store, user_id: str) -> None:
     admin_store = get_admin_store()
 
     with st.expander("Comptes administrateurs", expanded=False):
-        emails = store.list_admin_emails()
+        # list_admin_emails() appelle l'API Admin Auth de Supabase
+        # (auth.admin.list_users()), qui exige la clé service_role — jamais
+        # disponible sur `store` (RLS-scoped), d'où "User not allowed" si on
+        # l'appelle dessus par erreur.
+        emails = admin_store.list_admin_emails()
         st.write(", ".join(emails) if emails else "Aucun admin listé.")
         with st.form("add_admin_form", clear_on_submit=True):
             nouvel_email = st.text_input("Email à promouvoir administrateur")
