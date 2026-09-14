@@ -39,6 +39,52 @@ def default_visual(nom_lieu: str, donnees: dict | None = None) -> tuple[str, str
             return emoji, couleur
     return "🏘️", couleur
 
+
+def vignette_html(emoji: str, couleur: str, hauteur: str = "9rem") -> str:
+    return (
+        f'<div style="width:100%;height:{hauteur};border-radius:8px;background:{couleur};'
+        f'display:flex;align-items:center;justify-content:center;font-size:2.2rem;">{emoji}</div>'
+    )
+
+
+def photo_html(url: str, hauteur: str = "9rem") -> str:
+    """Rendu HTML brut plutôt que st.image() : object-fit:cover force une
+    hauteur/largeur identique pour toutes les vignettes de la galerie
+    (Annuaire, Portfolio, popup), quel que soit le format d'origine de la
+    photo — st.image() seul affiche chaque image à son ratio propre, ce qui
+    donnait une grille aux hauteurs de carte irrégulières.
+
+    Ces trois fonctions (vignette_html, photo_html, category_chips_html)
+    vivent ici plutôt que dans app.py : app.py exécute st.set_page_config()
+    à l'import, donc l'importer depuis src/pages/2_Portfolio.py (une page
+    Streamlit distincte) relancerait toute son exécution — annuaire.py, lui,
+    est un module pur, importable en toute sécurité par app.py ET par
+    chaque page, ce qui garantit une seule et même apparence de galerie
+    partout plutôt que deux implémentations HTML dupliquées à maintenir en
+    parallèle."""
+    return (
+        f'<img src="{url}" style="width:100%;height:{hauteur};border-radius:8px;'
+        f'object-fit:cover;display:block;" />'
+    )
+
+
+_CATEGORY_COLORS = {
+    "Alimentaire": "#C97A3D", "Culturel": "#8B4B6B", "Éducation": "#3D6E8C", "Santé": "#4F7A52",
+}
+
+
+def category_chips_html(categories: list) -> str:
+    if not categories:
+        return ""
+    chips = "".join(
+        f'<span style="background:{_CATEGORY_COLORS.get(c, "#888")};color:#fff;font-size:0.72rem;'
+        f'padding:2px 8px;border-radius:10px;margin-right:4px;display:inline-block;'
+        f'margin-bottom:4px;">{c}</span>'
+        for c in categories
+    )
+    return f'<div style="margin:4px 0;">{chips}</div>'
+
+
 _LABELS_BY_FIELD_ID = {f.id: f.label for _, _, f in all_fields()}
 
 # Ordre et libellés d'affichage des sections homogénéisées de l'Annuaire —

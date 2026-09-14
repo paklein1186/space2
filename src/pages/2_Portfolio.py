@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 import streamlit as st
 from dotenv import load_dotenv
 
-from src.annuaire import default_visual
+from src.annuaire import category_chips_html, default_visual, photo_html, vignette_html
 from src.db.factory import get_store
 from src.theme import apply_theme
 
@@ -31,7 +31,11 @@ if not lieux:
     st.info("Aucun lieu mis en avant pour l'instant.")
     st.stop()
 
-cols_par_ligne = 3
+# Même gabarit de galerie que l'Annuaire (4 colonnes, vignette homogénéisée
+# via photo_html/vignette_html, chips de catégorie) — mêmes fonctions
+# partagées depuis annuaire.py, pour une seule apparence de galerie à
+# maintenir plutôt que deux implémentations HTML qui finissent par diverger.
+cols_par_ligne = 4
 for i in range(0, len(lieux), cols_par_ligne):
     cols = st.columns(cols_par_ligne)
     for col, lieu in zip(cols, lieux[i:i + cols_par_ligne]):
@@ -40,23 +44,13 @@ for i in range(0, len(lieux), cols_par_ligne):
         with col:
             with st.container(border=True):
                 if derive and derive.photo_url:
-                    # HTML brut + object-fit:cover plutôt que st.image() : donne
-                    # une hauteur de vignette identique à toutes les cartes,
-                    # quel que soit le format d'origine de la photo.
-                    st.markdown(
-                        f'<img src="{derive.photo_url}" style="width:100%;height:9rem;'
-                        f'border-radius:8px;object-fit:cover;display:block;" />',
-                        unsafe_allow_html=True,
-                    )
+                    st.markdown(photo_html(derive.photo_url), unsafe_allow_html=True)
                 else:
                     emoji, couleur = default_visual(lieu.nom, donnees)
-                    st.markdown(
-                        f'<div style="width:100%;height:9rem;border-radius:8px;background:{couleur};'
-                        f'display:flex;align-items:center;justify-content:center;font-size:2.2rem;">'
-                        f'{emoji}</div>',
-                        unsafe_allow_html=True,
-                    )
-                st.markdown(f"### {lieu.nom}")
+                    st.markdown(vignette_html(emoji, couleur), unsafe_allow_html=True)
+                if donnees.get("categories"):
+                    st.markdown(category_chips_html(donnees["categories"]), unsafe_allow_html=True)
+                st.markdown(f"**{lieu.nom}**")
                 st.caption(f"{lieu.pays or ''} — {lieu.region or ''}")
                 if donnees.get("resume"):
                     st.write(donnees["resume"])

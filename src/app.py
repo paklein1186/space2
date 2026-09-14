@@ -24,9 +24,12 @@ from src.agent.collecte_tools import CollecteToolHandler
 from src.annuaire import (
     SECTIONS_SYNTHESE,
     build_fiche_lieu,
+    category_chips_html,
     default_visual,
     lieux_avec_coordonnees,
+    photo_html,
     source_items_for_section,
+    vignette_html,
 )
 from src.auth_session import clear_session_cookie, read_session_cookie, save_session_cookie
 from src.db.factory import get_admin_store, get_store
@@ -302,25 +305,6 @@ def _auto_enrich_one(store, lieu) -> None:
         pass  # une synthèse en échec ne doit jamais bloquer l'affichage de la fiche
 
 
-def _vignette_html(emoji: str, couleur: str, hauteur: str = "9rem") -> str:
-    return (
-        f'<div style="width:100%;height:{hauteur};border-radius:8px;background:{couleur};'
-        f'display:flex;align-items:center;justify-content:center;font-size:2.2rem;">{emoji}</div>'
-    )
-
-
-def _photo_html(url: str, hauteur: str = "9rem") -> str:
-    """Rendu HTML brut plutôt que st.image() : object-fit:cover force une
-    hauteur/largeur identique pour toutes les vignettes de la galerie
-    (Annuaire, popup), quel que soit le format d'origine de la photo —
-    st.image() seul affiche chaque image à son ratio propre, ce qui donnait
-    une grille aux hauteurs de carte irrégulières."""
-    return (
-        f'<img src="{url}" style="width:100%;height:{hauteur};border-radius:8px;'
-        f'object-fit:cover;display:block;" />'
-    )
-
-
 def _texte_en_points(texte: str) -> str:
     """Reformate un texte de synthèse en liste à puces plutôt qu'un seul
     paragraphe dense : le prompt d'enrichissement homogénéise la LONGUEUR de
@@ -337,23 +321,6 @@ def _texte_en_points(texte: str) -> str:
     return "\n".join(f"- {p}" for p in phrases)
 
 
-_CATEGORY_COLORS = {
-    "Alimentaire": "#C97A3D", "Culturel": "#8B4B6B", "Éducation": "#3D6E8C", "Santé": "#4F7A52",
-}
-
-
-def _category_chips_html(categories: list) -> str:
-    if not categories:
-        return ""
-    chips = "".join(
-        f'<span style="background:{_CATEGORY_COLORS.get(c, "#888")};color:#fff;font-size:0.72rem;'
-        f'padding:2px 8px;border-radius:10px;margin-right:4px;display:inline-block;'
-        f'margin-bottom:4px;">{c}</span>'
-        for c in categories
-    )
-    return f'<div style="margin:4px 0;">{chips}</div>'
-
-
 @st.dialog("Fiche du lieu", width="large")
 def _fiche_dialog(store, fiche, est_admin: bool, user_id: str):
     lieu = fiche["tiers_lieu"]
@@ -368,10 +335,10 @@ def _fiche_dialog(store, fiche, est_admin: bool, user_id: str):
     col_vignette, col_info = st.columns([1, 2.5])
     with col_vignette:
         if derive and derive.photo_url:
-            st.markdown(_photo_html(derive.photo_url, hauteur="10rem"), unsafe_allow_html=True)
+            st.markdown(photo_html(derive.photo_url, hauteur="10rem"), unsafe_allow_html=True)
         else:
             emoji, couleur = default_visual(lieu.nom, donnees)
-            st.markdown(_vignette_html(emoji, couleur, hauteur="10rem"), unsafe_allow_html=True)
+            st.markdown(vignette_html(emoji, couleur, hauteur="10rem"), unsafe_allow_html=True)
     with col_info:
         st.markdown(f"### {lieu.nom}")
         st.caption(
@@ -379,7 +346,7 @@ def _fiche_dialog(store, fiche, est_admin: bool, user_id: str):
             f"{fiche['nombre_contributeurs']} contributeur(s)"
         )
         if donnees.get("categories"):
-            st.markdown(_category_chips_html(donnees["categories"]), unsafe_allow_html=True)
+            st.markdown(category_chips_html(donnees["categories"]), unsafe_allow_html=True)
         if derive:
             st.write(donnees.get("resume", ""))
             if derive.lien_externe:
@@ -651,12 +618,12 @@ def annuaire_tab(store, est_admin: bool, user_id: str):
             with col:
                 with st.container(border=True):
                     if derive and derive.photo_url:
-                        st.markdown(_photo_html(derive.photo_url), unsafe_allow_html=True)
+                        st.markdown(photo_html(derive.photo_url), unsafe_allow_html=True)
                     else:
                         emoji, couleur = default_visual(lieu.nom, donnees)
-                        st.markdown(_vignette_html(emoji, couleur), unsafe_allow_html=True)
+                        st.markdown(vignette_html(emoji, couleur), unsafe_allow_html=True)
                     if donnees.get("categories"):
-                        st.markdown(_category_chips_html(donnees["categories"]), unsafe_allow_html=True)
+                        st.markdown(category_chips_html(donnees["categories"]), unsafe_allow_html=True)
                     if st.button(lieu.nom, key=f"open_{lieu.id}", use_container_width=True):
                         st.session_state["annuaire_open_lieu_id"] = lieu.id
                         st.rerun()
@@ -669,8 +636,27 @@ def _admin_portfolio_form(store, lieu, derive) -> None:
         st.caption("Une synthèse doit d'abord être générée pour ce lieu avant de pouvoir "
                     "l'inclure au Portfolio.")
         return
-    with st.form(f"portfolio_{lieu.id}"):
-        inclus = st.checkbox("Inclure ce lieu dans le Portfolio public", value=bool(derive.inclus_portfolio))
+
+    # Case à cocher hors formulaire, sauvegardée immédiatement via on_change —
+    # dans un st.form, elle restait sans effet tant que le bouton "Enregistrer"
+    # n'était pas cliqué séparément (facile à manquer, et c'est bien ce qui
+    # s'est produit en pratique : aucun lieu n'avait jamais inclus_portfolio à
+    # true en base malgré des cases cochées). L'inclusion est un simple
+    # bascule ; seul le texte de campagne, plus long à saisir, garde un
+    # formulaire pour éviter un rerun à chaque frappe.
+    def _bascule_inclusion() -> None:
+        nouvel_etat = st.session_state[f"portfolio_inclus_{lieu.id}"]
+        get_admin_store().update_portfolio_entry(
+            lieu.id, nouvel_etat, derive.campagne_texte, derive.campagne_objectif, derive.campagne_contact,
+        )
+
+    st.checkbox(
+        "Inclure ce lieu dans le Portfolio public", value=bool(derive.inclus_portfolio),
+        key=f"portfolio_inclus_{lieu.id}", on_change=_bascule_inclusion,
+        help="Sauvegardé immédiatement, sans passer par le bouton Enregistrer ci-dessous.",
+    )
+
+    with st.form(f"portfolio_campagne_{lieu.id}"):
         campagne_texte = st.text_area("Texte de campagne (appel, contexte des besoins)",
                                        value=derive.campagne_texte or "")
         col1, col2 = st.columns(2)
@@ -679,11 +665,12 @@ def _admin_portfolio_form(store, lieu, derive) -> None:
                                                 value=derive.campagne_objectif or "")
         with col2:
             campagne_contact = st.text_input("Contact", value=derive.campagne_contact or "")
-        if st.form_submit_button("Enregistrer"):
+        if st.form_submit_button("Enregistrer la campagne"):
             get_admin_store().update_portfolio_entry(
-                lieu.id, inclus, campagne_texte or None, campagne_objectif or None, campagne_contact or None,
+                lieu.id, bool(derive.inclus_portfolio), campagne_texte or None,
+                campagne_objectif or None, campagne_contact or None,
             )
-            st.success("Portfolio mis à jour.")
+            st.success("Campagne mise à jour.")
             st.rerun()
 
 
