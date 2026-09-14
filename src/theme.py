@@ -140,7 +140,15 @@ def apply_theme() -> str:
     on_change, pas juste "le widget a été rendu"), on continue de relire le
     cookie à chaque rerun et de s'y aligner — sans quoi une lecture prématurée
     (vide) se figerait et écraserait ensuite un cookie déjà valide."""
-    from src.auth_session import THEME_COOKIE_NAME, read_cookie, save_cookie
+    from src.auth_session import THEME_COOKIE_NAME, read_cookie, refresh_cookies, save_cookie
+
+    # Seul vrai appel au composant cookie de tout le script (voir la note
+    # dans auth_session.py) : auth_screen()/read_session_cookie() ne font
+    # ensuite que relire l'instantané que ce refresh vient de poser, sans
+    # réinvoquer le composant — deux appels avec la même clé dans un même
+    # passage de script feraient planter l'app (StreamlitDuplicateElementKey,
+    # rencontré concrètement).
+    refresh_cookies()
 
     def _on_user_choice() -> None:
         st.session_state["ui_theme_user_set"] = True
