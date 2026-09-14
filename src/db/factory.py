@@ -37,11 +37,18 @@ def get_store(client=None) -> Store:
 
 
 def get_admin_store() -> Store:
-    """Store pour les scripts de fond (import, enrichissement, migration) qui
-    écrivent au nom du système plutôt que d'un utilisateur connecté. Sur
-    Supabase, ces écritures doivent contourner RLS (aucune session utilisateur
-    dans un script CLI) — nécessite `SUPABASE_SERVICE_KEY` (clé service_role,
-    jamais utilisée côté app interactive). À défaut, retombe sur SQLite local."""
+    """Store pour les scripts de fond (import, enrichissement, migration) et
+    pour les actions d'administration de l'app interactive (modération,
+    curation Portfolio...) qui doivent contourner RLS — nécessite
+    `SUPABASE_SERVICE_KEY` (clé service_role).
+
+    Si `SUPABASE_URL` est configuré mais que la clé service_role est absente,
+    on lève une erreur explicite plutôt que de retomber silencieusement sur
+    SQLite local : un tel repli silencieux fait croire qu'une écriture admin
+    a réussi (le formulaire se ferme sans erreur) alors qu'elle a atterri
+    dans une base SQLite locale que le reste de l'app ne relit jamais — c'est
+    exactement le bug rencontré en production avec la case à cocher Portfolio,
+    invisible jusqu'à ce qu'on compare les deux bases directement."""
     url = os.environ.get("SUPABASE_URL")
     service_key = os.environ.get("SUPABASE_SERVICE_KEY")
     if url and service_key:
@@ -50,14 +57,12 @@ def get_admin_store() -> Store:
         return SupabaseStore(url, service_key)
 
     if url and os.environ.get("SUPABASE_KEY") and not service_key:
-        import warnings
-
-        warnings.warn(
+        raise RuntimeError(
             "SUPABASE_URL est configuré mais SUPABASE_SERVICE_KEY est absent : "
-            "les scripts de fond ne peuvent pas écrire sur Supabase à cause de "
-            "RLS (elle exige un utilisateur authentifié, absent dans un script "
-            "CLI). Utilisation de SQLite local à la place — ajoutez "
-            "SUPABASE_SERVICE_KEY dans .env pour basculer ces scripts sur Supabase."
+            "impossible d'effectuer cette action admin sur Supabase (RLS exige "
+            "soit un utilisateur authentifié admin, soit la clé service_role). "
+            "Ajoutez SUPABASE_SERVICE_KEY dans les secrets (.env en local, "
+            "secrets de l'app en production) — voir README.md."
         )
 
     from .sqlite_store import SqliteStore

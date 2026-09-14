@@ -50,7 +50,7 @@ for i in range(0, len(lieux), cols_par_ligne):
                     st.markdown(vignette_html(emoji, couleur), unsafe_allow_html=True)
                 if donnees.get("categories"):
                     st.markdown(category_chips_html(donnees["categories"]), unsafe_allow_html=True)
-                st.markdown(f"**{lieu.nom}**")
+                st.markdown(f"### {lieu.nom}")
                 st.caption(f"{lieu.pays or ''} — {lieu.region or ''}")
                 if donnees.get("resume"):
                     st.write(donnees["resume"])

@@ -191,6 +191,27 @@ ROLE_LABELS = {
 }
 
 
+def _admin_store_or_error(silent: bool = False):
+    """get_admin_store(), mais affiche un message clair dans l'UI plutôt que
+    de laisser planter l'onglet si SUPABASE_SERVICE_KEY manque — ce repli
+    silencieux (avant : écriture vers une base SQLite locale jamais relue)
+    est exactement ce qui a fait "disparaître" un lieu coché pour le
+    Portfolio en production. Renvoie None si indisponible ; l'appelant doit
+    vérifier avant d'utiliser le store retourné.
+
+    `silent=True` pour un appel de lecture fait pour TOUT visiteur d'une
+    fiche (ex. résoudre la liste des contributeurs) : un visiteur non-admin
+    ne peut rien faire de ce message et ne devrait pas voir une bannière
+    d'erreur rouge à chaque ouverture de fiche pour un problème de
+    configuration qui ne le concerne pas."""
+    try:
+        return get_admin_store()
+    except RuntimeError as exc:
+        if not silent:
+            st.error(str(exc))
+        return None
+
+
 def sidebar_lieu_et_role(store, user_id: str):
     st.sidebar.header("Votre contribution")
     # Tous les lieux recensés (pas seulement les siens) : n'importe quel
@@ -420,7 +441,8 @@ def _fiche_dialog(store, fiche, est_admin: bool, user_id: str):
     # donc passer par le store service_role pour voir tous les contributeurs
     # d'un lieu, sans quoi la liste de modération ne montrerait jamais que
     # soi-même.
-    contributeurs_lieu = get_admin_store().list_contributeurs(lieu.id)
+    admin_store_moderation = _admin_store_or_error(silent=not est_admin)
+    contributeurs_lieu = admin_store_moderation.list_contributeurs(lieu.id) if admin_store_moderation else []
     mon_contributeur_interne = next(
         (c for c in contributeurs_lieu if c.user_id == user_id and c.role in ROLES_INTERNES and not c.bloque),
         None,
@@ -444,12 +466,16 @@ def _historique_et_moderation(store, lieu, contributeurs_lieu: list, est_admin: 
                     pass
                 elif c.bloque:
                     if st.button("Débloquer", key=f"unblock_{c.id}"):
-                        get_admin_store().set_contributeur_bloque(c.id, False)
-                        st.rerun()
+                        admin_store = _admin_store_or_error()
+                        if admin_store:
+                            admin_store.set_contributeur_bloque(c.id, False)
+                            st.rerun()
                 else:
                     if st.button("Bloquer", key=f"block_{c.id}"):
-                        get_admin_store().set_contributeur_bloque(c.id, True, bloque_par=user_id)
-                        st.rerun()
+                        admin_store = _admin_store_or_error()
+                        if admin_store:
+                            admin_store.set_contributeur_bloque(c.id, True, bloque_par=user_id)
+                            st.rerun()
 
         st.markdown("**Signaler un litige**")
         options_cible = [None] + [c.id for c in contributeurs_lieu]
@@ -462,12 +488,14 @@ def _historique_et_moderation(store, lieu, contributeurs_lieu: list, est_admin: 
                 if not description.strip():
                     st.error("Décrivez le désaccord avant de signaler.")
                 else:
-                    get_admin_store().save_litige(Litige(
-                        tiers_lieu_id=lieu.id, description=description.strip(),
-                        signale_par=user_id, contributeur_vise_id=cible,
-                    ))
-                    st.success("Litige signalé.")
-                    st.rerun()
+                    admin_store = _admin_store_or_error()
+                    if admin_store:
+                        admin_store.save_litige(Litige(
+                            tiers_lieu_id=lieu.id, description=description.strip(),
+                            signale_par=user_id, contributeur_vise_id=cible,
+                        ))
+                        st.success("Litige signalé.")
+                        st.rerun()
 
         litiges = store.list_litiges(lieu.id)
         if litiges:
@@ -480,8 +508,10 @@ def _historique_et_moderation(store, lieu, contributeurs_lieu: list, est_admin: 
                 with col2:
                     if est_admin and lit.statut == "ouvert":
                         if st.button("Résoudre", key=f"resoudre_{lit.id}"):
-                            get_admin_store().resoudre_litige(lit.id)
-                            st.rerun()
+                            admin_store = _admin_store_or_error()
+                            if admin_store:
+                                admin_store.resoudre_litige(lit.id)
+                                st.rerun()
 
         st.markdown("**Historique récent**")
         historique = store.get_historique(lieu.id, limite=30)
@@ -645,8 +675,17 @@ def _admin_portfolio_form(store, lieu, derive) -> None:
     # bascule ; seul le texte de campagne, plus long à saisir, garde un
     # formulaire pour éviter un rerun à chaque frappe.
     def _bascule_inclusion() -> None:
-        nouvel_etat = st.session_state[f"portfolio_inclus_{lieu.id}"]
-        get_admin_store().update_portfolio_entry(
+        cle = f"portfolio_inclus_{lieu.id}"
+        nouvel_etat = st.session_state[cle]
+        admin_store = _admin_store_or_error()
+        if admin_store is None:
+            # Écriture impossible (SUPABASE_SERVICE_KEY manquant) : on annule
+            # visuellement la case plutôt que de la laisser cochée sans rien
+            # avoir sauvegardé — une case cochée à tort qui semble "prise en
+            # compte" est exactement ce qui a masqué ce bug en production.
+            st.session_state[cle] = not nouvel_etat
+            return
+        admin_store.update_portfolio_entry(
             lieu.id, nouvel_etat, derive.campagne_texte, derive.campagne_objectif, derive.campagne_contact,
         )
 
@@ -666,12 +705,14 @@ def _admin_portfolio_form(store, lieu, derive) -> None:
         with col2:
             campagne_contact = st.text_input("Contact", value=derive.campagne_contact or "")
         if st.form_submit_button("Enregistrer la campagne"):
-            get_admin_store().update_portfolio_entry(
-                lieu.id, bool(derive.inclus_portfolio), campagne_texte or None,
-                campagne_objectif or None, campagne_contact or None,
-            )
-            st.success("Campagne mise à jour.")
-            st.rerun()
+            admin_store = _admin_store_or_error()
+            if admin_store:
+                admin_store.update_portfolio_entry(
+                    lieu.id, bool(derive.inclus_portfolio), campagne_texte or None,
+                    campagne_objectif or None, campagne_contact or None,
+                )
+                st.success("Campagne mise à jour.")
+                st.rerun()
 
 
 def _condition_text(condition) -> str | None:
@@ -686,7 +727,9 @@ def _condition_text(condition) -> str | None:
 
 def administration_tab(store, user_id: str) -> None:
     st.subheader("Administration")
-    admin_store = get_admin_store()
+    admin_store = _admin_store_or_error()
+    if admin_store is None:
+        return
 
     with st.expander("Comptes administrateurs", expanded=False):
         # list_admin_emails() appelle l'API Admin Auth de Supabase
