@@ -7,6 +7,7 @@ travailler sans compte Supabase.
 
 from __future__ import annotations
 
+import math
 import os
 import sys
 from pathlib import Path
@@ -14,6 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pandas as pd
+import pydeck as pdk
 import streamlit as st
 from dotenv import load_dotenv
 
@@ -545,7 +547,61 @@ def annuaire_tab(store, est_admin: bool, user_id: str):
 
     coords = lieux_avec_coordonnees(store)
     if coords:
-        st.map(pd.DataFrame(coords))
+        df_coords = pd.DataFrame(coords)
+        lat_centre = df_coords["lat"].mean()
+        lon_centre = df_coords["lon"].mean()
+        # Zoom calé sur l'étendue réelle des lieux plutôt qu'une valeur fixe
+        # (vue par défaut trop large ou trop resserrée selon les données) :
+        # formule standard "fit bounds" (256px = 360° au niveau 0), avec une
+        # marge de 30% pour ne pas coller les points au bord de la carte.
+        etendue = max(
+            df_coords["lat"].max() - df_coords["lat"].min(),
+            df_coords["lon"].max() - df_coords["lon"].min(),
+            0.02,
+        )
+        zoom = max(3.0, min(math.log2(757 / etendue), 14.0))
+
+        couche_lieux = pdk.Layer(
+            "ScatterplotLayer",
+            data=df_coords,
+            id="lieux",
+            get_position=["lon", "lat"],
+            get_fill_color=[74, 222, 128, 210],
+            get_radius=600,
+            # Rayon plancher en pixels (indépendant du zoom) : à faible zoom,
+            # 600m à l'échelle réelle devient quelques pixels à peine, trop
+            # petit pour être cliqué de façon fiable.
+            radius_min_pixels=6,
+            radius_max_pixels=24,
+            pickable=True,
+            auto_highlight=True,
+        )
+        vue = pdk.ViewState(latitude=lat_centre, longitude=lon_centre, zoom=zoom)
+        # map_provider="carto" : fond de carte par défaut de pydeck, sans
+        # jeton Mapbox à configurer (contrairement à map_style="mapbox://...").
+        deck = pdk.Deck(
+            layers=[couche_lieux], initial_view_state=vue,
+            map_provider="carto", map_style="light",
+            tooltip={"text": "{nom}"},
+        )
+        # on_select="rerun" + id sur la couche : un clic renvoie le lieu
+        # sélectionné, réutilisé pour ouvrir la même fiche que le clic sur
+        # une carte de la grille (annuaire_open_lieu_id), sans dupliquer le
+        # popup dans un second mécanisme d'affichage.
+        evenement = st.pydeck_chart(
+            deck, on_select="rerun", selection_mode="single-object", key="annuaire_map",
+        )
+        objets_selectionnes = evenement.selection.get("objects", {}).get("lieux", [])
+        # La sélection du widget carte reste posée d'un rerun à l'autre (pas
+        # d'événement ponctuel comme un clic de bouton) : sans le comparer à
+        # la dernière traitée, chaque rerun (dialogue fermé, filtre changé...)
+        # rouvrirait la même fiche en boucle, provoquant une boucle infinie.
+        if objets_selectionnes:
+            lieu_selectionne_id = objets_selectionnes[0]["id"]
+            if st.session_state.get("_derniere_selection_carte") != lieu_selectionne_id:
+                st.session_state["_derniere_selection_carte"] = lieu_selectionne_id
+                st.session_state["annuaire_open_lieu_id"] = lieu_selectionne_id
+                st.rerun()
 
     recherche = st.text_input(
         "Rechercher", placeholder="🔍 Nom, ville, région...", label_visibility="collapsed",

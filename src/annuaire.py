@@ -133,7 +133,7 @@ def build_annuaire(store: Store) -> list:
 
 def lieux_avec_coordonnees(store: Store) -> list:
     return [
-        {"nom": l.nom, "lat": l.latitude, "lon": l.longitude}
+        {"id": l.id, "nom": l.nom, "lat": l.latitude, "lon": l.longitude}
         for l in store.list_tiers_lieux()
         if l.latitude is not None and l.longitude is not None
     ]
