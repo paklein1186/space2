@@ -88,19 +88,21 @@ def build_fiche_lieu(store: Store, tiers_lieu) -> dict:
     }
 
 
-def source_items_for_section(store: Store, tiers_lieu_id: str, section_key: str,
-                              lieu_derive) -> list:
+def source_items_for_section(section_key: str, lieu_derive, notes: list, par_contributeur: dict) -> list:
     """Résout les identifiants de provenance d'une section de synthèse
     (lieu_derive.sources[section_key], ex. ["milieu", "note_2"]) vers leur
-    contenu brut affichable dans le popup de sources."""
+    contenu brut affichable dans le popup de sources.
+
+    `notes`/`par_contributeur` sont pré-chargés par l'appelant (une seule
+    fois pour tout le lieu) plutôt que refetchés ici : cette fonction est
+    appelée une fois par section affichée (jusqu'à 11 fois pour un même
+    lieu) — les refetcher à chaque appel multipliait les allers-retours
+    réseau par 11 pour rien, l'une des causes de la lenteur de la fiche."""
     if not lieu_derive or not lieu_derive.sources:
         return []
     ids = lieu_derive.sources.get(section_key, [])
     if not ids:
         return []
-
-    notes = store.get_free_text_notes(tiers_lieu_id)
-    par_contributeur = store.get_all_answers_by_contributeur(tiers_lieu_id)
 
     items = []
     for source_id in ids:

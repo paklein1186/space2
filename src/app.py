@@ -265,12 +265,22 @@ def entretien_tab(store, user_id: str, nom_lieu: str, role: str):
         with st.chat_message(speaker):
             st.write(text)
 
+    # En deux temps (message ajouté + rerun immédiat, appel LLM au rerun
+    # suivant) — voir la même note dans rag_tab : sans ça, la réponse de
+    # l'utilisateur ne s'affichait elle-même qu'une fois la réplique de
+    # l'agent obtenue, plusieurs secondes plus tard.
     user_text = st.chat_input("Votre réponse...")
     if user_text:
         state["history"].append(("user", user_text))
+        state["reponse_en_attente"] = user_text
+        st.rerun()
+
+    if state.get("reponse_en_attente"):
+        reponse_en_attente = state["reponse_en_attente"]
         with st.spinner("L'agent réfléchit..."):
-            reply = state["agent"].send(user_text)
+            reply = state["agent"].send(reponse_en_attente)
         state["history"].append(("assistant", reply))
+        state["reponse_en_attente"] = None
         st.rerun()
 
 
@@ -390,9 +400,13 @@ def _fiche_dialog(store, fiche, est_admin: bool, user_id: str):
         # partenariat... n'est mentionné") — ne rien afficher plutôt que du
         # bruit sans valeur informative, cohérent avec le principe
         # déclaré/déduit : rien de déclaré, rien à montrer comme fait.
+        # Un seul chargement pour tout le lieu, réutilisé pour les jusqu'à 11
+        # sections (voir la note dans source_items_for_section).
+        notes_lieu = store.get_free_text_notes(lieu.id)
+        reponses_lieu = store.get_all_answers_by_contributeur(lieu.id)
         sections_avec_sources = []
         for cle, titre in SECTIONS_SYNTHESE[1:]:  # sans "resume", déjà affiché
-            sources = source_items_for_section(store, lieu.id, cle, derive)
+            sources = source_items_for_section(cle, derive, notes_lieu, reponses_lieu)
             if sources:
                 sections_avec_sources.append((cle, titre, sources))
 
@@ -741,12 +755,24 @@ def rag_tab(store):
         with st.chat_message(speaker):
             st.write(text)
 
+    # En deux temps (message ajouté + rerun IMMÉDIAT, puis appel LLM dans le
+    # rerun suivant) plutôt qu'un seul passage qui ajoute le message ET
+    # attend la réponse avant de rafraîchir l'affichage : sans ça, la
+    # question de l'utilisateur ne s'affichait elle-même qu'une fois la
+    # réponse complète obtenue, donnant l'impression que tout le site est
+    # lent alors que c'est seulement l'appel LLM qui prend plusieurs secondes.
     question = st.chat_input("Posez une question sur les lieux recensés ou les documents déposés...")
     if question:
         st.session_state["rag_history"].append(("user", question))
+        st.session_state["rag_question_en_attente"] = question
+        st.rerun()
+
+    if st.session_state.get("rag_question_en_attente"):
+        question_en_attente = st.session_state["rag_question_en_attente"]
         with st.spinner("Recherche en cours..."):
-            reply = st.session_state["rag_agent"].send(question)
+            reply = st.session_state["rag_agent"].send(question_en_attente)
         st.session_state["rag_history"].append(("assistant", reply))
+        st.session_state["rag_question_en_attente"] = None
         st.rerun()
 
 
