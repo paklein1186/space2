@@ -136,8 +136,8 @@ def apply_theme() -> str:
     Le composant cookie (iframe bidirectionnel) ne répond pas forcément dès
     le premier passage du script : une lecture peut renvoyer vide alors qu'un
     cookie existe bel et bien, le temps que le navigateur réponde. Tant que
-    l'utilisateur n'a pas explicitement touché le sélecteur (détecté via
-    on_change, pas juste "le widget a été rendu"), on continue de relire le
+    l'utilisateur n'a pas explicitement touché le bouton (détecté via
+    on_click, pas juste "le widget a été rendu"), on continue de relire le
     cookie à chaque rerun et de s'y aligner — sans quoi une lecture prématurée
     (vide) se figerait et écraserait ensuite un cookie déjà valide."""
     from src.auth_session import THEME_COOKIE_NAME, read_cookie, refresh_cookies, save_cookie
@@ -150,9 +150,6 @@ def apply_theme() -> str:
     # rencontré concrètement).
     refresh_cookies()
 
-    def _on_user_choice() -> None:
-        st.session_state["ui_theme_user_set"] = True
-
     if "ui_theme" not in st.session_state:
         st.session_state["ui_theme"] = "dark"
         st.session_state["ui_theme_user_set"] = False
@@ -162,20 +159,22 @@ def apply_theme() -> str:
         if cookie_value in _PALETTES:
             st.session_state["ui_theme"] = cookie_value
 
-    # st.selectbox plutôt que st.radio/st.segmented_control/st.toggle : déjà
-    # utilisé ailleurs dans cette app (rôle/lieu en barre latérale), donc son
-    # chunk JS est déjà chargé de façon fiable — un widget jamais utilisé
-    # avant a fait planter toute l'app en production (chunk JS introuvable).
-    mode = st.sidebar.selectbox(
-        "Thème", options=["dark", "light"],
-        format_func=lambda m: "🌙 Sombre" if m == "dark" else "☀️ Clair",
-        label_visibility="collapsed", key="ui_theme", on_change=_on_user_choice,
+    def _basculer_theme() -> None:
+        st.session_state["ui_theme"] = "light" if st.session_state["ui_theme"] == "dark" else "dark"
+        st.session_state["ui_theme_user_set"] = True
+        save_cookie(THEME_COOKIE_NAME, st.session_state["ui_theme"])
+
+    mode = st.session_state["ui_theme"]
+    # Un simple bouton bascule (icône soleil/lune) plutôt qu'un st.selectbox :
+    # la structure DOM interne du composant BaseWeb Select (utilisé par
+    # st.selectbox) ne correspondait plus au sélecteur CSS ciblé pour le
+    # thème sombre — le menu déroulant s'affichait avec un fond blanc
+    # illisible. st.button suit le même style déjà éprouvé partout ailleurs
+    # dans l'app (voir _CSS_TEMPLATE plus haut), sans ce risque.
+    st.sidebar.button(
+        "☀️ Mode clair" if mode == "dark" else "🌙 Mode sombre",
+        key="ui_theme_toggle", on_click=_basculer_theme, use_container_width=True,
     )
-    # N'écrit le cookie que sur un choix explicite de l'utilisateur — jamais
-    # depuis une simple valeur par défaut le temps que le cookie réel arrive,
-    # sans quoi on écraserait un cookie valide avec ce repli temporaire.
-    if st.session_state.get("ui_theme_user_set") and read_cookie(THEME_COOKIE_NAME) != mode:
-        save_cookie(THEME_COOKIE_NAME, mode)
 
     palette = _PALETTES.get(mode, _PALETTES["dark"])
     st.markdown(_CSS_TEMPLATE.format(**palette), unsafe_allow_html=True)

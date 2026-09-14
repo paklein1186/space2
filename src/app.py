@@ -213,8 +213,13 @@ def _admin_store_or_error(silent: bool = False):
         return None
 
 
-def sidebar_lieu_et_role(store, user_id: str):
-    st.sidebar.header("Votre contribution")
+def contribution_selector(store, user_id: str):
+    """Sélection du lieu/rôle pour l'Entretien — affichée dans le corps de
+    l'onglet lui-même (pas dans la barre latérale) : ce choix ne conditionne
+    QUE cet onglet (Assistant RAG, Annuaire, Administration n'en ont pas
+    besoin), et le montrer dans la barre latérale le faisait apparaître sur
+    tous les onglets sans raison, y compris ceux où il n'a aucun effet."""
+    st.subheader("Votre contribution")
     # Tous les lieux recensés (pas seulement les siens) : n'importe quel
     # utilisateur connecté peut devenir contributeur/steward d'un lieu créé
     # par quelqu'un d'autre (cf. bouton "Continuer à nourrir" de l'Annuaire).
@@ -226,26 +231,30 @@ def sidebar_lieu_et_role(store, user_id: str):
 
     options_lieu = ["— Nouveau lieu —"] + noms_existants
     index_lieu = options_lieu.index(preselect_lieu) if preselect_lieu in options_lieu else 0
-    choix = st.sidebar.selectbox("Tiers-lieu", options=options_lieu, index=index_lieu)
-    if choix == "— Nouveau lieu —":
-        nom_lieu = st.sidebar.text_input("Nom du nouveau lieu")
-    else:
-        nom_lieu = choix
+    col_lieu, col_role = st.columns(2)
+    with col_lieu:
+        choix = st.selectbox("Tiers-lieu", options=options_lieu, index=index_lieu)
+        if choix == "— Nouveau lieu —":
+            nom_lieu = st.text_input("Nom du nouveau lieu")
+        else:
+            nom_lieu = choix
 
     role_options = [r.value for r in Role]
     index_role = role_options.index(preselect_role) if preselect_role in role_options else 0
-    role = st.sidebar.selectbox(
-        "Votre rôle vis-à-vis de ce lieu",
-        options=role_options,
-        index=index_role,
-        format_func=lambda r: ROLE_LABELS[r],
-    )
+    with col_role:
+        role = st.selectbox(
+            "Votre rôle vis-à-vis de ce lieu",
+            options=role_options,
+            index=index_role,
+            format_func=lambda r: ROLE_LABELS[r],
+        )
     return nom_lieu, role
 
 
-def entretien_tab(store, user_id: str, nom_lieu: str, role: str):
+def entretien_tab(store, user_id: str):
+    nom_lieu, role = contribution_selector(store, user_id)
     if not nom_lieu:
-        st.info("Choisissez ou créez un tiers-lieu dans la barre latérale pour démarrer.")
+        st.info("Choisissez ou créez un tiers-lieu ci-dessus pour démarrer.")
         return
     if not os.environ.get("ANTHROPIC_API_KEY"):
         st.error("ANTHROPIC_API_KEY n'est pas configuré (voir .env.example).")
@@ -865,7 +874,6 @@ def main():
             st.session_state.pop(key, None)
         st.rerun()
 
-    nom_lieu, role = sidebar_lieu_et_role(store, user_id)
     # En LOCAL_DEV_AUTOLOGIN, le store est déjà admin (service_role) : pas de
     # table `admins` à consulter, l'accès complet est déjà acquis par construction.
     est_admin = bool(st.session_state.get("use_admin_store")) or store.is_admin(user_id)
@@ -889,7 +897,7 @@ def main():
             st.error(f"L'onglet « {nom_onglet} » a rencontré une erreur : {exc}")
 
     with tabs[0]:
-        _rendre_isole("Entretien", entretien_tab, store, user_id, nom_lieu, role)
+        _rendre_isole("Entretien", entretien_tab, store, user_id)
     with tabs[1]:
         _rendre_isole("Assistant RAG", rag_tab, store)
     with tabs[2]:
