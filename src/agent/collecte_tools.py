@@ -15,6 +15,7 @@ from typing import Optional
 from ..db.store import SessionEntretien, Store
 from ..questionnaire.resolver import (
     country_code_for,
+    field_is_active,
     next_incomplete_section,
     next_module,
     resolve_section_fields,
@@ -159,7 +160,13 @@ class CollecteToolHandler:
         fields = []
         for champ_id in restants:
             f = get_field(champ_id)
-            if f is None or not f.allowed_for(self.role):
+            # field_is_active (pas juste allowed_for) : une campagne peut
+            # référencer un champ dont la condition dépend d'un autre champ de
+            # la même campagne (ex. une question de cadrage "oui/non" suivie
+            # de champs de détail visibles seulement si la réponse est "oui")
+            # — sans ce filtre, tous les champs de la campagne seraient
+            # proposés d'un coup, condition ou pas.
+            if f is None or not field_is_active(f, answers, self.role):
                 continue
             fields.append({
                 "id": f.id, "label": f.label, "type": f.type.value,

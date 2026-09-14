@@ -229,6 +229,14 @@ TRANCHES_AGE = [
     "Je ne sais pas",
 ]
 
+# Bande d'intensité réutilisée pour les questions de répartition (mode de
+# déplacement, provenance des usagers...) — reprend l'échelle du questionnaire
+# gestionnaires ULiège plutôt qu'un pourcentage exact, plus réaliste à donner
+# à l'oral dans un entretien conversationnel qu'un chiffre précis.
+BANDE_INTENSITE = [
+    "Nul (0%)", "Limité (< 25%)", "Peu élevé (25 à 50%)", "Assez élevé (50 à 75%)", "Très élevé (> 75%)",
+]
+
 
 # ---------------------------------------------------------------------------
 # Module 1 — Socle (obligatoire)
@@ -250,6 +258,8 @@ section_localisation_identite = Section(
               options=["Rural", "Semi-rural", "Urbain"], required=True),
         Field("date_ouverture", "Date (ou année) d'ouverture du lieu", FieldType.DATE),
         Field("description_courte", "En une phrase, comment décririez-vous ce lieu ?", FieldType.TEXTAREA),
+        Field("avantages_localisation", "Quels avantages trouvez-vous à cette localisation ?", FieldType.TEXTAREA),
+        Field("inconvenients_localisation", "Quels inconvénients trouvez-vous à cette localisation ?", FieldType.TEXTAREA),
     ],
 )
 
@@ -272,6 +282,10 @@ section_acteurs_origine = Section(
               options=["Ateliers artisanaux partagés", "Bureaux partagés / coworking", "Cuisine partagée / foodlab",
                        "Fablab / makerspace / hackerspace", "Living lab / laboratoire d'innovation sociale",
                        "Tiers-lieu nourricier", "Tiers-lieu culturel / lieu intermédiaire", "Autre"]),
+        Field("lance_seul", "Avez-vous choisi et commencé à occuper ce lieu seul, ou à plusieurs ?", FieldType.BOOLEAN,
+              help_text="Répondez « oui » si vous avez été seul·e à l'initiative du lancement."),
+        Field("modalite_lancement_collectif", "Comment le lancement s'est-il fait à plusieurs ?", FieldType.TEXTAREA,
+              condition=Condition("lance_seul", "eq", False)),
     ],
 )
 
@@ -302,6 +316,24 @@ section_activites_alimentaires = Section(
               options=["Production sur place", "Circuits courts locaux", "Approvisionnement mixte", "Approvisionnement non local", "Je ne sais pas"]),
         Field("volume_repas_paniers", "Volume approximatif (repas ou paniers distribués par mois)", FieldType.NUMBER, roles=ROLES_INTERNES),
         Field("tarification_solidaire", "Une tarification solidaire ou différenciée est-elle proposée ?", FieldType.BOOLEAN),
+    ],
+)
+
+section_services_detailles = Section(
+    id="services_detailles",
+    title="Détail des services proposés",
+    fields=[
+        Field("services_proposes", "Parmi cette liste, lesquels de ces services le lieu propose-t-il ?",
+              FieldType.MULTI_CHOICE,
+              options=["Espaces de télétravail", "Salles de réunion", "Espaces de loisirs ou de spectacle",
+                       "Service de restauration", "Fablab / makerspace / hackerspace", "Atelier(s) pour artisans",
+                       "Domiciliation d'entreprises", "Accompagnement d'entreprises / accueil de structures d'accompagnement",
+                       "Accueil d'associations", "Événements culturels", "Événements professionnels",
+                       "Formations (para)professionnelles", "Aucun de ceux-ci", "Autre"]),
+        Field("nombre_entreprises_domiciliees", "Combien d'entreprises sont domiciliées au lieu ?", FieldType.NUMBER,
+              condition=Condition("services_proposes", "contains", "Domiciliation d'entreprises")),
+        Field("nombre_associations_accueillies", "Combien d'associations sont accueillies au lieu ?", FieldType.NUMBER,
+              condition=Condition("services_proposes", "contains", "Accueil d'associations")),
     ],
 )
 
@@ -337,6 +369,9 @@ section_foncier = Section(
         Field("proprietaire_type", "Si le lieu n'est pas propriétaire, qui possède le bâtiment ?", FieldType.SINGLE_CHOICE,
               condition=Condition("statut_occupation", "ne", "Propriétaire"), roles=ROLES_INTERNES,
               options=["Collectivité publique", "Bailleur social", "Propriétaire privé", "Opérateur public", "Autre"]),
+        Field("lieu_inoccupe_avant", "Ce lieu était-il inoccupé juste avant votre arrivée ?", FieldType.BOOLEAN),
+        Field("ancienne_occupation", "Quelle était son occupation précédente ?", FieldType.TEXT,
+              condition=Condition("lieu_inoccupe_avant", "eq", False)),
     ],
 )
 
@@ -354,6 +389,30 @@ section_publics = Section(
         Field("accessibilite_pmr", "Le lieu est-il accessible aux personnes à mobilité réduite ?", FieldType.BOOLEAN),
         Field("problematiques_sociales", "Le lieu porte-t-il des projets sur l'une de ces problématiques ?", FieldType.MULTI_CHOICE,
               options=DIFFICULTES_SOCIALES),
+        Field("motivations_usagers", "Pourquoi vos usagers viennent-ils principalement ? (plusieurs réponses possibles)",
+              FieldType.MULTI_CHOICE,
+              options=["Pas de place à domicile", "Ambiance et contacts sociaux", "Télétravail",
+                       "Soutien à la démarche du lieu", "Collaborer avec d'autres usagers",
+                       "Recevoir des collaborateurs externes", "Recevoir des clients",
+                       "Installer son activité / son entreprise", "Mener des réunions", "Domicilier son activité",
+                       "Éviter de domicilier son activité à domicile", "Animations extraprofessionnelles",
+                       "Formations (para)professionnelles", "Autre"]),
+        Field("statuts_usagers_dominants", "Parmi ces statuts, lesquels sont bien représentés parmi les usagers ?",
+              FieldType.MULTI_CHOICE,
+              options=["Indépendant à titre principal", "Indépendant à titre complémentaire", "Freelance",
+                       "Salarié", "Étudiant", "Sans emploi", "Membre d'une association", "Dirigeant d'entreprise",
+                       "Riverain", "Autre"]),
+        Field("domaines_professionnels_top3", "Quels sont les 2-3 domaines professionnels les plus représentés parmi les usagers ?",
+              FieldType.TEXTAREA),
+        Field("profil_usagers_evolution", "Par rapport à il y a trois ans, voyez-vous une évolution notable dans le profil des usagers ?",
+              FieldType.MULTI_CHOICE,
+              options=["Davantage de salariés", "Davantage de freelances", "Davantage d'indépendants à titre principal",
+                       "Davantage d'indépendants à titre complémentaire", "Pas de changement notable",
+                       "Le lieu n'existait pas il y a 3 ans"]),
+        Field("frequence_dominante_usagers", "À quelle fréquence la majorité de vos usagers reviennent-ils au lieu ?",
+              FieldType.SINGLE_CHOICE,
+              options=["Quotidienne", "2 à 4 fois par semaine", "Une fois par semaine",
+                       "Quelques fois par mois", "Une fois par mois ou moins", "Je ne sais pas"]),
     ],
 )
 
@@ -417,6 +476,16 @@ section_partenariats = Section(
         Field("liens_entreprises", "Quels liens existent avec des entreprises du territoire ?", FieldType.MULTI_CHOICE,
               options=["Financement d'activités", "Co-développement de projets", "Consommation de services/biens proposés",
                        "Association à la gouvernance", "Pas de lien", "Autre"]),
+        Field("usagers_partenariats_evenements",
+              "Vos usagers ont-ils eux-mêmes des partenariats ou organisent-ils des événements avec d'autres acteurs locaux ?",
+              FieldType.BOOLEAN),
+        Field("usagers_partenariats_detail", "Pouvez-vous préciser ?", FieldType.TEXTAREA,
+              condition=Condition("usagers_partenariats_evenements", "eq", True)),
+        Field("usagers_activites_annexes_quartier",
+              "Vos usagers profitent-ils de leur venue pour faire d'autres activités (achats, démarches, loisirs...) dans le quartier ?",
+              FieldType.BOOLEAN),
+        Field("usagers_activites_annexes_detail", "Lesquelles reviennent le plus souvent ?", FieldType.TEXTAREA,
+              condition=Condition("usagers_activites_annexes_quartier", "eq", True)),
     ],
 )
 
@@ -460,6 +529,7 @@ module_socle = Module(
         section_acteurs_origine,
         section_activites,
         section_activites_alimentaires,
+        section_services_detailles,
         section_milieu_rural,
         section_milieu_urbain,
         section_foncier,
@@ -486,6 +556,14 @@ section_impact_mobilite = Section(
               options=["Faible", "Modérée", "Élevée", "Je ne sais pas"]),
         Field("bilan_carbone_fait", "Un bilan carbone du lieu (énergie, mobilité, alimentation) a-t-il déjà été réalisé ?", FieldType.BOOLEAN),
         Field("part_energie_renouvelable", "Une part de l'énergie utilisée est-elle renouvelable ?", FieldType.BOOLEAN),
+        Field("usagers_mode_voiture", "Quelle part des usagers privilégie la voiture pour venir ?",
+              FieldType.SINGLE_CHOICE, options=BANDE_INTENSITE),
+        Field("usagers_mode_velo", "Quelle part des usagers privilégie le vélo pour venir ?",
+              FieldType.SINGLE_CHOICE, options=BANDE_INTENSITE),
+        Field("usagers_mode_pied", "Quelle part des usagers vient à pied ?",
+              FieldType.SINGLE_CHOICE, options=BANDE_INTENSITE),
+        Field("usagers_mode_transport_commun", "Quelle part des usagers vient en transport en commun ?",
+              FieldType.SINGLE_CHOICE, options=BANDE_INTENSITE),
     ],
 )
 
@@ -505,6 +583,13 @@ section_impact_satisfaction = Section(
         Field("satisfaction_usagers", "Comment évalueriez-vous la satisfaction générale des usagers ?", FieldType.SCALE_1_5),
         Field("taux_fidelisation", "Les usagers reviennent-ils régulièrement sur la durée, ou le renouvellement est-il rapide ?",
               FieldType.SINGLE_CHOICE, options=["Forte fidélisation", "Fidélisation modérée", "Fort renouvellement", "Je ne sais pas"]),
+        Field("frequentation_semaine_type",
+              "Sur une « bonne » semaine ouvrable, combien de passages estimez-vous en moyenne "
+              "(une même personne comptée à chaque jour où elle vient) ?", FieldType.NUMBER),
+        Field("evolution_frequentation_3ans", "Par rapport à il y a trois ans, comment la fréquentation a-t-elle évolué ?",
+              FieldType.SINGLE_CHOICE,
+              options=["Nette hausse", "Légère hausse", "Stable", "Légère baisse", "Nette baisse",
+                       "Le lieu n'existait pas il y a 3 ans"]),
     ],
 )
 
@@ -519,6 +604,21 @@ section_impact_resilience = Section(
               FieldType.BOOLEAN),
         Field("transmission_intergenerationnelle", "Existe-t-il des formes de transmission de savoirs entre générations, même informelles ?",
               FieldType.TEXTAREA),
+        Field("provenance_usagers_commune", "Quelle part des usagers vient de la commune d'implantation du lieu ?",
+              FieldType.SINGLE_CHOICE, options=BANDE_INTENSITE),
+        Field("provenance_usagers_limitrophe", "Quelle part des usagers vient d'une commune limitrophe ?",
+              FieldType.SINGLE_CHOICE, options=BANDE_INTENSITE),
+        Field("provenance_usagers_plus_loin", "Quelle part des usagers vient de plus loin ?",
+              FieldType.SINGLE_CHOICE, options=BANDE_INTENSITE),
+        Field("evolution_provenance_usagers", "Par rapport à il y a trois ans, la provenance géographique des usagers a-t-elle changé ?",
+              FieldType.SINGLE_CHOICE,
+              options=["Usagers plus locaux qu'avant", "Usagers viennent de plus loin qu'avant",
+                       "Pas de changement notable", "Le lieu n'existait pas il y a 3 ans"]),
+        Field("rayonnement_large",
+              "Le lieu accueille-t-il des événements ou réunions organisés par/pour des personnes venant d'assez loin ?",
+              FieldType.BOOLEAN),
+        Field("rayonnement_exemples", "Pouvez-vous donner un exemple ?", FieldType.TEXTAREA,
+              condition=Condition("rayonnement_large", "eq", True)),
     ],
 )
 
@@ -586,6 +686,32 @@ section_diagnostic_besoins_futurs = Section(
     ],
 )
 
+section_learning_expedition = Section(
+    id="learning_expedition_europe",
+    title="Programme — Learning Expedition Europe",
+    intro="Un appel à candidatures est en cours pour une learning expedition entre tiers-lieux à travers l'Europe.",
+    fields=[
+        Field("interet_learning_expedition",
+              "Seriez-vous intéressé·e à déposer un dossier de candidature pour participer à une "
+              "learning expedition entre tiers-lieux en Europe ?", FieldType.SINGLE_CHOICE,
+              options=["Oui, je souhaite déposer un dossier", "Pas pour l'instant", "Je ne sais pas encore"]),
+        Field("candidat_referent", "Qui serait la personne référente pour ce dossier (nom, fonction) ?",
+              FieldType.TEXT,
+              condition=Condition("interet_learning_expedition", "eq", "Oui, je souhaite déposer un dossier")),
+        Field("candidat_motivation",
+              "En quelques mots, qu'espérez-vous retirer de cette learning expedition pour votre lieu ?",
+              FieldType.TEXTAREA,
+              condition=Condition("interet_learning_expedition", "eq", "Oui, je souhaite déposer un dossier")),
+        Field("candidat_experience_internationale",
+              "Votre équipe a-t-elle déjà une expérience d'échange avec des tiers-lieux à l'étranger ?",
+              FieldType.BOOLEAN,
+              condition=Condition("interet_learning_expedition", "eq", "Oui, je souhaite déposer un dossier")),
+        Field("candidat_disponibilite",
+              "Sur quelle période votre équipe serait-elle disponible pour ce déplacement ?", FieldType.TEXT,
+              condition=Condition("interet_learning_expedition", "eq", "Oui, je souhaite déposer un dossier")),
+    ],
+)
+
 module_diagnostic = Module(
     id="diagnostic",
     title="Diagnostic et besoins d'accompagnement",
@@ -595,6 +721,7 @@ module_diagnostic = Module(
         section_diagnostic_gouvernance,
         section_diagnostic_swot,
         section_diagnostic_besoins_futurs,
+        section_learning_expedition,
     ],
 )
 
