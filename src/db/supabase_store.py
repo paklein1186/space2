@@ -182,7 +182,13 @@ class SupabaseStore(Store):
         self._log_modification(tiers_lieu_id, contributeur_id, "note", section_id, texte)
 
     def get_free_text_notes(self, tiers_lieu_id: str) -> list:
-        result = self.client.table("notes_libres").select("*").eq("tiers_lieu_id", tiers_lieu_id).execute()
+        # order() explicite : Postgres/PostgREST ne garantit aucun ordre par
+        # défaut, ce qui rendait compute_source_hash() non déterministe d'un
+        # appel à l'autre (voir le tri côté hash pour le détail).
+        result = (
+            self.client.table("notes_libres").select("*")
+            .eq("tiers_lieu_id", tiers_lieu_id).order("id").execute()
+        )
         return result.data
 
     def save_lieu_derive(self, lieu_derive: LieuDerive) -> None:

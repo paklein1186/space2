@@ -291,7 +291,7 @@ class SqliteStore(Store):
 
     def get_free_text_notes(self, tiers_lieu_id: str) -> list:
         rows = self.conn.execute(
-            "select * from notes_libres where tiers_lieu_id = ?", (tiers_lieu_id,)
+            "select * from notes_libres where tiers_lieu_id = ? order by id", (tiers_lieu_id,)
         ).fetchall()
         return [dict(r) for r in rows]
 

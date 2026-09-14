@@ -124,9 +124,36 @@ def apply_theme() -> str:
     """Affiche le sélecteur clair/sombre en barre latérale et injecte le CSS
     correspondant. À appeler une fois, juste après st.set_page_config(), sur
     chaque script (app.py + chaque page) — retourne le mode actif ("dark" ou
-    "light") si un appelant veut l'utiliser ailleurs (ex. couleurs de graphique)."""
+    "light") si un appelant veut l'utiliser ailleurs (ex. couleurs de graphique).
+
+    Le choix est mémorisé dans un cookie (pas seulement st.session_state) :
+    app.py et chaque page de src/pages/ sont des scripts Streamlit distincts,
+    et st.session_state ne s'est pas propagé de façon fiable entre eux en
+    pratique (réglé sur une page, revenu à "sombre" par défaut en naviguant
+    vers une autre) — le cookie devient la source de vérité commune, relue
+    au tout début de chaque page, qui persiste aussi d'une visite à l'autre.
+
+    Le composant cookie (iframe bidirectionnel) ne répond pas forcément dès
+    le premier passage du script : une lecture peut renvoyer vide alors qu'un
+    cookie existe bel et bien, le temps que le navigateur réponde. Tant que
+    l'utilisateur n'a pas explicitement touché le sélecteur (détecté via
+    on_change, pas juste "le widget a été rendu"), on continue de relire le
+    cookie à chaque rerun et de s'y aligner — sans quoi une lecture prématurée
+    (vide) se figerait et écraserait ensuite un cookie déjà valide."""
+    from src.auth_session import THEME_COOKIE_NAME, read_cookie, save_cookie
+
+    def _on_user_choice() -> None:
+        st.session_state["ui_theme_user_set"] = True
+
     if "ui_theme" not in st.session_state:
         st.session_state["ui_theme"] = "dark"
+        st.session_state["ui_theme_user_set"] = False
+
+    if not st.session_state.get("ui_theme_user_set"):
+        cookie_value = read_cookie(THEME_COOKIE_NAME)
+        if cookie_value in _PALETTES:
+            st.session_state["ui_theme"] = cookie_value
+
     # st.selectbox plutôt que st.radio/st.segmented_control/st.toggle : déjà
     # utilisé ailleurs dans cette app (rôle/lieu en barre latérale), donc son
     # chunk JS est déjà chargé de façon fiable — un widget jamais utilisé
@@ -134,8 +161,14 @@ def apply_theme() -> str:
     mode = st.sidebar.selectbox(
         "Thème", options=["dark", "light"],
         format_func=lambda m: "🌙 Sombre" if m == "dark" else "☀️ Clair",
-        label_visibility="collapsed", key="ui_theme",
+        label_visibility="collapsed", key="ui_theme", on_change=_on_user_choice,
     )
+    # N'écrit le cookie que sur un choix explicite de l'utilisateur — jamais
+    # depuis une simple valeur par défaut le temps que le cookie réel arrive,
+    # sans quoi on écraserait un cookie valide avec ce repli temporaire.
+    if st.session_state.get("ui_theme_user_set") and read_cookie(THEME_COOKIE_NAME) != mode:
+        save_cookie(THEME_COOKIE_NAME, mode)
+
     palette = _PALETTES.get(mode, _PALETTES["dark"])
     st.markdown(_CSS_TEMPLATE.format(**palette), unsafe_allow_html=True)
     return mode

@@ -105,7 +105,14 @@ def _format_notes(notes: list) -> str:
 
 
 def compute_source_hash(par_contributeur: dict, notes: list) -> str:
-    payload = json.dumps({"reponses": par_contributeur, "notes": [n["texte"] for n in notes]},
+    # `notes` est une LISTE : sort_keys=True normalise l'ordre des clés des
+    # dicts, mais ne touche pas à l'ordre des éléments d'une liste. Sans
+    # ORDER BY côté SQL (Postgres ne garantit aucun ordre par défaut), deux
+    # lectures successives peuvent renvoyer les mêmes notes dans un ordre
+    # différent -> hash différent à chaque appel -> ré-enrichissement complet
+    # (LLM + embeddings) déclenché à chaque ouverture d'un lieu, même quand
+    # rien n'a changé. Trier explicitement rend le hash déterministe.
+    payload = json.dumps({"reponses": par_contributeur, "notes": sorted(n["texte"] for n in notes)},
                           sort_keys=True, ensure_ascii=False)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
