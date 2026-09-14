@@ -513,7 +513,9 @@ def _historique_et_moderation(store, lieu, contributeurs_lieu: list, est_admin: 
 
 def annuaire_tab(store, est_admin: bool, user_id: str):
     st.subheader("Annuaire des lieux recensés")
-    lieux = store.list_tiers_lieux()
+    # Ordre alphabétique par défaut plutôt que l'ordre d'insertion en base,
+    # peu significatif pour qui parcourt la liste.
+    lieux = sorted(store.list_tiers_lieux(), key=lambda l: l.nom.lower())
     if not lieux:
         st.info("Aucun lieu recensé pour l'instant.")
         return
@@ -531,12 +533,33 @@ def annuaire_tab(store, est_admin: bool, user_id: str):
     if coords:
         st.map(pd.DataFrame(coords))
 
-    filtre_categories = st.multiselect("Filtrer par catégorie", options=CATEGORIES_POSSIBLES)
+    recherche = st.text_input(
+        "Rechercher", placeholder="🔍 Nom, ville, région...", label_visibility="collapsed",
+    )
+    col_pays, col_region, col_categories = st.columns(3)
+    with col_pays:
+        options_pays = sorted({l.pays for l in lieux if l.pays})
+        filtre_pays = st.multiselect("Pays", options=options_pays)
+    with col_region:
+        options_region = sorted({l.region for l in lieux if l.region})
+        filtre_region = st.multiselect("Région", options=options_region)
+    with col_categories:
+        filtre_categories = st.multiselect("Catégorie", options=CATEGORIES_POSSIBLES)
 
     lieux_affiches = lieux
+    if recherche.strip():
+        q = recherche.strip().lower()
+        lieux_affiches = [
+            l for l in lieux_affiches
+            if q in l.nom.lower() or q in (l.region or "").lower() or q in (l.pays or "").lower()
+        ]
+    if filtre_pays:
+        lieux_affiches = [l for l in lieux_affiches if l.pays in filtre_pays]
+    if filtre_region:
+        lieux_affiches = [l for l in lieux_affiches if l.region in filtre_region]
     if filtre_categories:
         lieux_affiches = [
-            l for l in lieux
+            l for l in lieux_affiches
             if (lambda d: d and set(d.donnees.get("categories") or []) & set(filtre_categories))(
                 derive_par_lieu.get(l.id)
             )
