@@ -31,7 +31,11 @@ class VoyageEmbedder:
     def __init__(self, api_key: str | None = None):
         import voyageai
 
-        self.client = voyageai.Client(api_key=api_key or os.environ.get("VOYAGE_API_KEY"))
+        # Timeout explicite : sans lui, une requête sans réponse peut bloquer
+        # indéfiniment un enrichissement en masse au lieu d'échouer proprement.
+        self.client = voyageai.Client(
+            api_key=api_key or os.environ.get("VOYAGE_API_KEY"), timeout=60.0
+        )
 
     @_retry_on_rate_limit
     def embed_documents(self, texts: list) -> list:

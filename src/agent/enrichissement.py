@@ -148,7 +148,11 @@ def enrich_lieu(store: Store, tiers_lieu_id: str, force: bool = False, nom_lieu:
         nb_categories=len(CATEGORIES_POSSIBLES),
         categories_possibles=", ".join(CATEGORIES_POSSIBLES),
     )
-    client = Anthropic()
+    # Timeout explicite : sans lui, une requête qui ne reçoit jamais de
+    # réponse (ni succès ni erreur réseau propre) peut bloquer indéfiniment
+    # un enrichissement en masse (import_communecter.py, enrich_places.py)
+    # au lieu d'échouer proprement pour ce lieu et de passer au suivant.
+    client = Anthropic(timeout=90.0)
     response = client.messages.create(
         model=MODEL,
         max_tokens=5000,
