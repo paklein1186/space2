@@ -71,7 +71,11 @@ Règles :
 class CollecteAgent:
     def __init__(self, tool_handler: CollecteToolHandler, model: str = "claude-sonnet-5",
                  store=None, tiers_lieu_id: str | None = None):
-        self.client = Anthropic()
+        # Timeout explicite : sans lui, une requête sans réponse peut laisser
+        # l'interface figée indéfiniment plutôt que d'échouer proprement (même
+        # classe de bug qu'un enrichissement en masse resté bloqué des heures
+        # sur un seul appel sans timeout — voir enrichissement.py).
+        self.client = Anthropic(timeout=60.0)
         self.model = model
         self.tool_handler = tool_handler
         self.messages: list = []

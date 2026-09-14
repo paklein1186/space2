@@ -32,7 +32,10 @@ dis-le clairement plutôt que de deviner.
 
 class RagAgent:
     def __init__(self, tool_handler: RagToolHandler, model: str = "claude-sonnet-5", store=None):
-        self.client = Anthropic()
+        # Timeout explicite : voir la même note dans collecte_agent.py /
+        # enrichissement.py — sans lui, une requête sans réponse peut bloquer
+        # l'interface indéfiniment plutôt que d'échouer proprement.
+        self.client = Anthropic(timeout=60.0)
         self.model = model
         self.tool_handler = tool_handler
         self.messages: list = []

@@ -224,18 +224,27 @@ def entretien_tab(store, user_id: str, nom_lieu: str, role: str):
         st.error("ANTHROPIC_API_KEY n'est pas configuré (voir .env.example).")
         return
 
-    tiers_lieu = store.get_or_create_tiers_lieu(user_id, nom_lieu)
-    contributeur = store.get_or_create_contributeur(user_id, tiers_lieu.id, role)
-    if contributeur.bloque:
-        st.error(
-            "Votre contribution à ce lieu a été suspendue par un administrateur ou un steward "
-            "de ce lieu, suite à un signalement. Contactez l'équipe si vous pensez qu'il s'agit "
-            "d'une erreur."
-        )
-        return
-
+    # tiers_lieu/contributeur ne sont résolus qu'à la création de la session
+    # (pas à chaque message : chaque envoi redéclenche tout le script, et les
+    # re-résoudre à chaque fois ajoutait 2 aller-retours réseau à chaque
+    # message sur Supabase, pour rien la plupart du temps). Le blocage d'un
+    # contributeur reste appliqué : c'est la lecture agrégée (get_answers /
+    # get_all_answers_by_contributeur, filtrée par bloque) qui l'exclut
+    # réellement des synthèses, pas cette vérification d'accueil — un blocage
+    # décidé en cours de session prend effet à la prochaine session plutôt
+    # qu'au message suivant, ce qui est un compromis acceptable.
     session_key = f"agent::{nom_lieu}::{role}"
     if session_key not in st.session_state:
+        tiers_lieu = store.get_or_create_tiers_lieu(user_id, nom_lieu)
+        contributeur = store.get_or_create_contributeur(user_id, tiers_lieu.id, role)
+        if contributeur.bloque:
+            st.error(
+                "Votre contribution à ce lieu a été suspendue par un administrateur ou un steward "
+                "de ce lieu, suite à un signalement. Contactez l'équipe si vous pensez qu'il s'agit "
+                "d'une erreur."
+            )
+            return
+
         # Le nom du lieu est déjà connu (saisi dans la barre latérale) : on le
         # pré-remplit comme réponse pour que l'entretien ne redemande jamais
         # "quel est le nom de votre lieu ?" en première question.
@@ -288,6 +297,18 @@ def _vignette_html(emoji: str, couleur: str, hauteur: str = "9rem") -> str:
     )
 
 
+def _photo_html(url: str, hauteur: str = "9rem") -> str:
+    """Rendu HTML brut plutôt que st.image() : object-fit:cover force une
+    hauteur/largeur identique pour toutes les vignettes de la galerie
+    (Annuaire, popup), quel que soit le format d'origine de la photo —
+    st.image() seul affiche chaque image à son ratio propre, ce qui donnait
+    une grille aux hauteurs de carte irrégulières."""
+    return (
+        f'<img src="{url}" style="width:100%;height:{hauteur};border-radius:8px;'
+        f'object-fit:cover;display:block;" />'
+    )
+
+
 _CATEGORY_COLORS = {
     "Alimentaire": "#C97A3D", "Culturel": "#8B4B6B", "Éducation": "#3D6E8C", "Santé": "#4F7A52",
 }
@@ -319,7 +340,7 @@ def _fiche_dialog(store, fiche, est_admin: bool, user_id: str):
     col_vignette, col_info = st.columns([1, 2.5])
     with col_vignette:
         if derive and derive.photo_url:
-            st.image(derive.photo_url, use_container_width=True)
+            st.markdown(_photo_html(derive.photo_url, hauteur="10rem"), unsafe_allow_html=True)
         else:
             emoji, couleur = default_visual(lieu.nom, donnees)
             st.markdown(_vignette_html(emoji, couleur, hauteur="10rem"), unsafe_allow_html=True)
@@ -347,17 +368,30 @@ def _fiche_dialog(store, fiche, est_admin: bool, user_id: str):
 
     if derive:
         st.divider()
-        cols = st.columns(3)
-        for i, (cle, titre) in enumerate(SECTIONS_SYNTHESE[1:]):  # sans "resume", déjà affiché
-            texte = donnees.get(cle) or "—"
-            with cols[i % 3]:
-                st.markdown(f"**{titre}**")
-                st.caption(texte)
-                sources = source_items_for_section(store, lieu.id, cle, derive)
-                if sources:
+        # Une section sans aucune source déclarée (sources[cle] vide) n'est
+        # que la formule de remplissage que le prompt d'enrichissement
+        # demande explicitement pour homogénéiser la longueur (ex. "Aucun
+        # partenariat... n'est mentionné") — ne rien afficher plutôt que du
+        # bruit sans valeur informative, cohérent avec le principe
+        # déclaré/déduit : rien de déclaré, rien à montrer comme fait.
+        sections_avec_sources = []
+        for cle, titre in SECTIONS_SYNTHESE[1:]:  # sans "resume", déjà affiché
+            sources = source_items_for_section(store, lieu.id, cle, derive)
+            if sources:
+                sections_avec_sources.append((cle, titre, sources))
+
+        if sections_avec_sources:
+            cols = st.columns(3)
+            for i, (cle, titre, sources) in enumerate(sections_avec_sources):
+                texte = donnees.get(cle) or "—"
+                with cols[i % 3]:
+                    st.markdown(f"**{titre}**")
+                    st.caption(texte)
                     with st.popover("Sources", use_container_width=True):
                         for s in sources:
                             st.markdown(f"**{s['label']}** : {s['valeur']}")
+        else:
+            st.caption("Pas encore assez d'informations déclarées pour détailler ce lieu par thème.")
 
         with st.expander("Modifier le lien externe / la photo"):
             with st.form(f"liens_{lieu.id}"):
@@ -508,7 +542,7 @@ def annuaire_tab(store, est_admin: bool, user_id: str):
             with col:
                 with st.container(border=True):
                     if derive and derive.photo_url:
-                        st.image(derive.photo_url, use_container_width=True)
+                        st.markdown(_photo_html(derive.photo_url), unsafe_allow_html=True)
                     else:
                         emoji, couleur = default_visual(lieu.nom, donnees)
                         st.markdown(_vignette_html(emoji, couleur), unsafe_allow_html=True)

@@ -40,7 +40,14 @@ for i in range(0, len(lieux), cols_par_ligne):
         with col:
             with st.container(border=True):
                 if derive and derive.photo_url:
-                    st.image(derive.photo_url, use_container_width=True)
+                    # HTML brut + object-fit:cover plutôt que st.image() : donne
+                    # une hauteur de vignette identique à toutes les cartes,
+                    # quel que soit le format d'origine de la photo.
+                    st.markdown(
+                        f'<img src="{derive.photo_url}" style="width:100%;height:9rem;'
+                        f'border-radius:8px;object-fit:cover;display:block;" />',
+                        unsafe_allow_html=True,
+                    )
                 else:
                     emoji, couleur = default_visual(lieu.nom, donnees)
                     st.markdown(
