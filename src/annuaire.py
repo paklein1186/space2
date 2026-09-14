@@ -73,6 +73,22 @@ _CATEGORY_COLORS = {
 }
 
 
+def texte_en_points(texte: str) -> str:
+    """Reformate un texte de synthèse en liste à puces plutôt qu'un seul
+    paragraphe dense : le prompt d'enrichissement homogénéise la LONGUEUR de
+    chaque section (150-220 caractères), pas sa forme — le résultat est
+    souvent une suite de faits juxtaposés séparés par des points, plus
+    lisible une fois éclatée en puces qu'en bloc continu. Purement un
+    réaffichage : ne modifie ni ne réenrichit la donnée elle-même."""
+    if not texte or texte == "—":
+        return texte
+    phrases = [p.strip() for p in texte.replace("\n", " ").split(". ")]
+    phrases = [p if p.endswith((".", "!", "?")) else p + "." for p in phrases if p]
+    if len(phrases) <= 1:
+        return texte
+    return "\n".join(f"- {p}" for p in phrases)
+
+
 def category_chips_html(categories: list) -> str:
     if not categories:
         return ""

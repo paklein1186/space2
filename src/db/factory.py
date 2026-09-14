@@ -13,6 +13,7 @@ import os
 from .store import Store
 
 _store_singleton: Store | None = None
+_admin_store_singleton: Store | None = None
 
 
 def get_store(client=None) -> Store:
@@ -48,13 +49,25 @@ def get_admin_store() -> Store:
     a réussi (le formulaire se ferme sans erreur) alors qu'elle a atterri
     dans une base SQLite locale que le reste de l'app ne relit jamais — c'est
     exactement le bug rencontré en production avec la case à cocher Portfolio,
-    invisible jusqu'à ce qu'on compare les deux bases directement."""
+    invisible jusqu'à ce qu'on compare les deux bases directement.
+
+    Le client Supabase est mis en cache (comme get_store()) plutôt que
+    recréé à chaque appel : cette fonction est invoquée à chaque ouverture de
+    fiche du lieu (section modération), et un create_client() refait à
+    chaque rerun ajoutait une latence perceptible une fois le service_role
+    réellement utilisé (avant, le repli silencieux vers SQLite masquait ce
+    coût — voir la note ci-dessus)."""
+    global _admin_store_singleton
+    if _admin_store_singleton is not None:
+        return _admin_store_singleton
+
     url = os.environ.get("SUPABASE_URL")
     service_key = os.environ.get("SUPABASE_SERVICE_KEY")
     if url and service_key:
         from .supabase_store import SupabaseStore
 
-        return SupabaseStore(url, service_key)
+        _admin_store_singleton = SupabaseStore(url, service_key)
+        return _admin_store_singleton
 
     if url and os.environ.get("SUPABASE_KEY") and not service_key:
         raise RuntimeError(

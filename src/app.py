@@ -29,6 +29,7 @@ from src.annuaire import (
     lieux_avec_coordonnees,
     photo_html,
     source_items_for_section,
+    texte_en_points,
     vignette_html,
 )
 from src.auth_session import clear_session_cookie, read_session_cookie, save_session_cookie
@@ -326,22 +327,6 @@ def _auto_enrich_one(store, lieu) -> None:
         pass  # une synthèse en échec ne doit jamais bloquer l'affichage de la fiche
 
 
-def _texte_en_points(texte: str) -> str:
-    """Reformate un texte de synthèse en liste à puces plutôt qu'un seul
-    paragraphe dense : le prompt d'enrichissement homogénéise la LONGUEUR de
-    chaque section (150-220 caractères), pas sa forme — le résultat est
-    souvent une suite de faits juxtaposés séparés par des points, plus
-    lisible une fois éclatée en puces qu'en bloc continu. Purement un
-    réaffichage : ne modifie ni ne réenrichit la donnée elle-même."""
-    if not texte or texte == "—":
-        return texte
-    phrases = [p.strip() for p in texte.replace("\n", " ").split(". ")]
-    phrases = [p if p.endswith((".", "!", "?")) else p + "." for p in phrases if p]
-    if len(phrases) <= 1:
-        return texte
-    return "\n".join(f"- {p}" for p in phrases)
-
-
 @st.dialog("Fiche du lieu", width="large")
 def _fiche_dialog(store, fiche, est_admin: bool, user_id: str):
     lieu = fiche["tiers_lieu"]
@@ -406,7 +391,7 @@ def _fiche_dialog(store, fiche, est_admin: bool, user_id: str):
                 texte = donnees.get(cle) or "—"
                 with cols[i % 3]:
                     st.markdown(f"**{titre}**")
-                    st.caption(_texte_en_points(texte))
+                    st.caption(texte_en_points(texte))
                     with st.popover("Sources", use_container_width=True):
                         for s in sources:
                             st.markdown(f"**{s['label']}** : {s['valeur']}")
