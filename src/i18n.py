@@ -87,11 +87,6 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "en": "No previous conversation yet — ask a question to get started.",
     },
     "bibliotheque.supprimer_conversation": {"fr": "Supprimer", "en": "Delete"},
-    "bibliotheque.ajouter_a_un_lieu": {"fr": "💾 Ajouter à un lieu", "en": "💾 Add to a place"},
-    "bibliotheque.quel_lieu": {"fr": "À quel lieu ajouter cette information ?", "en": "Which place does this relate to?"},
-    "bibliotheque.enregistrer": {"fr": "Enregistrer", "en": "Save"},
-    "bibliotheque.annuler": {"fr": "Annuler", "en": "Cancel"},
-    "bibliotheque.ajoute_succes": {"fr": "Ajouté à la fiche du lieu.", "en": "Added to the place's record."},
 
     "nav.compte": {"fr": "Compte", "en": "Account"},
     "contribution.title": {"fr": "Votre contribution", "en": "Your contribution"},

@@ -10,6 +10,7 @@ reprise exacte après interruption — voir `db.store.SessionEntretien`.
 
 from __future__ import annotations
 
+import unicodedata
 from typing import Optional
 
 from ..db.store import SessionEntretien, Store
@@ -21,9 +22,37 @@ from ..questionnaire.resolver import (
     resolve_section_fields,
     section_is_complete,
 )
-from ..questionnaire.schema import QUESTIONNAIRE, Role, get_field, get_module, get_section
+from ..questionnaire.schema import QUESTIONNAIRE, Role, all_fields, get_field, get_module, get_section
 
 PRIORITY_MODULE_ID = "__priorite__"
+
+# Sigles/abréviations du jargon tiers-lieux fréquemment employés à l'oral
+# mais absents tels quels des libellés du schéma (qui les épellent en
+# toutes lettres) — sans ça, un recouvrement de mots simple ne peut jamais
+# relier "ETP" à "équivalents temps plein", exactement le cas qui a motivé
+# cet outil (un effectif mentionné en passant, jamais rattaché au bon champ).
+_SYNONYMES_CHAMPS = {
+    "etp": "equivalent temps plein effectif salarie",
+    "ca": "chiffre affaires",
+    "asbl": "association sans but lucratif statut juridique",
+    "scic": "societe cooperative interet collectif statut juridique",
+    "scop": "societe cooperative participative statut juridique",
+}
+
+
+def _normaliser(texte: str) -> str:
+    """Minuscules, accents retirés, sigles courants développés — pour que le
+    recouvrement de mots dans find_matching_field ne dépende pas d'une
+    orthographe ou d'une casse exactement identique entre la question posée
+    à l'agent et le libellé du champ."""
+    sans_accents = unicodedata.normalize("NFKD", texte.lower()).encode("ascii", "ignore").decode()
+    mots = sans_accents.split()
+    developpes = []
+    for m in mots:
+        developpes.append(m)
+        if m in _SYNONYMES_CHAMPS:
+            developpes.append(_SYNONYMES_CHAMPS[m])
+    return " ".join(developpes)
 
 TOOL_DEFINITIONS = [
     {
@@ -78,6 +107,31 @@ TOOL_DEFINITIONS = [
                 },
             },
             "required": ["texte"],
+        },
+    },
+    {
+        "name": "find_matching_field",
+        "description": (
+            "Cherche si une information donnée SPONTANÉMENT par le répondant, en dehors du fil "
+            "normal de la section en cours (une donnée précise glissée en passant pendant qu'il "
+            "parle d'autre chose — un effectif, une date, un statut, un montant), correspond à un "
+            "champ précis du schéma, même hors de la section en cours. Renvoie une courte liste de "
+            "champs candidats (id + libellé) dont le libellé se rapproche des mots-clés donnés. "
+            "N'appeler QUE pour vérifier une correspondance sur une info déjà donnée — jamais pour "
+            "explorer le schéma ou décider quoi demander ensuite (get_current_section reste la "
+            "seule source pour ça). Si un champ correspond clairement, enregistre-le avec "
+            "save_answer (ça fonctionne même hors section en cours) en plus, si pertinent, d'une "
+            "note libre pour le contexte qualitatif qui ne rentre dans aucun champ."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "mots_cles": {
+                    "type": "string",
+                    "description": "quelques mots décrivant le sujet de l'info (ex. \"nombre d'ETP\", \"date d'ouverture\")",
+                },
+            },
+            "required": ["mots_cles"],
         },
     },
     {
@@ -400,6 +454,35 @@ class CollecteToolHandler:
             self.tiers_lieu_id, self.contributeur_id, tool_input.get("section_id"), tool_input["texte"]
         )
         return {"saved": True}
+
+    def find_matching_field(self, tool_input: dict) -> dict:
+        """Recherche par mots-clés (recouvrement de mots normalisés, pas
+        d'embeddings — surdimensionné pour vérifier une correspondance
+        ponctuelle) parmi TOUS les champs du schéma actifs pour ce rôle,
+        indépendamment de la section en cours. Volontairement une recherche
+        à la demande plutôt qu'exposer le schéma complet en continu : l'agent
+        ne le consulte que quand une info semble correspondre à une question
+        précise déjà connue, jamais pour explorer ce qui reste à demander."""
+        # Longueur minimale 4 des deux côtés : sans elle, un mot très court
+        # d'un libellé ("en", "la", "qui"...) matche comme sous-chaîne de
+        # presque n'importe quel mot plus long de la requête, noyant les
+        # vrais candidats sous des correspondances sans rapport.
+        mots = {m for m in _normaliser(tool_input["mots_cles"]).split() if len(m) >= 4}
+        candidats = []
+        for _module, _section, f in all_fields():
+            if not f.allowed_for(self.role):
+                continue
+            libelle_mots = {m for m in _normaliser(f.label).split() if len(m) >= 4}
+            score = sum(
+                2 if m == lm else (1 if len(m) >= 6 and len(lm) >= 6 and (m in lm or lm in m) else 0)
+                for m in mots for lm in libelle_mots
+            )
+            if score > 0:
+                candidats.append((score, f))
+        candidats.sort(key=lambda t: t[0], reverse=True)
+        return {
+            "champs": [{"id": f.id, "label": f.label} for _score, f in candidats[:5]],
+        }
 
     def skip_optional_module(self, tool_input: dict) -> dict:
         module_id = tool_input["module_id"]

@@ -189,6 +189,19 @@ hr{{ border-color: var(--sp-border-soft) !important; }}
    liste) : on la garde donc dans st.navigation(), en masquant uniquement
    son lien dans le menu par CSS. */
 a[data-testid="stSidebarNavLink"][href$="/fiche"]{{ display: none; }}
+
+/* ---------- Bibliothèque : icône "Nourrir l'intelligence" discrète ---------- */
+/* Action secondaire sur un message de l'assistant, pas une action principale
+   du chat : à peine visible au repos, pleinement visible au survol du
+   message plutôt qu'un bouton pleine largeur affiché en permanence. Opacité
+   plutôt que display:none au repos (jamais totalement invisible) : au
+   toucher (mobile/tablette), qui n'a pas de survol, le bouton reste
+   atteignable. */
+[data-testid="stChatMessage"] [data-testid="stButton"] button{{
+  opacity: 0.35; padding: 0.1rem 0.5rem; min-height: unset;
+  transition: opacity 0.15s ease;
+}}
+[data-testid="stChatMessage"]:hover [data-testid="stButton"] button{{ opacity: 1; }}
 </style>
 """
 

@@ -1317,59 +1317,27 @@ def rag_tab(store, user_id: str):
                 continue
             # Une info utile peut émerger d'une discussion (recherche web
             # ponctuelle par l'agent, recoupement entre lieux...) sans jamais
-            # avoir été écrite nulle part. Deux destinations distinctes,
-            # pas une seule : rattachée à UN lieu (note libre, nourrit son
-            # prochain enrichissement) si l'info concerne spécifiquement ce
-            # lieu, ou versée dans la base de connaissances générale
-            # (embeddée directement dans l'index vectoriel, cherchable tout
-            # de suite par la Bibliothèque elle-même) si c'est un savoir
-            # transversal qui ne concerne aucun lieu en particulier — un
-            # recoupement, une pratique générale, une info glanée par une
-            # recherche web ponctuelle de l'agent.
-            col_capture_lieu, col_capture_savoir = st.columns(2)
-            with col_capture_lieu:
-                if st.button(t("bibliotheque.ajouter_a_un_lieu"), key=f"capture_btn_{i}",
-                             use_container_width=True):
-                    st.session_state["capture_message_idx"] = i
-                    st.rerun()
-            with col_capture_savoir:
-                if st.button("🧠 Nourrir l'intelligence", key=f"capture_savoir_btn_{i}",
-                             use_container_width=True,
-                             help="Verse ce texte dans la base de connaissances générale de la "
-                                  "Bibliothèque, cherchable tout de suite — pas rattaché à un lieu."):
-                    from src.agent.embeddings import VoyageEmbedder
-                    from src.agent.vectorstore import ChromaStore
-                    import uuid
+            # avoir été écrite nulle part. Icône discrète (visible au survol
+            # du message, via la règle CSS ciblant stChatMessage dans
+            # theme.py) plutôt qu'un bouton pleine largeur toujours affiché :
+            # une action secondaire, pas une action principale du chat.
+            if st.button("🧠", key=f"capture_savoir_btn_{i}",
+                         help="Nourrir l'intelligence : verse ce texte dans la base de connaissances "
+                              "générale de la Bibliothèque, cherchable tout de suite."):
+                from src.agent.embeddings import VoyageEmbedder
+                from src.agent.vectorstore import ChromaStore
+                import uuid
 
-                    with st.spinner("Ajout à la base de connaissances..."):
-                        embedder = VoyageEmbedder()
-                        embedding = embedder.embed_documents([text])[0]
-                        ChromaStore().upsert(
-                            ids=[f"bibliotheque_{uuid.uuid4()}"],
-                            embeddings=[embedding],
-                            documents=[text],
-                            metadatas=[{"doc_type": "connaissance_bibliotheque", "source_file": "Bibliothèque"}],
-                        )
-                    st.toast("Ajouté à la base de connaissances.", icon="🧠")
-            if st.session_state.get("capture_message_idx") == i:
-                lieux_disponibles = {l.nom: l.id for l in store.list_tiers_lieux()}
-                choix_nom = st.selectbox(
-                    t("bibliotheque.quel_lieu"), options=sorted(lieux_disponibles.keys()),
-                    key=f"capture_select_{i}",
-                )
-                col_ok, col_annuler = st.columns(2)
-                with col_ok:
-                    if st.button(t("bibliotheque.enregistrer"), key=f"capture_ok_{i}", type="primary"):
-                        lieu_id = lieux_disponibles[choix_nom]
-                        contributeur = store.get_or_create_contributeur(user_id, lieu_id, Role.AUTRE.value)
-                        store.save_free_text_note(lieu_id, contributeur.id, "bibliotheque_capture", text)
-                        st.session_state.pop("capture_message_idx", None)
-                        st.toast(t("bibliotheque.ajoute_succes"), icon="💾")
-                        st.rerun()
-                with col_annuler:
-                    if st.button(t("bibliotheque.annuler"), key=f"capture_annuler_{i}"):
-                        st.session_state.pop("capture_message_idx", None)
-                        st.rerun()
+                with st.spinner("Ajout à la base de connaissances..."):
+                    embedder = VoyageEmbedder()
+                    embedding = embedder.embed_documents([text])[0]
+                    ChromaStore().upsert(
+                        ids=[f"bibliotheque_{uuid.uuid4()}"],
+                        embeddings=[embedding],
+                        documents=[text],
+                        metadatas=[{"doc_type": "connaissance_bibliotheque", "source_file": "Bibliothèque"}],
+                    )
+                st.toast("Ajouté à la base de connaissances.", icon="🧠")
 
     # En deux temps (message ajouté + rerun IMMÉDIAT, puis appel LLM dans le
     # rerun suivant) plutôt qu'un seul passage qui ajoute le message ET
