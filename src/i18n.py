@@ -71,6 +71,13 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "fr": "Une sélection de lieux et de leurs campagnes de besoins actuelles.",
         "en": "A selection of spaces and their current fundraising/support campaigns.",
     },
+    "chat.entretien_placeholder": {"fr": "Votre réponse...", "en": "Your answer..."},
+    "chat.bibliotheque_placeholder": {
+        "fr": "Posez une question sur les lieux recensés ou les documents déposés...",
+        "en": "Ask a question about the recorded spaces or uploaded documents...",
+    },
+    "voice.dicter_reponse": {"fr": "Dicter la réponse", "en": "Dictate your answer"},
+    "voice.dicter_question": {"fr": "Dicter la question", "en": "Dictate your question"},
 }
 
 

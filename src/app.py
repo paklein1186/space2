@@ -39,6 +39,7 @@ from src.db.store import Litige
 from src.i18n import language_toggle, t
 from src.questionnaire.schema import QUESTIONNAIRE, CATEGORIES_POSSIBLES, Role, all_fields
 from src.theme import apply_theme
+from src.voice_input import bouton_dictee, consume_voice_transcript
 
 ROLES_INTERNES = {"fondateur", "equipe", "steward"}
 
@@ -313,7 +314,10 @@ def entretien_tab(store, user_id: str):
     # suivant) — voir la même note dans rag_tab : sans ça, la réponse de
     # l'utilisateur ne s'affichait elle-même qu'une fois la réplique de
     # l'agent obtenue, plusieurs secondes plus tard.
-    user_text = st.chat_input("Votre réponse...")
+    lang_code = "fr-FR" if st.session_state.get("ui_lang", "fr") == "fr" else "en-US"
+    voice_text = consume_voice_transcript()
+    bouton_dictee(lang_code, label=t("voice.dicter_reponse"))
+    user_text = st.chat_input(t("chat.entretien_placeholder")) or voice_text
     if user_text:
         state["history"].append(("user", user_text))
         state["reponse_en_attente"] = user_text
@@ -1009,7 +1013,10 @@ def rag_tab(store):
     # question de l'utilisateur ne s'affichait elle-même qu'une fois la
     # réponse complète obtenue, donnant l'impression que tout le site est
     # lent alors que c'est seulement l'appel LLM qui prend plusieurs secondes.
-    question = st.chat_input("Posez une question sur les lieux recensés ou les documents déposés...")
+    lang_code = "fr-FR" if st.session_state.get("ui_lang", "fr") == "fr" else "en-US"
+    voice_question = consume_voice_transcript()
+    bouton_dictee(lang_code, label=t("voice.dicter_question"))
+    question = st.chat_input(t("chat.bibliotheque_placeholder")) or voice_question
     if question:
         st.session_state["rag_history"].append(("user", question))
         st.session_state["rag_question_en_attente"] = question
