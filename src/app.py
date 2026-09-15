@@ -1444,6 +1444,17 @@ def page_bibliotheque() -> None:
     user_id = auth_screen()
     if not user_id:
         return
+    if st.session_state.get("_page_vient_de_changer"):
+        # Revenir sur cet onglet depuis un autre repart d'une conversation
+        # vierge — la conversation précédente n'est pas perdue (déjà
+        # sauvegardée à chaque tour, voir _sauvegarder_conversation_
+        # bibliotheque), juste plus affichée par défaut ; réouvrable via
+        # "Vos conversations". Ne s'applique qu'au changement d'onglet, pas
+        # à un rerun normal causé par un widget à l'intérieur de la page
+        # elle-même (question posée, bouton cliqué...).
+        st.session_state.pop("rag_agent", None)
+        st.session_state.pop("rag_history", None)
+        st.session_state.pop("rag_conversation_id", None)
     store = _resolve_store(user_id)
     _rendre_isole("Bibliothèque", rag_tab, store, user_id)
 
@@ -1505,6 +1516,14 @@ def main():
         ]
 
     pg = st.navigation(pages)
+    # Détecte un changement d'onglet (pas juste un rerun causé par un widget
+    # à l'intérieur du même onglet) : sert à repartir d'une Bibliothèque
+    # vierge à chaque fois qu'on y revient depuis un autre onglet, plutôt que
+    # de laisser la conversation en cours affichée indéfiniment (elle reste
+    # accessible via "Vos conversations" si besoin) — voir page_bibliotheque().
+    page_vient_de_changer = st.session_state.get("_derniere_page_active") != pg.url_path
+    st.session_state["_page_vient_de_changer"] = page_vient_de_changer
+    st.session_state["_derniere_page_active"] = pg.url_path
     pg.run()
 
     # Barre latérale "compte" : rendue après pg.run() (pas avant), pour que
