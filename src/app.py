@@ -1240,6 +1240,70 @@ def administration_tab(store, user_id: str) -> None:
                 else:
                     st.success(message)
 
+    with st.expander("Base de connaissances générale (pas rattachée à un lieu)", expanded=False):
+        st.caption(
+            "Verse directement dans l'index vectoriel de la Bibliothèque (cherchable tout de "
+            "suite, sans passer par un lieu ni un enrichissement) — même mécanisme que le "
+            "bouton « 🧠 Nourrir l'intelligence » de la Bibliothèque."
+        )
+        from src.agent.web_crawl import ARTICLES_TROIS_TIERS_IDS
+
+        st.markdown("**Base de connaissances Trois-Tiers**")
+        st.caption(
+            f"Scanne les {len(ARTICLES_TROIS_TIERS_IDS)} articles publics connus de "
+            "troistiers.space/knowledge — liste figée au moment où elle a été relevée, pas de "
+            "découverte automatique des nouveaux articles pour l'instant."
+        )
+        if st.button("Scanner la base de connaissances Trois-Tiers"):
+            from src.agent.web_crawl import crawler_trois_tiers
+
+            progress = st.progress(0.0)
+            statut = st.empty()
+
+            def _maj_progress(i, total, url):
+                statut.caption(f"{url}...")
+                progress.progress(i / total)
+
+            resultats = crawler_trois_tiers(admin_store, callback=_maj_progress)
+            statut.empty()
+            progress.empty()
+            message = (f"{resultats['ajoutes']} article(s) ajouté(s) à la base de connaissances, "
+                       f"{resultats['rien_d_utile']} sans contenu utile.")
+            if resultats["erreurs"]:
+                st.warning(message + f" {len(resultats['erreurs'])} erreur(s) :\n" + "\n".join(resultats["erreurs"]))
+            else:
+                st.success(message)
+
+        st.divider()
+        st.markdown("**Ajouter une connaissance depuis un lien**")
+        st.caption(
+            "Pour une recherche ponctuelle sur un sujet : trouvez la page vous-même (Google, un "
+            "site spécialisé...) et collez son lien ici — analysé et versé dans la base de "
+            "connaissances générale, comme le crawl ci-dessus."
+        )
+        url_connaissance = st.text_input("URL à analyser", key="admin_connaissance_url")
+        if st.button("Analyser et ajouter") and url_connaissance.strip():
+            from src.agent.web_crawl import ajouter_connaissance, fetch_page_text
+
+            url_connaissance = url_connaissance.strip()
+            try:
+                with st.spinner("Récupération de la page..."):
+                    texte_brut = fetch_page_text(url_connaissance)
+            except Exception as exc:
+                st.error(f"Impossible de récupérer cette page : {exc}")
+                texte_brut = None
+            if texte_brut:
+                with st.spinner("Analyse et ajout à la base de connaissances..."):
+                    statut = ajouter_connaissance(
+                        admin_store, texte_brut, f"une recherche ponctuelle ({url_connaissance})",
+                    )
+                if statut == "ajoute":
+                    st.success("Ajouté à la base de connaissances.")
+                elif statut == "rien_d_utile":
+                    st.info("Rien d'exploitable n'a été trouvé sur cette page.")
+                else:
+                    st.error(statut)
+
     with st.expander("Complétion des lieux (profondeur du questionnaire)", expanded=False):
         st.caption(
             "Pour chaque lieu, part des questions actuellement actives (tous rôles confondus, "

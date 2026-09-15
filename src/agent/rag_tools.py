@@ -29,12 +29,14 @@ TOOL_DEFINITIONS = [
             "Recherche sémantique. Utiliser doc_type='profil_lieu' pour comparer des "
             "lieux entre eux ou trouver des lieux travaillant sur une thématique donnée "
             "(1 profil consolidé par lieu). Utiliser doc_type='connaissance_bibliotheque' "
-            "pour un savoir transversal ajouté manuellement (pas rattaché à un lieu précis) — "
-            "recoupements, pratiques générales, résultats de recherches web ponctuelles. "
-            "Utiliser les autres doc_type pour retrouver un passage précis dans les "
-            "interviews, rapports, résumés de datasets ou de géodonnées déposés. Renvoie "
-            "les extraits les plus pertinents avec leur source, pour permettre de citer "
-            "d'où vient l'information."
+            "pour un savoir transversal ajouté manuellement depuis la Bibliothèque (pas rattaché "
+            "à un lieu précis) — recoupements, pratiques générales, résultats de recherches web "
+            "ponctuelles. Utiliser doc_type='connaissance_trois_tiers' pour un savoir issu de la "
+            "base de connaissances publique du réseau Trois-Tiers (méthodes, dispositifs, cadres "
+            "juridiques ou de financement, ressources du réseau). Utiliser les autres doc_type "
+            "pour retrouver un passage précis dans les interviews, rapports, résumés de datasets "
+            "ou de géodonnées déposés. Renvoie les extraits les plus pertinents avec leur source, "
+            "pour permettre de citer d'où vient l'information."
         ),
         "input_schema": {
             "type": "object",
@@ -42,7 +44,7 @@ TOOL_DEFINITIONS = [
                 "query": {"type": "string"},
                 "doc_type": {"type": "string",
                              "enum": ["profil_lieu", "interview", "rapport", "dataset_summary", "geodata",
-                                      "connaissance_bibliotheque"],
+                                      "connaissance_bibliotheque", "connaissance_trois_tiers"],
                              "description": "optionnel, pour restreindre la recherche à un type de source"},
                 "top_k": {"type": "integer", "default": 6},
             },
