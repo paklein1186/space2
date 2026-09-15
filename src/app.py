@@ -367,7 +367,13 @@ def _fiche_dialog(store, fiche, est_admin: bool, user_id: str):
     if "fiche_enrichie" not in st.session_state:
         st.session_state["fiche_enrichie"] = set()
     if lieu.id not in st.session_state["fiche_enrichie"]:
-        _auto_enrich_one(store, lieu)
+        # Généralement rapide (enrich_lieu compare un hash et ne fait rien
+        # si les réponses n'ont pas changé) — mais quand un appel LLM part
+        # réellement, ça prend plusieurs secondes sans qu'aucun indicateur
+        # ne le montrait jusqu'ici, donnant l'impression que la fiche entière
+        # est devenue lente.
+        with st.spinner("Mise à jour de la synthèse..."):
+            _auto_enrich_one(store, lieu)
         st.session_state["fiche_enrichie"].add(lieu.id)
     derive = store.get_lieu_derive(lieu.id)
     donnees = derive.donnees if derive else {}
