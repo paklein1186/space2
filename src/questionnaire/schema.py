@@ -304,6 +304,18 @@ section_activites = Section(
               options=["Bureautique et connexion internet", "Outils de fabrication numérique", "Ateliers manuels / bricolage",
                        "Espaces de production artistique", "Cuisine professionnelle ou partagée", "Espaces extérieurs",
                        "Hébergement (douches, lits...)", "Aucun équipement particulier", "Autre"]),
+        Field("frequence_activites_principales", "À quelle fréquence les activités principales du lieu ont-elles lieu ?",
+              FieldType.SINGLE_CHOICE,
+              options=["Quotidienne", "Plusieurs fois par semaine", "Hebdomadaire", "Mensuelle",
+                       "Ponctuelle / événementielle", "Variable selon l'activité"]),
+        Field("activite_phare", "Si vous deviez décrire l'activité la plus emblématique ou porteuse du lieu, "
+                                 "laquelle et pourquoi ?", FieldType.TEXTAREA),
+        Field("evolution_activites_3ans", "Comment l'offre d'activités a-t-elle évolué ces trois dernières années ?",
+              FieldType.MULTI_CHOICE,
+              options=["De nouvelles activités se sont ajoutées", "Certaines activités ont été abandonnées",
+                       "L'offre s'est recentrée / spécialisée", "Peu de changement",
+                       "Le lieu n'existait pas il y a 3 ans"]),
+        Field("activites_saisonnalite", "L'activité du lieu varie-t-elle fortement selon les saisons ?", FieldType.BOOLEAN),
     ],
 )
 
@@ -334,6 +346,16 @@ section_services_detailles = Section(
               condition=Condition("services_proposes", "contains", "Domiciliation d'entreprises")),
         Field("nombre_associations_accueillies", "Combien d'associations sont accueillies au lieu ?", FieldType.NUMBER,
               condition=Condition("services_proposes", "contains", "Accueil d'associations")),
+        Field("modalites_acces", "Comment les usagers accèdent-ils principalement aux services du lieu ?",
+              FieldType.MULTI_CHOICE,
+              options=["Gratuit / libre accès", "Adhésion", "Abonnement", "Paiement à l'usage",
+                       "Sur réservation uniquement", "Sur critères / dossier", "Autre"]),
+        Field("capacite_accueil_simultanee", "Combien de personnes le lieu peut-il accueillir simultanément "
+                                              "(ordre de grandeur) ?", FieldType.NUMBER),
+        Field("amplitude_horaire", "Quelle est l'amplitude horaire d'ouverture habituelle du lieu ?",
+              FieldType.SINGLE_CHOICE,
+              options=["Moins de 20h/semaine", "20 à 40h/semaine", "40 à 60h/semaine",
+                       "Plus de 60h/semaine", "Ouvert en continu (7j/7)"]),
     ],
 )
 
@@ -441,6 +463,14 @@ section_rh = Section(
               FieldType.SINGLE_CHOICE, options=ORGANISME_INSERTION_FORMATION, roles=ROLES_INTERNES),
         Field("qvt_equipe", "Comment décririez-vous la qualité de vie au travail de l'équipe salariée ?", FieldType.TEXTAREA,
               roles=ROLES_INTERNES),
+        Field("nombre_benevoles_reguliers", "Combien de bénévoles réguliers contribuent au fonctionnement du lieu ?",
+              FieldType.NUMBER, roles=ROLES_INTERNES),
+        Field("turnover_equipe", "Comment qualifieriez-vous le turnover au sein de l'équipe salariée ?",
+              FieldType.SINGLE_CHOICE,
+              options=["Très faible, équipe stable", "Modéré", "Élevé", "Pas d'équipe salariée"],
+              roles=ROLES_INTERNES),
+        Field("defis_recrutement_rh", "Rencontrez-vous des difficultés de recrutement ou de fidélisation de "
+                                       "l'équipe ?", FieldType.TEXTAREA, roles=ROLES_INTERNES),
     ],
 )
 
@@ -463,6 +493,19 @@ section_gouvernance = Section(
               condition=Condition("statut_juridique", "in",
                                    ["SCIC", "SCOP", "Coopérative", "Coopérative (SC / SCRL)"]),
               roles=ROLES_INTERNES),
+        Field("frequence_instances_gouvernance", "À quelle fréquence les instances de gouvernance "
+                                                  "(CA, AG, comité...) se réunissent-elles ?", FieldType.SINGLE_CHOICE,
+              options=["Hebdomadaire", "Mensuelle", "Trimestrielle", "Annuelle uniquement",
+                       "Pas d'instance formelle", "Je ne sais pas"], roles=ROLES_INTERNES),
+        Field("outils_gouvernance_formalises", "Quels outils de gouvernance sont formalisés ?", FieldType.MULTI_CHOICE,
+              options=["Statuts", "Règlement intérieur", "Charte de valeurs", "Organigramme", "Aucun", "Autre"],
+              roles=ROLES_INTERNES),
+        Field("mode_prise_decision", "Comment les décisions importantes sont-elles généralement prises ?",
+              FieldType.SINGLE_CHOICE,
+              options=["Par consensus", "Par vote majoritaire", "Par la direction / le porteur de projet seul",
+                       "Sociocratie / gouvernance partagée", "Autre"], roles=ROLES_INTERNES),
+        Field("difficulte_gouvernance", "Rencontrez-vous des difficultés particulières liées à la gouvernance ou "
+                                         "à la prise de décision ?", FieldType.TEXTAREA, roles=ROLES_INTERNES),
     ],
 )
 
