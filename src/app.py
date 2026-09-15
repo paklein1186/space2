@@ -36,6 +36,7 @@ from src.annuaire import (
 from src.auth_session import clear_session_cookie, read_session_cookie, save_session_cookie
 from src.db.factory import get_admin_store, get_store
 from src.db.store import Litige
+from src.i18n import language_toggle, t
 from src.questionnaire.schema import QUESTIONNAIRE, CATEGORIES_POSSIBLES, Role, all_fields
 from src.theme import apply_theme
 
@@ -46,6 +47,7 @@ RAG_DISPONIBLE = bool(os.environ.get("VOYAGE_API_KEY"))
 load_dotenv()
 st.set_page_config(page_title="Lieux hybrides et territoires", layout="wide")
 apply_theme()
+language_toggle()
 
 # Contournement d'authentification STRICTEMENT réservé au développement local.
 # ⚠️ Ne JAMAIS définir LOCAL_DEV_AUTOLOGIN dans les secrets Streamlit Cloud (ou
@@ -93,7 +95,7 @@ def auth_screen() -> str | None:
             st.session_state["user_id"] = saved_email
             st.rerun()
 
-        st.title("Lieux hybrides et territoires")
+        st.title(t("auth.title"))
         st.info(
             "Mode développement local : aucun projet Supabase configuré "
             "(`SUPABASE_URL`/`SUPABASE_KEY` absents de `.env`). L'identification "
@@ -101,7 +103,7 @@ def auth_screen() -> str | None:
             "par le vrai flux Supabase en production."
         )
         with st.form("dev_login_form"):
-            email = st.text_input("Votre email")
+            email = st.text_input(t("auth.email_label"))
             submitted = st.form_submit_button("Continuer")
         if submitted and email:
             st.session_state["user_id"] = email
@@ -132,12 +134,12 @@ def auth_screen() -> str | None:
             else:
                 st.session_state["cookie_restore_failed"] = True
 
-    st.title("Lieux hybrides et territoires")
+    st.title(t("auth.title"))
 
     if "otp_sent_to" not in st.session_state:
         with st.form("otp_request_form"):
-            email = st.text_input("Votre email")
-            submitted = st.form_submit_button("Recevoir un code de connexion")
+            email = st.text_input(t("auth.email_label"))
+            submitted = st.form_submit_button(t("auth.send_code"))
         if submitted and email:
             try:
                 client.auth.sign_in_with_otp({"email": email})
@@ -156,14 +158,14 @@ def auth_screen() -> str | None:
                     st.error(f"Échec de l'envoi du code de connexion : {message}")
         return None
 
-    st.write(f"Un code a été envoyé à **{st.session_state['otp_sent_to']}**.")
+    st.write(t("auth.code_sent", email=st.session_state["otp_sent_to"]))
     with st.form("otp_verify_form"):
-        code = st.text_input("Code reçu par email")
+        code = st.text_input(t("auth.code_label"))
         col1, col2 = st.columns(2)
         with col1:
-            verify = st.form_submit_button("Valider")
+            verify = st.form_submit_button(t("auth.verify"))
         with col2:
-            change_email = st.form_submit_button("Changer d'email")
+            change_email = st.form_submit_button(t("auth.change_email"))
     if change_email:
         st.session_state.pop("otp_sent_to", None)
         st.rerun()
@@ -183,7 +185,7 @@ def auth_screen() -> str | None:
                 save_session_cookie(result.session.refresh_token)
             st.rerun()
         else:
-            st.error("Code invalide ou expiré.")
+            st.error(t("auth.invalid_code"))
     return None
 
 
@@ -257,7 +259,7 @@ def contribution_selector(store, user_id: str):
 
 
 def entretien_tab(store, user_id: str):
-    st.title("Compléter l'histoire")
+    st.title(t("entretien.title"))
     nom_lieu, role = contribution_selector(store, user_id)
     if not nom_lieu:
         st.info("Choisissez ou créez un tiers-lieu ci-dessus pour démarrer.")
@@ -525,8 +527,8 @@ def _historique_et_moderation(store, lieu, contributeurs_lieu: list, est_admin: 
 
 
 def annuaire_tab(store, est_admin: bool, user_id: str):
-    st.title("Lieux hybrides")
-    st.caption("L'annuaire de l'ensemble des tiers-lieux recensés.")
+    st.title(t("lieux_hybrides.title"))
+    st.caption(t("lieux_hybrides.caption"))
     # Ordre alphabétique par défaut plutôt que l'ordre d'insertion en base,
     # peu significatif pour qui parcourt la liste.
     lieux = sorted(store.list_tiers_lieux(), key=lambda l: l.nom.lower())
@@ -967,8 +969,8 @@ def administration_tab(store, user_id: str) -> None:
 
 
 def rag_tab(store):
-    st.title("Bibliothèque")
-    st.caption("Interrogez en langage naturel l'ensemble des lieux recensés et des documents déposés.")
+    st.title(t("bibliotheque.title"))
+    st.caption(t("bibliotheque.caption"))
     if not RAG_DISPONIBLE:
         st.info(
             "VOYAGE_API_KEY n'est pas configuré (voir .env.example) : l'assistant "
@@ -1104,18 +1106,18 @@ def main():
     # rerun suivant la connexion, jamais avant.
     pages = {
         "": [
-            st.Page(page_entretien, title="Compléter l'histoire", icon="📝",
+            st.Page(page_entretien, title=t("nav.entretien"), icon="📝",
                     url_path="entretien", default=True),
-            st.Page(page_bibliotheque, title="Bibliothèque", icon="📚", url_path="bibliotheque"),
-            st.Page(page_lieux_hybrides, title="Lieux hybrides", icon="🏘️", url_path="lieux-hybrides"),
-            st.Page("pages/1_Observatoire.py", title="Observatoire", icon="📊"),
-            st.Page("pages/2_Portfolio.py", title="Portfolio", icon="✨"),
+            st.Page(page_bibliotheque, title=t("nav.bibliotheque"), icon="📚", url_path="bibliotheque"),
+            st.Page(page_lieux_hybrides, title=t("nav.lieux_hybrides"), icon="🏘️", url_path="lieux-hybrides"),
+            st.Page("pages/1_Observatoire.py", title=t("nav.observatoire"), icon="📊"),
+            st.Page("pages/2_Portfolio.py", title=t("nav.portfolio"), icon="✨"),
         ],
     }
     user_id_sonde = st.session_state.get("user_id")
     if user_id_sonde and _est_admin(_resolve_store(user_id_sonde), user_id_sonde):
         pages["Compte"] = [
-            st.Page(page_administration, title="Administration", icon="⚙️", url_path="administration"),
+            st.Page(page_administration, title=t("nav.administration"), icon="⚙️", url_path="administration"),
         ]
 
     pg = st.navigation(pages)
@@ -1130,9 +1132,9 @@ def main():
     if user_id:
         with st.sidebar:
             if st.session_state.get("use_admin_store"):
-                st.warning("Mode admin local (LOCAL_DEV_AUTOLOGIN) — accès complet sans RLS.")
-            st.caption(f"Connecté·e : {st.session_state.get('user_email') or user_id}")
-            if st.button("Se déconnecter", use_container_width=True):
+                st.warning(t("sidebar.admin_local_mode"))
+            st.caption(t("sidebar.connected_as", email=st.session_state.get("user_email") or user_id))
+            if st.button(t("sidebar.logout"), use_container_width=True):
                 clear_session_cookie()
                 for key in ("user_id", "user_email", "otp_sent_to", "cookie_restore_failed",
                             "use_admin_store", "supabase_client"):

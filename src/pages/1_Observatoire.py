@@ -22,10 +22,11 @@ import streamlit as st
 
 from src.agent.rag_tools import lieux_enrichis_dataframe, reponses_long_dataframe
 from src.db.factory import get_admin_store, get_store
+from src.i18n import t
 from src.questionnaire.schema import BANDE_INTENSITE, CATEGORIES_POSSIBLES
 
-st.title("Observatoire des lieux hybrides et territoires")
-st.caption("Relevés statistiques, publics, sur l'ensemble des lieux recensés dans l'Annuaire.")
+st.title(t("observatoire.title"))
+st.caption(t("observatoire.caption"))
 
 
 def _store_pour_agregats():

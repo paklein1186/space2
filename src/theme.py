@@ -200,8 +200,10 @@ def apply_theme() -> str:
     # thème sombre — le menu déroulant s'affichait avec un fond blanc
     # illisible. st.button suit le même style déjà éprouvé partout ailleurs
     # dans l'app (voir _CSS_TEMPLATE plus haut), sans ce risque.
+    from src.i18n import t
+
     st.sidebar.button(
-        "☀️ Mode clair" if mode == "dark" else "🌙 Mode sombre",
+        t("theme.light") if mode == "dark" else t("theme.dark"),
         key="ui_theme_toggle", on_click=_basculer_theme, use_container_width=True,
     )
 

@@ -27,6 +27,7 @@ from src.annuaire import (
     vignette_html,
 )
 from src.db.factory import get_store
+from src.i18n import t
 
 
 @st.dialog("Fiche du lieu", width="large")
@@ -88,8 +89,8 @@ def _fiche_publique_dialog(lieu, derive) -> None:
         st.markdown(f"[🔗 En savoir plus]({derive.lien_externe})")
 
 
-st.title("Portfolio")
-st.caption("Une sélection de lieux et de leurs campagnes de besoins actuelles.")
+st.title(t("portfolio.title"))
+st.caption(t("portfolio.caption"))
 
 store = get_store()
 lieux = store.list_lieux_portfolio()
