@@ -64,6 +64,14 @@ code, pre, [data-testid="stMetricValue"], .stCode, [data-testid="stCaptionContai
   background: var(--sp-bg-sidebar) !important; border-right: 1px solid var(--sp-border-soft);
 }}
 [data-testid="stSidebar"] *, [data-testid="stMain"] * {{ color: var(--sp-text); }}
+/* Flèche de repli de la barre latérale : en dehors de stSidebar (chrome de
+   l'appli, pas son contenu), donc pas couverte par la règle générale
+   ci-dessus — et son icône fixe une couleur via un attribut HTML `color=`
+   calé sur le texte sombre du thème clair Streamlit, quasi invisible au
+   repos sur notre fond sombre (visible seulement au survol, qui la
+   réhausse). */
+[data-testid="stSidebarCollapseButton"] [data-testid="stIconMaterial"],
+[data-testid="stSidebarCollapseButton"] span {{ color: var(--sp-text) !important; }}
 [data-testid="stCaptionContainer"], .stCaption {{ color: var(--sp-text-muted) !important; }}
 
 /* ---------- boutons : lueur "bio-luminescente" au survol ---------- */
