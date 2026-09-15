@@ -442,6 +442,12 @@ class SqliteStore(Store):
     def list_admin_emails(self) -> list:
         return [r["user_id"] for r in self.conn.execute("select user_id from admins").fetchall()]
 
+    def list_users_with_last_login(self) -> list:
+        # Pas de vraie table auth.users en local (LOCAL_DEV_AUTOLOGIN) : rien
+        # à lister de significatif, cette vue n'a de sens qu'avec un vrai
+        # Supabase Auth derrière.
+        return []
+
     def update_portfolio_entry(self, tiers_lieu_id: str, inclus_portfolio: bool,
                                 campagne_texte: Optional[str], campagne_objectif: Optional[str],
                                 campagne_contact: Optional[str]) -> None:

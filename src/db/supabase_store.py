@@ -396,6 +396,29 @@ class SupabaseStore(Store):
     def delete_campagne_prioritaire(self, campagne_id: str) -> None:
         self.client.table("campagnes_prioritaires").delete().eq("id", campagne_id).execute()
 
+    def list_users_with_last_login(self) -> list:
+        users = self.client.auth.admin.list_users()
+        try:
+            admin_ids = {r["user_id"] for r in self.client.table("admins").select("user_id").execute().data}
+        except Exception:
+            admin_ids = set()
+        resultat = [
+            {
+                "email": u.email or u.id,
+                "cree_le": str(u.created_at) if u.created_at else None,
+                "derniere_connexion": str(u.last_sign_in_at) if u.last_sign_in_at else None,
+                "admin": u.id in admin_ids,
+                # "@system.local" : voir SERVICE_ACCOUNTS_EMAIL_DOMAIN dans
+                # migrate_sqlite_to_supabase.py (comptes créés pour attribuer
+                # les imports groupés/le crawl à un auteur, jamais un vrai
+                # utilisateur connecté — leur dernière_connexion reste None).
+                "compte_service": (u.email or "").endswith("@system.local"),
+            }
+            for u in users
+        ]
+        resultat.sort(key=lambda r: r["derniere_connexion"] or "", reverse=True)
+        return resultat
+
     def map_user_emails(self, user_ids: list) -> dict:
         if not user_ids:
             return {}

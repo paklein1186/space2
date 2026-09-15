@@ -935,6 +935,23 @@ def administration_tab(store, user_id: str) -> None:
                     st.error("Aucun compte trouvé avec cet email (l'utilisateur doit s'être déjà connecté "
                               "au moins une fois).")
 
+    with st.expander("Utilisateurs", expanded=False):
+        st.caption("Tous les comptes connus, du plus récemment connecté au plus ancien "
+                    "(jamais connecté en dernier) — inclut les comptes de service (imports, "
+                    "crawl), signalés comme tels plutôt qu'omis.")
+        utilisateurs = admin_store.list_users_with_last_login()
+        if not utilisateurs:
+            st.caption("Aucun utilisateur à afficher.")
+        else:
+            lignes = [{
+                "Email": u["email"],
+                "Dernière connexion": (u["derniere_connexion"] or "Jamais")[:19],
+                "Créé le": (u["cree_le"] or "")[:19],
+                "Admin": "✅" if u["admin"] else "",
+                "Compte de service": "🤖" if u["compte_service"] else "",
+            } for u in utilisateurs]
+            st.dataframe(pd.DataFrame(lignes), use_container_width=True, hide_index=True)
+
     with st.expander("Campagnes prioritaires (recensement ciblé)", expanded=False):
         st.caption("Pendant leur fenêtre active, les champs listés sont proposés en priorité dans "
                     "l'entretien, avant la suite normale du questionnaire.")

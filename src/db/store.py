@@ -254,6 +254,14 @@ class Store(ABC):
     def list_admin_emails(self) -> list: ...
 
     @abstractmethod
+    def list_users_with_last_login(self) -> list:
+        """Comptes connus (email, date de création, dernière connexion,
+        admin ou non, compte de service ou non), triés de la connexion la
+        plus récente à la plus ancienne (jamais connecté en dernier) —
+        utilisé par la section Administration."""
+        ...
+
+    @abstractmethod
     def update_portfolio_entry(self, tiers_lieu_id: str, inclus_portfolio: bool,
                                 campagne_texte: Optional[str], campagne_objectif: Optional[str],
                                 campagne_contact: Optional[str]) -> None: ...
