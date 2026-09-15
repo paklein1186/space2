@@ -71,7 +71,15 @@ code, pre, [data-testid="stMetricValue"], .stCode, [data-testid="stCaptionContai
    plus spécifiques ci-dessous (boutons, etc.) restent prioritaires malgré
    le !important : à spécificité CSS égale sur !important, la règle la plus
    spécifique gagne toujours, pas seulement l'ordre d'apparition. */
-[data-testid="stSidebar"] *, [data-testid="stMain"] * {{ color: var(--sp-text) !important; }}
+[data-testid="stSidebar"] *:not(.deck-tooltip), [data-testid="stMain"] *:not(.deck-tooltip) {{
+  color: var(--sp-text) !important;
+}}
+/* Tooltip de la carte pydeck (survol d'un lieu) : deck.gl fixe lui-même une
+   paire couleur/fond cohérente en style inline (gris clair sur bleu marine)
+   — la règle générale ci-dessus n'écrasait que la couleur du texte, jamais
+   le fond, laissant du texte sombre (thème clair) sur un fond déjà sombre.
+   Exclu plutôt que "corrigé" : son fond ne dépend pas de nos variables de
+   thème, pas la peine d'essayer de le faire coller aux deux thèmes. */
 /* Flèche de repli de la barre latérale : en dehors de stSidebar (chrome de
    l'appli, pas son contenu), donc pas couverte par la règle générale
    ci-dessus — et son icône fixe une couleur via un attribut HTML `color=`

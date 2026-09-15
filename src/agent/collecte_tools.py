@@ -139,6 +139,31 @@ TOOL_DEFINITIONS = [
         },
     },
     {
+        "name": "rechercher_connaissances_existantes",
+        "description": (
+            "Cherche si quelque chose est déjà documenté sur CE lieu dans la base de connaissances "
+            "de la plateforme (articles Trois-Tiers, rapports déposés par des admins, retours "
+            "d'expérience d'autres entretiens) — à appeler UNE FOIS, tôt dans l'entretien, dès que "
+            "le nom du lieu est connu. Renvoie les 3 passages les plus proches par similarité "
+            "sémantique, MÊME s'ils ne parlent pas vraiment de ce lieu (recherche non filtrée) — "
+            "c'est à toi de juger si un extrait renvoyé parle bien de CE lieu précis avant de t'en "
+            "servir : un nom de lieu très générique ou un extrait qui parle visiblement d'autre "
+            "chose ne doit jamais être présenté. Un extrait pertinent reste une SUGGESTION à faire "
+            "confirmer, jamais un fait imposé ni enregistré directement : présente-le comme "
+            "\"d'après nos données, ... — c'est bien ça ?\" et enregistre ce que le répondant "
+            "confirme ou corrige avec save_answer, pas la suggestion telle quelle. Rien de "
+            "pertinent ? Dis simplement que tu pars de zéro pour ce lieu, sans insister ni "
+            "réessayer avec d'autres mots-clés."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "nom_lieu": {"type": "string", "description": "nom du lieu tel que donné par le répondant"},
+            },
+            "required": ["nom_lieu"],
+        },
+    },
+    {
         "name": "skip_optional_module",
         "description": (
             "À appeler si le répondant décline explicitement de continuer avec "
@@ -496,6 +521,41 @@ class CollecteToolHandler:
         candidats.sort(key=lambda t: t[0], reverse=True)
         return {
             "champs": [{"id": f.id, "label": f.label} for _score, f in candidats[:5]],
+        }
+
+    def rechercher_connaissances_existantes(self, tool_input: dict) -> dict:
+        """Recherche sémantique (Voyage + Chroma, même index que la
+        Bibliothèque) sur le nom du lieu dans TOUTE la base de connaissances
+        — articles Trois-Tiers, rapports déposés, bonnes pratiques d'autres
+        entretiens. But : éviter qu'un répondant reparte de zéro pour un
+        lieu déjà documenté ailleurs sur la plateforme, sans jamais imposer
+        cette info (voir la règle dédiée dans collecte_agent.SYSTEM_PROMPT —
+        toujours une suggestion à confirmer). Dégrade en liste vide si
+        VOYAGE_API_KEY n'est pas configuré ou en cas d'erreur réseau : ce
+        croisement reste un bonus, jamais un prérequis pour continuer
+        l'entretien."""
+        try:
+            from .embeddings import VoyageEmbedder
+            from .vectorstore import ChromaStore
+
+            embedder = VoyageEmbedder()
+            embedding = embedder.embed_query(tool_input["nom_lieu"])
+            hits = ChromaStore().query(embedding, top_k=3)
+        except Exception:
+            return {"resultats": []}
+        # Pas de seuil numérique sur la distance : l'échelle réelle rendue
+        # par Chroma/Voyage n'est pas une similarité cosinus bornée [0,1]
+        # exploitable telle quelle (une correspondance exacte peut afficher
+        # une distance proche de 1, pas de 0) — un seuil arbitraire écartait
+        # à tort de vrais résultats pertinents. Les k plus proches sont
+        # toujours renvoyés ; c'est à l'agent de juger si le texte renvoyé
+        # parle vraiment de CE lieu avant de le présenter (voir la règle
+        # dédiée dans collecte_agent.SYSTEM_PROMPT).
+        return {
+            "resultats": [
+                {"source": h["metadata"].get("source_file", "source inconnue"), "extrait": h["text"]}
+                for h in hits
+            ],
         }
 
     def skip_optional_module(self, tool_input: dict) -> dict:
