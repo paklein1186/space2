@@ -164,6 +164,30 @@ TOOL_DEFINITIONS = [
         },
     },
     {
+        "name": "rechercher_web",
+        "description": (
+            "Recherche sur le web public (au-delà de la plateforme) — à utiliser avec parcimonie, "
+            "typiquement quand `rechercher_connaissances_existantes` n'a rien donné de pertinent ET "
+            "qu'une information basique manque encore (adresse, site du lieu). Renvoie jusqu'à 3 "
+            "résultats (titre, url, extrait) — des pistes à examiner et proposer au répondant pour "
+            "CONFIRMATION, jamais des faits à enregistrer directement : n'invente jamais une "
+            "adresse précise à partir d'un simple extrait de résultat, demande toujours "
+            "confirmation avant `save_answer`. Peut renvoyer une liste vide (recherche non "
+            "disponible, ou rien de pertinent) — dans ce cas, continue normalement en posant la "
+            "question au répondant, sans réessayer avec d'autres mots-clés."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "requete": {
+                    "type": "string",
+                    "description": "requête de recherche, ex. \"Ma Ferme tiers-lieu Belgique\"",
+                },
+            },
+            "required": ["requete"],
+        },
+    },
+    {
         "name": "skip_optional_module",
         "description": (
             "À appeler si le répondant décline explicitement de continuer avec "
@@ -557,6 +581,13 @@ class CollecteToolHandler:
                 for h in hits
             ],
         }
+
+    def rechercher_web(self, tool_input: dict) -> dict:
+        """Recherche web publique (API Brave Search) — voir web_crawl.
+        rechercher_web pour la dégradation silencieuse si non configuré."""
+        from .web_crawl import rechercher_web as _rechercher_web
+
+        return {"resultats": _rechercher_web(tool_input["requete"])}
 
     def skip_optional_module(self, tool_input: dict) -> dict:
         module_id = tool_input["module_id"]

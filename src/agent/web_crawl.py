@@ -1,4 +1,4 @@
-"""Recherche web complémentaire, deux usages :
+"""Recherche web complémentaire, trois usages :
 
 1. Le site externe déclaré d'UN lieu (lieu_derive.lien_externe, alimenté
    notamment par l'import CommunECter) : extrait ce que les réponses au
@@ -11,15 +11,25 @@
    nouvelle table SQL, le vecteur embeddé EST le stockage (même mécanisme
    que le bouton "🧠 Nourrir l'intelligence" de la Bibliothèque, voir
    `ajouter_connaissance`).
+3. Une recherche web ponctuelle PENDANT l'entretien (`rechercher_web`,
+   API Brave Search) quand un lieu est inconnu à la fois des réponses déjà
+   données et de la base de connaissances interne (voir
+   `rechercher_connaissances_existantes` dans collecte_tools.py) — pour ne
+   jamais faire repartir un répondant de zéro sur une info trouvable en une
+   recherche. Nécessite BRAVE_SEARCH_API_KEY (payant au-delà d'un crédit
+   mensuel offert) ; dégrade silencieusement en liste vide si absent, cette
+   capacité reste optionnelle.
 
-Toujours déclenché manuellement depuis l'admin (jamais en tâche de fond
-automatique) : un site web réel est plus lent et plus gros qu'un texte déjà
-en base, et sa structure est imprévisible — mieux vaut que quelqu'un
-supervise plutôt qu'un cron qui échoue silencieusement sur des sites variés.
+1 et 2 restent toujours déclenchés manuellement depuis l'admin (jamais en
+tâche de fond automatique) : un site web réel est plus lent et plus gros
+qu'un texte déjà en base, et sa structure est imprévisible — mieux vaut que
+quelqu'un supervise plutôt qu'un cron qui échoue silencieusement sur des
+sites variés.
 """
 
 from __future__ import annotations
 
+import os
 import re
 import tempfile
 from pathlib import Path
@@ -35,6 +45,36 @@ NOTE_SECTION_CRAWL = "crawl_site_lieu"
 TIMEOUT_S = 15
 MAX_TEXTE_BRUT = 8000  # caractères — borne le coût du prompt d'extraction
 USER_AGENT = "Mozilla/5.0 (compatible; lieux-hybrides-territoires/1.0; +https://troistiers.space)"
+BRAVE_SEARCH_URL = "https://api.search.brave.com/res/v1/web/search"
+
+
+def rechercher_web(requete: str, max_resultats: int = 3) -> list:
+    """Recherche web publique via l'API Brave Search — renvoie une liste de
+    {titre, url, description}, ou une liste vide si BRAVE_SEARCH_API_KEY
+    n'est pas configuré ou en cas d'erreur réseau. Jamais d'exception : cette
+    capacité reste un bonus ponctuel pendant l'entretien (une piste à faire
+    confirmer par le répondant, voir la règle dédiée dans collecte_agent.
+    SYSTEM_PROMPT), jamais un prérequis pour continuer sans elle."""
+    api_key = os.environ.get("BRAVE_SEARCH_API_KEY")
+    if not api_key:
+        return []
+    try:
+        response = requests.get(
+            BRAVE_SEARCH_URL,
+            params={"q": requete, "count": max_resultats},
+            headers={"Accept": "application/json", "X-Subscription-Token": api_key},
+            timeout=TIMEOUT_S,
+        )
+        response.raise_for_status()
+        data = response.json()
+    except Exception:
+        return []
+    resultats = (data.get("web") or {}).get("results") or []
+    return [
+        {"titre": r.get("title", ""), "url": r.get("url", ""), "description": r.get("description", "")}
+        for r in resultats[:max_resultats]
+    ]
+
 
 PROMPT_EXTRACTION = """Voici du texte brut concernant un tiers-lieu nommé « {nom_lieu} »,
 transmis via {source_label}.
