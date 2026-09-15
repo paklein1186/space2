@@ -337,6 +337,23 @@ class CollecteToolHandler:
                 # entretien complet). Même mécanisme que l'import CommunEcter/CSV,
                 # simplement déclenché ici par l'entretien plutôt qu'un script.
                 self.store.update_tiers_lieu(self.tiers_lieu_id, **{champ_id: valeur})
+            elif champ_id == "adresse" and valeur:
+                # Géocode l'adresse texte en lat/lon (Nominatim) et les pose
+                # sur la fiche du lieu — sans ça, un lieu créé via l'entretien
+                # n'a jamais de coordonnées (contrairement à un import
+                # CommunEcter), donc n'apparaît jamais sur la carte de
+                # l'Annuaire (vécu : aucun des lieux français, entrés
+                # uniquement via l'entretien, n'avait de coordonnées). Ne
+                # bloque jamais l'enregistrement de la réponse en cas d'échec
+                # réseau ou d'adresse introuvable (geocoder_adresse renvoie
+                # None plutôt que de lever).
+                from ..geocoding import geocoder_adresse
+                pays_connu = self._current_answers().get("pays")
+                coords = geocoder_adresse(valeur, pays_connu)
+                if coords:
+                    self.store.update_tiers_lieu(
+                        self.tiers_lieu_id, latitude=coords[0], longitude=coords[1],
+                    )
 
         if self._priority_active and champ_id in self._priority_field_ids:
             section = self._priority_section()

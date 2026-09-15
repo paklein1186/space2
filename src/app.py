@@ -660,7 +660,54 @@ def annuaire_tab(store, est_admin: bool, user_id: str):
     # que pour le lieu réellement ouvert dans le popup.
     derive_par_lieu = store.get_lieu_derive_batch([l.id for l in lieux])
 
-    coords = lieux_avec_coordonnees(store)
+    # Recherche et filtres calculés AVANT la carte : elle doit refléter les
+    # mêmes lieux que la grille affichée plus bas, pas systématiquement tous
+    # les lieux recensés — sans ça, filtrer par pays ne faisait rien à la
+    # carte alors que la grille en dessous, elle, se filtrait bien (signalé
+    # comme un bug : "si on filtre sur un pays, la carte ne s'adapte pas").
+    # selectbox + accept_new_options plutôt qu'un simple text_input : les
+    # lieux dont le nom correspond à ce qui est tapé apparaissent aussitôt en
+    # menu déroulant (filtrage instantané côté navigateur, lettre après
+    # lettre, sans aller-retour serveur) — pratique pour repérer/ouvrir un
+    # lieu déjà recensé plutôt que de parcourir toute la grille. Taper une
+    # ville ou une région ne correspond à aucune suggestion mais reste
+    # accepté comme texte libre une fois validé, et alimente le même filtre
+    # nom/région/pays que par le passé.
+    recherche = st.selectbox(
+        "Rechercher", options=sorted(l.nom for l in lieux), index=None,
+        accept_new_options=True, placeholder="🔍 Nom, ville, région...", label_visibility="collapsed",
+    ) or ""
+    col_pays, col_region, col_categories = st.columns(3)
+    with col_pays:
+        options_pays = sorted({l.pays for l in lieux if l.pays})
+        filtre_pays = st.multiselect("Pays", options=options_pays)
+    with col_region:
+        options_region = sorted({l.region for l in lieux if l.region})
+        filtre_region = st.multiselect("Région", options=options_region)
+    with col_categories:
+        filtre_categories = st.multiselect("Catégorie", options=CATEGORIES_POSSIBLES)
+
+    lieux_affiches = lieux
+    if recherche.strip():
+        q = recherche.strip().lower()
+        lieux_affiches = [
+            l for l in lieux_affiches
+            if q in l.nom.lower() or q in (l.region or "").lower() or q in (l.pays or "").lower()
+        ]
+    if filtre_pays:
+        lieux_affiches = [l for l in lieux_affiches if l.pays in filtre_pays]
+    if filtre_region:
+        lieux_affiches = [l for l in lieux_affiches if l.region in filtre_region]
+    if filtre_categories:
+        lieux_affiches = [
+            l for l in lieux_affiches
+            if (lambda d: d and set(d.donnees.get("categories") or []) & set(filtre_categories))(
+                derive_par_lieu.get(l.id)
+            )
+        ]
+    st.caption(f"{len(lieux_affiches)} lieu(x) affiché(s)")
+
+    coords = lieux_avec_coordonnees(lieux_affiches)
     if coords:
         df_coords = pd.DataFrame(coords)
         lat_centre = df_coords["lat"].mean()
@@ -717,48 +764,6 @@ def annuaire_tab(store, est_admin: bool, user_id: str):
                 st.session_state["_derniere_selection_carte"] = lieu_selectionne_id
                 st.session_state["annuaire_open_lieu_id"] = lieu_selectionne_id
                 st.rerun()
-
-    # selectbox + accept_new_options plutôt qu'un simple text_input : les
-    # lieux dont le nom correspond à ce qui est tapé apparaissent aussitôt en
-    # menu déroulant (filtrage instantané côté navigateur, lettre après
-    # lettre, sans aller-retour serveur) — pratique pour repérer/ouvrir un
-    # lieu déjà recensé plutôt que de parcourir toute la grille. Taper une
-    # ville ou une région ne correspond à aucune suggestion mais reste
-    # accepté comme texte libre une fois validé, et alimente le même filtre
-    # nom/région/pays que par le passé.
-    recherche = st.selectbox(
-        "Rechercher", options=sorted(l.nom for l in lieux), index=None,
-        accept_new_options=True, placeholder="🔍 Nom, ville, région...", label_visibility="collapsed",
-    ) or ""
-    col_pays, col_region, col_categories = st.columns(3)
-    with col_pays:
-        options_pays = sorted({l.pays for l in lieux if l.pays})
-        filtre_pays = st.multiselect("Pays", options=options_pays)
-    with col_region:
-        options_region = sorted({l.region for l in lieux if l.region})
-        filtre_region = st.multiselect("Région", options=options_region)
-    with col_categories:
-        filtre_categories = st.multiselect("Catégorie", options=CATEGORIES_POSSIBLES)
-
-    lieux_affiches = lieux
-    if recherche.strip():
-        q = recherche.strip().lower()
-        lieux_affiches = [
-            l for l in lieux_affiches
-            if q in l.nom.lower() or q in (l.region or "").lower() or q in (l.pays or "").lower()
-        ]
-    if filtre_pays:
-        lieux_affiches = [l for l in lieux_affiches if l.pays in filtre_pays]
-    if filtre_region:
-        lieux_affiches = [l for l in lieux_affiches if l.region in filtre_region]
-    if filtre_categories:
-        lieux_affiches = [
-            l for l in lieux_affiches
-            if (lambda d: d and set(d.donnees.get("categories") or []) & set(filtre_categories))(
-                derive_par_lieu.get(l.id)
-            )
-        ]
-    st.caption(f"{len(lieux_affiches)} lieu(x) affiché(s)")
 
     if "annuaire_open_lieu_id" in st.session_state:
         lieu_id = st.session_state.pop("annuaire_open_lieu_id")

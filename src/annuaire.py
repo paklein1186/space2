@@ -268,9 +268,14 @@ def render_fiche_sections(store: Store, lieu, derive, montrer_sources: bool = Tr
         st.caption("Pas encore assez d'informations déclarées pour détailler ce lieu par thème.")
 
 
-def lieux_avec_coordonnees(store: Store) -> list:
+def lieux_avec_coordonnees(lieux: list) -> list:
+    """`lieux` : la liste déjà filtrée à afficher (recherche/pays/région/
+    catégorie) — pas un nouvel appel à store.list_tiers_lieux(), pour que la
+    carte reflète les mêmes lieux que la grille en dessous plutôt que
+    systématiquement tous les lieux recensés (vécu : filtrer par pays ne
+    changeait rien à la carte)."""
     return [
         {"id": l.id, "nom": l.nom, "lat": l.latitude, "lon": l.longitude}
-        for l in store.list_tiers_lieux()
+        for l in lieux
         if l.latitude is not None and l.longitude is not None
     ]
