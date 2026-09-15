@@ -963,6 +963,46 @@ def administration_tab(store, user_id: str) -> None:
             else:
                 st.caption("Aucune réponse structurée pour ce lieu.")
 
+    with st.expander("Synthèses des lieux (enrichissement IA)", expanded=False):
+        st.caption(
+            "Régénère le résumé, les enjeux, besoins, mots-clés et catégories de chaque lieu à partir "
+            "de ses réponses actuelles. Seuls les lieux dont les réponses ont changé depuis le dernier "
+            "enrichissement sont réellement retraités (comparaison par empreinte des réponses) — relancer "
+            "souvent ne coûte donc rien pour les lieux déjà à jour. C'est aussi la seule façon de mettre "
+            "à jour la recherche sémantique de la Bibliothèque : elle est stockée sur le disque local du "
+            "serveur, jamais synchronisée automatiquement — un script lancé depuis un autre ordinateur "
+            "n'y contribue pas, contrairement à ce bouton qui s'exécute ici, sur le serveur de l'app."
+        )
+        force_tous = st.checkbox(
+            "Retraiter aussi les lieux déjà à jour (force)", value=False,
+            help="Utile après une modification du prompt d'enrichissement lui-même, pas pour un usage courant.",
+        )
+        if st.button("Régénérer les synthèses"):
+            from src.agent.enrichissement import enrich_lieu
+
+            lieux_admin = admin_store.list_tiers_lieux()
+            progress = st.progress(0.0)
+            statut = st.empty()
+            enrichis, inchanges, erreurs = 0, 0, []
+            for i, lieu in enumerate(lieux_admin):
+                statut.caption(f"{lieu.nom}...")
+                try:
+                    _, updated = enrich_lieu(admin_store, lieu.id, force=force_tous, nom_lieu=lieu.nom)
+                    if updated:
+                        enrichis += 1
+                    else:
+                        inchanges += 1
+                except Exception as exc:
+                    erreurs.append(f"{lieu.nom} : {exc}")
+                progress.progress((i + 1) / len(lieux_admin))
+            statut.empty()
+            progress.empty()
+            message = f"{enrichis} lieu(x) régénéré(s), {inchanges} déjà à jour."
+            if erreurs:
+                st.warning(message + f" {len(erreurs)} erreur(s) :\n" + "\n".join(erreurs))
+            else:
+                st.success(message)
+
     with st.expander("Schéma de l'entretien (lecture seule)", expanded=False):
         for module in QUESTIONNAIRE:
             st.markdown(f"#### {module.title} {'· optionnel' if module.optional else '· obligatoire'}")
