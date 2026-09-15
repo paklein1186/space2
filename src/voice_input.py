@@ -9,10 +9,25 @@ Pas de composant Streamlit bidirectionnel custom : une tentative précédente
 (bibliothèque tierce streamlit-mic-recorder) s'est heurtée à une
 incompatibilité avec la version de Streamlit utilisée ici, pour la même
 classe de raison qui rend ce genre de composant fragile en général — il doit
-suivre le protocole interne (non garanti stable) de communication
-JS/Python de Streamlit. À la place, le transcript final est transmis en
-rechargeant la page avec un paramètre d'URL (`st.query_params`), une
-technique qui ne dépend que d'API Streamlit publiques et documentées."""
+suivre le protocole interne (non garanti stable) de communication JS/Python
+de Streamlit. À la place, le transcript final est transmis en rechargeant
+la page avec un paramètre d'URL (`st.query_params`), une technique qui ne
+dépend que d'API Streamlit publiques et documentées.
+
+Le bouton lui-même est injecté DANS la page hôte (window.parent.document),
+pas affiché dans l'iframe de son propre `components.html` : un premier
+essai rendait un bouton normal dans le flux du script, qui atterrissait
+n'importe où au-dessus de la barre de saisie (elle-même toujours ancrée en
+bas par Streamlit, indépendamment de l'endroit du script où st.chat_input
+est appelé) — visuellement décroché du champ de texte plutôt qu'intégré à
+côté, comme sur Claude ou ChatGPT. Injecter dans `stBottomBlockContainer`
+(testid stable, déjà utilisé ailleurs dans ce projet pour le CSS de thème)
+et positionner en `position: fixed` relativement au bouton d'envoi natif
+(`stChatInputSubmitButton`) place le micro juste à côté — vérifié : cet
+ajout survit aux reruns Streamlit (React ne remonte que le sous-arbre du
+widget chat_input lui-même, pas les nœuds ajoutés en sibling dans son
+conteneur), sans dépendre de classes CSS générées (non stables d'une
+version à l'autre), seulement de data-testid officiels."""
 
 from __future__ import annotations
 
@@ -23,46 +38,78 @@ QUERY_PARAM = "voix"
 
 
 def bouton_dictee(lang: str = "fr-FR", *, label: str = "Dicter la réponse") -> None:
-    """Affiche un bouton micro compact (icône seule, pas un gros pavé) juste
-    au-dessus du champ de saisie, qui déclenche la reconnaissance vocale du
-    navigateur ; une fois la dictée terminée, recharge la page avec le
-    transcript dans l'URL (lu et consommé ensuite via consume_voice_transcript(),
-    à appeler côté Python avant de rendre le champ de saisie concerné).
-
-    Composant volontairement petit (bouton rond icône seule + une ligne de
-    statut compacte en dessous, dans le flux normal) : un `components.html`
-    est rendu dans son propre iframe qui rogne tout ce qui dépasse sa
-    hauteur, donc un texte de statut en superposition au-dessus du bouton
-    (essayé d'abord) se retrouvait invisible, coupé par le bord de l'iframe —
-    la ligne de statut doit rester DANS la hauteur réservée, pas par-dessus."""
+    """Injecte (ou réinjecte, à chaque rerun) le bouton micro à côté du
+    bouton d'envoi natif de st.chat_input, dans la page hôte. Une fois la
+    dictée terminée, recharge la page avec le transcript dans l'URL (lu et
+    consommé ensuite via consume_voice_transcript(), à appeler côté Python
+    avant de rendre le champ de saisie concerné). Sans effet si la page
+    n'a pas encore de st.chat_input rendu (ex. premier passage)."""
     html = f"""
-    <div style="display:flex; flex-direction:column; align-items:flex-end; font-family:inherit;">
-      <button id="lh-voice-btn" type="button" title="{label}" style="
-        display:flex; align-items:center; justify-content:center;
-        width:2.1rem; height:2.1rem; padding:0; flex:none;
-        border-radius:999px; border:1px solid rgba(148,163,184,0.4);
-        background:transparent; color:inherit; font-size:1.05rem; line-height:1; cursor:pointer;">
-        <span id="lh-voice-icon">🎙️</span>
-      </button>
-      <div id="lh-voice-status" style="
-        font-size:0.75rem; opacity:0.85; white-space:nowrap; max-width:260px;
-        overflow:hidden; text-overflow:ellipsis; text-align:right; margin-top:2px; height:1.1em;"></div>
-    </div>
     <script>
     (function() {{
-      const btn = document.getElementById("lh-voice-btn");
-      const icon = document.getElementById("lh-voice-icon");
-      const status = document.getElementById("lh-voice-status");
-      const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const parentDoc = window.parent.document;
+      const chatInput = parentDoc.querySelector('[data-testid="stChatInput"]');
+      const bottomContainer = parentDoc.querySelector('[data-testid="stBottomBlockContainer"]');
+      if (!chatInput || !bottomContainer) return;
+
+      const ancien = parentDoc.getElementById('lh-voice-btn-fixed');
+      if (ancien) ancien.remove();
+      const ancienStatus = parentDoc.getElementById('lh-voice-status-fixed');
+      if (ancienStatus) ancienStatus.remove();
+      if (window.parent.__lhVoiceInterval) {{
+        clearInterval(window.parent.__lhVoiceInterval);
+      }}
+
+      const btn = parentDoc.createElement('button');
+      btn.id = 'lh-voice-btn-fixed';
+      btn.type = 'button';
+      btn.title = {label!r};
+      btn.textContent = '🎙️';
+      btn.style.cssText = [
+        'position:fixed', 'z-index:999', 'width:2.1rem', 'height:2.1rem', 'padding:0',
+        'border-radius:999px', 'border:1px solid rgba(148,163,184,0.45)',
+        'background:var(--sp-bg-elevated, transparent)', 'color:inherit',
+        'cursor:pointer', 'font-size:1.05rem', 'line-height:1',
+        'display:flex', 'align-items:center', 'justify-content:center',
+      ].join(';');
+
+      const status = parentDoc.createElement('div');
+      status.id = 'lh-voice-status-fixed';
+      status.style.cssText = [
+        'position:fixed', 'z-index:999', 'font-size:0.78rem', 'opacity:0.9',
+        'white-space:nowrap', 'max-width:min(60vw,320px)', 'overflow:hidden',
+        'text-overflow:ellipsis', 'text-align:right', 'pointer-events:none',
+        'color:inherit',
+      ].join(';');
+
+      bottomContainer.style.position = bottomContainer.style.position || 'relative';
+      bottomContainer.appendChild(btn);
+      bottomContainer.appendChild(status);
+
+      function reposition() {{
+        const submit = chatInput.querySelector('[data-testid="stChatInputSubmitButton"]');
+        const ref = (submit || chatInput).getBoundingClientRect();
+        const top = ref.top + ref.height / 2 - btn.offsetHeight / 2;
+        const left = ref.left - btn.offsetWidth - 8;
+        btn.style.top = top + 'px';
+        btn.style.left = left + 'px';
+        status.style.top = (top - 22) + 'px';
+        status.style.left = Math.max(8, left - 260) + 'px';
+        status.style.width = '260px';
+      }}
+      reposition();
+      window.parent.__lhVoiceInterval = setInterval(reposition, 800);
+
+      const Recognition = window.parent.SpeechRecognition || window.parent.webkitSpeechRecognition;
       if (!Recognition) {{
         btn.disabled = true;
-        btn.style.opacity = "0.4";
-        btn.style.cursor = "not-allowed";
-        btn.title = "Dictée non disponible sur ce navigateur (essayez Chrome, Edge ou Opera)";
+        btn.style.opacity = '0.4';
+        btn.style.cursor = 'not-allowed';
+        btn.title = 'Dictée non disponible sur ce navigateur (essayez Chrome, Edge ou Opera)';
         return;
       }}
       const recognition = new Recognition();
-      recognition.lang = "{lang}";
+      recognition.lang = '{lang}';
       recognition.interimResults = true;
       recognition.maxAlternatives = 1;
       let listening = false;
@@ -72,44 +119,41 @@ def bouton_dictee(lang: str = "fr-FR", *, label: str = "Dicter la réponse") -> 
         status.textContent = text;
         if (statusTimeout) clearTimeout(statusTimeout);
         if (holdMs) {{
-          statusTimeout = setTimeout(function() {{ status.textContent = ""; }}, holdMs);
+          statusTimeout = setTimeout(function() {{ status.textContent = ''; }}, holdMs);
         }}
       }}
 
       recognition.onstart = function() {{
         listening = true;
-        icon.textContent = "🔴";
-        showStatus("Écoute... (recliquez pour arrêter)");
+        btn.textContent = '🔴';
+        showStatus('Écoute... (recliquez pour arrêter)');
       }};
       recognition.onerror = function(event) {{
         const messages = {{
-          "not-allowed": "Micro refusé — autorisez l'accès au micro pour ce site.",
-          "network": "Reconnaissance vocale indisponible (problème réseau côté navigateur — "
-                    + "vérifiez un bloqueur de pub/traqueurs ou un proxy qui filtrerait "
-                    + "les services Google, requis par cette API navigateur).",
-          "no-speech": "Rien entendu — réessayez.",
+          'not-allowed': "Micro refusé — autorisez l'accès au micro pour ce site.",
+          'network': 'Service de reconnaissance vocale (Google) injoignable — bloqueur/proxy ?',
+          'no-speech': 'Rien entendu — réessayez.',
         }};
-        showStatus(messages[event.error] || ("Erreur de reconnaissance : " + event.error), 6000);
+        showStatus(messages[event.error] || ('Erreur : ' + event.error), 6000);
       }};
       recognition.onend = function() {{
         listening = false;
-        icon.textContent = "🎙️";
+        btn.textContent = '🎙️';
       }};
       recognition.onresult = function(event) {{
-        let transcript = "";
+        let transcript = '';
         for (let i = 0; i < event.results.length; i++) {{
           transcript += event.results[i][0].transcript;
         }}
         showStatus(transcript);
         const last = event.results[event.results.length - 1];
         if (last.isFinal && transcript.trim()) {{
-          const target = window.parent || window;
-          const url = new URL(target.location.href);
-          url.searchParams.set("{QUERY_PARAM}", transcript.trim());
-          target.location.href = url.toString();
+          const url = new URL(window.parent.location.href);
+          url.searchParams.set('{QUERY_PARAM}', transcript.trim());
+          window.parent.location.href = url.toString();
         }}
       }};
-      btn.addEventListener("click", function() {{
+      btn.addEventListener('click', function() {{
         if (listening) {{
           recognition.stop();
         }} else {{
@@ -119,7 +163,7 @@ def bouton_dictee(lang: str = "fr-FR", *, label: str = "Dicter la réponse") -> 
     }})();
     </script>
     """
-    components.html(html, height=58)
+    components.html(html, height=1)
 
 
 def consume_voice_transcript() -> str | None:
