@@ -682,6 +682,37 @@ section_modele_economique = Section(
               options=["Fonds propres", "Subventions publiques", "Prêt bancaire", "Mécénat / fondations",
                        "Investissement en capital par les fondateurs ou proches", "Crowdfunding",
                        "Investissement en capital par des entreprises", "Autre"]),
+        # Le corpus ne comportait aucune donnée financière chiffrée exploitable
+        # pour une décision d'investissement (bilan, prévisionnel, ROI) au-delà
+        # de chiffre_affaires_annuel/resultat_annuel — ces champs comblent ce
+        # manque explicitement plutôt que de compter sur une mention spontanée.
+        Field("a_des_investisseurs_capital", "Le lieu compte-t-il des investisseurs ayant apporté du capital "
+                                              "(hors subventions, dons ou prêt bancaire) ?",
+              FieldType.BOOLEAN, roles=ROLES_INTERNES),
+        Field("montant_investi_capital", "Quel est le montant total de capital apporté par ces investisseurs (€) ?",
+              FieldType.NUMBER, roles=ROLES_INTERNES,
+              condition=Condition("a_des_investisseurs_capital", "eq", True)),
+        Field("type_retour_investisseurs", "Quel type de retour est prévu ou attendu pour ces investisseurs ?",
+              FieldType.SINGLE_CHOICE, roles=ROLES_INTERNES,
+              options=["Retour financier chiffré (dividendes, plus-value, intérêts)",
+                       "Remboursement du capital sans intérêt",
+                       "Retour social/environnemental uniquement (pas de retour financier)",
+                       "Non défini / pas encore clarifié", "Autre"],
+              condition=Condition("a_des_investisseurs_capital", "eq", True)),
+        Field("roi_annuel_pourcentage", "Si un retour financier chiffré est prévu, quel est le taux de "
+                                         "rendement annuel approximatif (%) ?",
+              FieldType.NUMBER, roles=ROLES_INTERNES,
+              help_text="Sert de base à une véritable analyse de rentabilité pour un investisseur potentiel — "
+                        "sans ce chiffre, seule une décision qualitative est possible.",
+              condition=Condition("type_retour_investisseurs", "eq",
+                                   "Retour financier chiffré (dividendes, plus-value, intérêts)")),
+        Field("previsionnel_financier_formalise", "Le lieu dispose-t-il d'un prévisionnel financier formalisé "
+                                                    "(business plan, budget prévisionnel pluriannuel) ?",
+              FieldType.BOOLEAN, roles=ROLES_INTERNES),
+        Field("horizon_previsionnel", "Sur quel horizon porte ce prévisionnel ?",
+              FieldType.SINGLE_CHOICE, roles=ROLES_INTERNES,
+              options=["1 an", "3 ans", "5 ans ou plus", "Autre"],
+              condition=Condition("previsionnel_financier_formalise", "eq", True)),
         Field("postes_depenses_significatifs", "Quels sont les postes de dépenses de fonctionnement les plus "
                                                 "significatifs ?", FieldType.MULTI_CHOICE, roles=ROLES_INTERNES,
               options=["Charges de fonctionnement (loyer, électricité, eau, internet, assurance...)",
