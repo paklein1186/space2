@@ -50,7 +50,11 @@ class RagAgent:
             apply_single_cache_breakpoint(self.messages)
             response = self.client.messages.create(
                 model=self.model,
-                max_tokens=2500,
+                # 2500 coupait net des réponses légitimement longues (liste
+                # de contacts/lieux, synthèse détaillée) en plein milieu
+                # d'une phrase — constaté en production, sans aucun signal
+                # que la réponse était incomplète.
+                max_tokens=8000,
                 system=cached_system(SYSTEM_PROMPT),
                 tools=TOOL_DEFINITIONS,
                 messages=self.messages,
@@ -62,7 +66,11 @@ class RagAgent:
             tool_uses = [b for b in response.content if b.type == "tool_use"]
             if not tool_uses:
                 text_blocks = [b.text for b in response.content if b.type == "text"]
-                return "\n".join(text_blocks)
+                texte = "\n".join(text_blocks)
+                if response.stop_reason == "max_tokens":
+                    texte += ("\n\n*(Réponse interrompue — trop longue pour être générée en une fois. "
+                              "Redemandez « continue » pour la suite, ou reformulez une question plus ciblée.)*")
+                return texte
 
             tool_results = []
             for tu in tool_uses:

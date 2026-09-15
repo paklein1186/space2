@@ -117,7 +117,10 @@ class CollecteAgent:
             apply_single_cache_breakpoint(self.messages)
             response = self.client.messages.create(
                 model=self.model,
-                max_tokens=2500,
+                # Voir la même note dans rag_agent.py : 2500 pouvait couper
+                # net un résumé d'ouverture ou une réaction un peu développée
+                # en plein milieu d'une phrase.
+                max_tokens=4000,
                 system=cached_system(SYSTEM_PROMPT),
                 tools=TOOL_DEFINITIONS,
                 messages=self.messages,
@@ -129,7 +132,10 @@ class CollecteAgent:
             tool_uses = [b for b in response.content if b.type == "tool_use"]
             if not tool_uses:
                 text_blocks = [b.text for b in response.content if b.type == "text"]
-                return "\n".join(text_blocks)
+                texte = "\n".join(text_blocks)
+                if response.stop_reason == "max_tokens":
+                    texte += "\n\n*(Message interrompu — trop long à générer d'un coup.)*"
+                return texte
 
             tool_results = []
             for tu in tool_uses:

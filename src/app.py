@@ -118,8 +118,15 @@ def auth_screen() -> str | None:
     # Restaure une session déjà ouverte (cookie posé lors d'une connexion
     # précédente) avant d'afficher le moindre formulaire — évite de redemander
     # un email à chaque visite. `cookie_restore_failed` empêche de reboucler
-    # indéfiniment si le refresh_token est expiré ou invalide.
-    if "otp_sent_to" not in st.session_state and "cookie_restore_failed" not in st.session_state:
+    # indéfiniment si le refresh_token est expiré ou invalide. `just_logged_out`
+    # (posé par le bouton "Se déconnecter", consommé une seule fois ici) évite
+    # une reconnexion automatique juste après : le composant cookie répond de
+    # façon asynchrone, et un rerun immédiat après la suppression peut encore
+    # relire l'ancien refresh_token avant que le navigateur n'ait fini de le
+    # supprimer — constaté en production (déconnexion suivie d'une reconnexion
+    # automatique silencieuse).
+    just_logged_out = st.session_state.pop("just_logged_out", False)
+    if not just_logged_out and "otp_sent_to" not in st.session_state and "cookie_restore_failed" not in st.session_state:
         refresh_token = read_session_cookie()
         if refresh_token:
             try:
@@ -1231,6 +1238,7 @@ def main():
                 for key in ("user_id", "user_email", "otp_sent_to", "cookie_restore_failed",
                             "use_admin_store", "supabase_client"):
                     st.session_state.pop(key, None)
+                st.session_state["just_logged_out"] = True
                 st.rerun()
 
 
