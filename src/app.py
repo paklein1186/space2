@@ -952,6 +952,57 @@ def administration_tab(store, user_id: str) -> None:
             } for u in utilisateurs]
             st.dataframe(pd.DataFrame(lignes), use_container_width=True, hide_index=True)
 
+    with st.expander("Lieux (éditer ou supprimer)", expanded=False):
+        st.caption(
+            "Corriger le nom, le pays ou la région d'un lieu, ou le supprimer définitivement avec "
+            "tout ce qui lui est rattaché (réponses, notes, sessions, synthèse) — irréversible."
+        )
+        tous_les_lieux_gestion = sorted(store.list_tiers_lieux(), key=lambda l: l.nom.lower())
+        if not tous_les_lieux_gestion:
+            st.caption("Aucun lieu recensé pour l'instant.")
+        else:
+            lieu_gestion_nom = st.selectbox(
+                "Lieu", options=[l.nom for l in tous_les_lieux_gestion], key="admin_gestion_lieu",
+            )
+            lieu_gestion = next(l for l in tous_les_lieux_gestion if l.nom == lieu_gestion_nom)
+
+            with st.form(f"edit_lieu_form_{lieu_gestion.id}"):
+                nouveau_nom = st.text_input("Nom", value=lieu_gestion.nom)
+                nouveau_pays = st.text_input("Pays", value=lieu_gestion.pays or "")
+                nouvelle_region = st.text_input("Région", value=lieu_gestion.region or "")
+                if st.form_submit_button("Enregistrer les modifications"):
+                    admin_store.update_tiers_lieu(
+                        lieu_gestion.id, nom=nouveau_nom.strip(),
+                        pays=nouveau_pays.strip() or None, region=nouvelle_region.strip() or None,
+                    )
+                    st.success("Lieu mis à jour.")
+                    st.rerun()
+
+            st.divider()
+            cle_confirmation = f"confirmer_suppression_lieu_{lieu_gestion.id}"
+            if not st.session_state.get(cle_confirmation):
+                if st.button("🗑️ Supprimer ce lieu", key=f"suppr_lieu_btn_{lieu_gestion.id}"):
+                    st.session_state[cle_confirmation] = True
+                    st.rerun()
+            else:
+                st.warning(
+                    f"Supprimer définitivement « {lieu_gestion.nom} » et toutes ses données "
+                    "(réponses, notes, sessions, synthèse) ? Cette action est irréversible."
+                )
+                col_confirmer, col_annuler_suppr = st.columns(2)
+                with col_confirmer:
+                    if st.button("Oui, supprimer définitivement", key=f"suppr_lieu_ok_{lieu_gestion.id}",
+                                 type="primary", use_container_width=True):
+                        admin_store.delete_tiers_lieu(lieu_gestion.id)
+                        st.session_state.pop(cle_confirmation, None)
+                        st.success(f"« {lieu_gestion.nom} » supprimé.")
+                        st.rerun()
+                with col_annuler_suppr:
+                    if st.button("Annuler", key=f"suppr_lieu_annuler_{lieu_gestion.id}",
+                                 use_container_width=True):
+                        st.session_state.pop(cle_confirmation, None)
+                        st.rerun()
+
     with st.expander("Campagnes prioritaires (recensement ciblé)", expanded=False):
         st.caption("Pendant leur fenêtre active, les champs listés sont proposés en priorité dans "
                     "l'entretien, avant la suite normale du questionnaire.")

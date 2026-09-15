@@ -119,6 +119,13 @@ class Store(ABC):
     def update_tiers_lieu(self, tiers_lieu_id: str, **fields) -> None: ...
 
     @abstractmethod
+    def delete_tiers_lieu(self, tiers_lieu_id: str) -> None:
+        """Supprime définitivement un lieu et tout ce qui lui est rattaché
+        (contributeurs, réponses, notes, sessions, synthèse dérivée) — utilisé
+        par la section Administration. Irréversible."""
+        ...
+
+    @abstractmethod
     def list_tiers_lieux(self, owner_user_id: Optional[str] = None) -> list: ...
 
     @abstractmethod

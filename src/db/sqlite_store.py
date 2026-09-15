@@ -184,6 +184,19 @@ class SqliteStore(Store):
             rows = self.conn.execute("select * from tiers_lieux").fetchall()
         return [TiersLieu(**dict(r)) for r in rows]
 
+    def delete_tiers_lieu(self, tiers_lieu_id: str) -> None:
+        # Pas de ON DELETE CASCADE dans ce schéma SQLite (contrairement à
+        # Postgres/schema.sql) : suppression manuelle dans l'ordre, table par
+        # table — llm_calls gardé mais détaché (même choix que côté Supabase,
+        # "on delete set null"), l'historique de coût n'a pas besoin d'être
+        # rattaché à un lieu qui n'existe plus pour rester valide.
+        self.conn.execute("update llm_calls set tiers_lieu_id = NULL where tiers_lieu_id = ?", (tiers_lieu_id,))
+        for table in ("journal_modifications", "litiges", "notes_libres", "reponses",
+                      "sessions_entretien", "lieu_derive", "contributeurs"):
+            self.conn.execute(f"delete from {table} where tiers_lieu_id = ?", (tiers_lieu_id,))
+        self.conn.execute("delete from tiers_lieux where id = ?", (tiers_lieu_id,))
+        self.conn.commit()
+
     # -- contributeurs --------------------------------------------------
 
     def get_or_create_contributeur(self, user_id: str, tiers_lieu_id: str, role: str) -> Contributeur:

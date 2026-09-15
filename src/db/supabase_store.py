@@ -67,6 +67,14 @@ class SupabaseStore(Store):
         result = query.execute()
         return [_to_dataclass(TiersLieu, row) for row in result.data]
 
+    def delete_tiers_lieu(self, tiers_lieu_id: str) -> None:
+        # Toutes les tables qui référencent tiers_lieu_id sont en "on delete
+        # cascade" côté schema.sql (contributeurs, reponses, notes_libres,
+        # sessions_entretien, lieu_derive, journal_modifications, litiges) —
+        # une seule suppression suffit. llm_calls (on delete set null) garde
+        # son historique de coût, orphelin plutôt que supprimé.
+        self.client.table("tiers_lieux").delete().eq("id", tiers_lieu_id).execute()
+
     def get_or_create_contributeur(self, user_id: str, tiers_lieu_id: str, role: str) -> Contributeur:
         existing = (
             self.client.table("contributeurs")
