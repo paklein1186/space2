@@ -156,8 +156,23 @@ class CollecteAgent:
             self.messages.append({"role": "user", "content": tool_results})
 
 
-def opening_message(store, tiers_lieu_id: str, nom_lieu: str = "",
-                     contributeur_id: str | None = None, role_label: str = "") -> str:
+_INSTRUCTIONS_MODE = {
+    "campagne": (
+        " Le répondant a choisi de commencer par la campagne prioritaire en cours plutôt que "
+        "par l'histoire complète du lieu — get_current_section te la proposera directement, "
+        "mentionne-le brièvement avant la première question de cette campagne."
+    ),
+    "besoins": (
+        " Le répondant a choisi de commencer par exprimer les besoins actuels du lieu (pour les "
+        "rendre visibles dans l'Annuaire et servir de base à une éventuelle mise en avant dans le "
+        "Portfolio) plutôt que par l'histoire complète — get_current_section te proposera ces "
+        "questions en priorité, mentionne-le brièvement avant de les poser."
+    ),
+}
+
+
+def opening_message(store, tiers_lieu_id: str, nom_lieu: str = "", contributeur_id: str | None = None,
+                     role_label: str = "", mode_entretien: str = "histoire") -> str:
     """Message d'ouverture envoyé à l'agent pour démarrer la conversation —
     jamais affiché tel quel au répondant, mais donne à l'agent de quoi
     personnaliser son premier message (nom du lieu, éventuel résumé ou
@@ -172,11 +187,16 @@ def opening_message(store, tiers_lieu_id: str, nom_lieu: str = "",
        rappelle où on en est sans redemander l'évident.
     3. Tout premier échange pour ce lieu : personnalisation minimale (nom du
        lieu, rôle) sans contenu à restituer.
-    """
+
+    `mode_entretien` ("histoire" par défaut, ou "campagne"/"besoins" si le
+    répondant a choisi une voie d'entrée différente à l'écran précédent) —
+    voir CollecteToolHandler, qui fait remonter les champs correspondants en
+    priorité via le même mécanisme que les campagnes prioritaires."""
     identite = f"Le répondant s'occupe du lieu « {nom_lieu} »" if nom_lieu else "Le répondant"
     if role_label:
         identite += f", en tant que {role_label.lower()}"
     identite += "."
+    identite += _INSTRUCTIONS_MODE.get(mode_entretien, "")
 
     derive = store.get_lieu_derive(tiers_lieu_id)
     if derive and derive.donnees.get("resume"):

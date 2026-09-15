@@ -97,12 +97,14 @@ class CollecteToolHandler:
     champs seraient optionnels (qui serait sinon considérée "complète" à tort
     dès qu'on la regarde)."""
 
-    def __init__(self, store: Store, tiers_lieu_id: str, contributeur_id: str, session: SessionEntretien, role: Role):
+    def __init__(self, store: Store, tiers_lieu_id: str, contributeur_id: str, session: SessionEntretien, role: Role,
+                 mode_entretien: str = "histoire"):
         self.store = store
         self.tiers_lieu_id = tiers_lieu_id
         self.contributeur_id = contributeur_id
         self.session_id = session.id
         self.role = role
+        self.mode_entretien = mode_entretien
         self._module_id: Optional[str] = session.module_courant
         self._section_id: Optional[str] = session.section_courante
         self._completed_section_ids: set = set(session.completed_sections or [])
@@ -114,6 +116,16 @@ class CollecteToolHandler:
         # d'inactif pour ce contributeur. Recalculé une fois par session
         # (pas besoin de suivre l'évolution des campagnes en cours de route).
         self._priority_field_ids: list = self._compute_priority_field_ids()
+        # Choix explicite du répondant en début d'entretien ("Rendre visible
+        # des besoins actuels") : mêmes champs que la section diagnostic
+        # normale (aucune duplication de schéma), juste proposés en premier
+        # via le même mécanisme de section synthétique que les campagnes —
+        # pas un chemin de code séparé.
+        if mode_entretien == "besoins":
+            besoins_section = get_section("diagnostic", "diagnostic_besoins_futurs")
+            besoins_ids = [f.id for f in (besoins_section.fields if besoins_section else [])
+                           if f.id not in self._priority_field_ids]
+            self._priority_field_ids = besoins_ids + self._priority_field_ids
         self._priority_active: bool = bool(self._priority_field_ids)
         # Questions "libre::" (collées par un admin, hors schéma) répondues
         # pendant CETTE session — sans schéma derrière, get_answers() ne les

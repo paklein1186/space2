@@ -287,6 +287,31 @@ def entretien_tab(store, user_id: str):
     # décidé en cours de session prend effet à la prochaine session plutôt
     # qu'au message suivant, ce qui est un compromis acceptable.
     session_key = f"agent::{nom_lieu}::{role}"
+    mode_key = f"mode_entretien::{session_key}"
+    if session_key not in st.session_state and mode_key not in st.session_state:
+        st.subheader("Par où commencer ?")
+        campagnes_actives = store.get_active_campagnes_prioritaires()
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.button("📖 Nourrir l'histoire du lieu", use_container_width=True,
+                         help="Genèse, défis, description, fonctionnement — l'entretien complet, comme d'habitude."):
+                st.session_state[mode_key] = "histoire"
+                st.rerun()
+        with col2:
+            label_campagne = "📋 Remplir une campagne en cours" if campagnes_actives else "📋 Aucune campagne active"
+            if st.button(label_campagne, use_container_width=True, disabled=not campagnes_actives,
+                         help="Répondre en priorité à un recensement ciblé actuellement ouvert par l'équipe."):
+                st.session_state[mode_key] = "campagne"
+                st.rerun()
+        with col3:
+            if st.button("📣 Rendre visibles vos besoins actuels", use_container_width=True,
+                         help="Exprimer directement de quoi le lieu aurait besoin — utilisé dans l'Annuaire et "
+                              "pour la curation du Portfolio."):
+                st.session_state[mode_key] = "besoins"
+                st.rerun()
+        return
+    mode_entretien = st.session_state.get(mode_key, "histoire")
+
     if session_key not in st.session_state:
         tiers_lieu = store.get_or_create_tiers_lieu(user_id, nom_lieu)
         contributeur = store.get_or_create_contributeur(user_id, tiers_lieu.id, role)
@@ -304,7 +329,8 @@ def entretien_tab(store, user_id: str):
         if store.get_answers(tiers_lieu.id, contributeur.id).get("nom_lieu") is None:
             store.save_answer(tiers_lieu.id, contributeur.id, "nom_lieu", tiers_lieu.nom)
         session = store.get_or_start_session(tiers_lieu.id, contributeur.id)
-        handler = CollecteToolHandler(store, tiers_lieu.id, contributeur.id, session, Role(role))
+        handler = CollecteToolHandler(store, tiers_lieu.id, contributeur.id, session, Role(role),
+                                       mode_entretien=mode_entretien)
         agent = CollecteAgent(handler, store=store, tiers_lieu_id=tiers_lieu.id)
         st.session_state[session_key] = {"agent": agent, "history": []}
         # Premier appel LLM (résumé d'ouverture) : sans spinner, la page
@@ -315,6 +341,7 @@ def entretien_tab(store, user_id: str):
             opening = agent.send(opening_message(
                 store, tiers_lieu.id, nom_lieu=tiers_lieu.nom,
                 contributeur_id=contributeur.id, role_label=ROLE_LABELS[role],
+                mode_entretien=mode_entretien,
             ))
         st.session_state[session_key]["history"].append(("assistant", opening))
 
