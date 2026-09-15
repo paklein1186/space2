@@ -647,9 +647,13 @@ def _auto_enrich_one(store, lieu) -> None:
 @st.dialog("Fiche du lieu", width="large")
 def _fiche_dialog(store, fiche, est_admin: bool, user_id: str):
     lieu = fiche["tiers_lieu"]
-    if "fiche_enrichie" not in st.session_state:
-        st.session_state["fiche_enrichie"] = set()
-    if lieu.id not in st.session_state["fiche_enrichie"]:
+    # Vérifié une seule fois par ouverture de fiche, pas une seule fois par
+    # session : la clé est réinitialisée à chaque (ré)ouverture (voir plus
+    # haut) pour ne pas rejouer le hash-check à chaque interaction interne
+    # au dialogue (formulaire, popover...) une fois qu'il est déjà à jour
+    # pour CETTE ouverture, sans pour autant rester figé indéfiniment sur
+    # une synthèse devenue obsolète après un nouvel apport entre-temps.
+    if st.session_state.get("fiche_enrichie_lieu_id") != lieu.id:
         # Généralement rapide (enrich_lieu compare un hash et ne fait rien
         # si les réponses n'ont pas changé) — mais quand un appel LLM part
         # réellement, ça prend plusieurs secondes sans qu'aucun indicateur
@@ -657,7 +661,7 @@ def _fiche_dialog(store, fiche, est_admin: bool, user_id: str):
         # est devenue lente.
         with st.spinner("Mise à jour de la synthèse..."):
             _auto_enrich_one(store, lieu)
-        st.session_state["fiche_enrichie"].add(lieu.id)
+        st.session_state["fiche_enrichie_lieu_id"] = lieu.id
     derive = store.get_lieu_derive(lieu.id)
 
     render_fiche_header(lieu, derive, nombre_contributeurs=fiche["nombre_contributeurs"])
@@ -921,6 +925,14 @@ def annuaire_tab(store, est_admin: bool, user_id: str):
         lieu_id = st.session_state.pop("annuaire_open_lieu_id")
         lieu_ouvert = next((l for l in lieux if l.id == lieu_id), None)
         if lieu_ouvert:
+            # Une vraie (ré)ouverture de fiche doit toujours revérifier la
+            # synthèse (enrich_lieu compare un hash, donc peu coûteux si rien
+            # n'a changé) — vécu : un lieu déjà ouvert une fois dans la
+            # session restait figé sur son ancienne synthèse même après un
+            # nouvel apport (entretien, document transmis) entre-temps, car
+            # _fiche_dialog ne revérifiait plus jamais ce lieu une fois
+            # marqué "déjà enrichi" pour toute la session.
+            st.session_state.pop("fiche_enrichie_lieu_id", None)
             with st.spinner("Chargement de la fiche..."):
                 fiche = build_fiche_lieu(store, lieu_ouvert)
             _fiche_dialog(store, fiche, est_admin, user_id)
