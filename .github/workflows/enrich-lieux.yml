@@ -1,0 +1,40 @@
+name: Régénérer les synthèses des lieux
+
+# Complète (sans le remplacer) le bouton "Régénérer les synthèses" de
+# l'admin (src/app.py, administration_tab) : ce cron tient à jour le
+# résumé/besoins/enjeux/mots-clés/catégories de chaque lieu (table
+# lieu_derive, Supabase — donc bien persistant) même si personne ne pense à
+# cliquer le bouton après une nouvelle série de réponses. Il ne peut PAS,
+# en revanche, mettre à jour la recherche sémantique de la Bibliothèque :
+# cet index (ChromaDB) vit sur le disque local du serveur de l'app, et un
+# run GitHub Actions s'exécute sur une machine éphémère différente — pour
+# ça, seul le bouton dans l'admin (exécuté sur le serveur lui-même) marche.
+#
+# enrich_lieu() ne retraite (appel LLM payant) que les lieux dont les
+# réponses ont changé depuis le dernier enrichissement (comparaison par
+# empreinte) : ce cron peut tourner souvent sans coût pour les lieux déjà
+# à jour.
+#
+# Secrets requis (Settings → Secrets and variables → Actions, sur ce dépôt) :
+#   SUPABASE_URL, SUPABASE_SERVICE_KEY, ANTHROPIC_API_KEY, VOYAGE_API_KEY
+
+on:
+  schedule:
+    - cron: "0 4 * * 1"  # tous les lundis à 4h UTC
+  workflow_dispatch: {}  # déclenchement manuel depuis l'onglet Actions
+
+jobs:
+  enrich:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - run: python -m src.agent.enrich_places
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
