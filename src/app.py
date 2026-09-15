@@ -1520,7 +1520,14 @@ def main():
             st.Page(page_lieux_hybrides, title=t("nav.lieux_hybrides"), icon="🏘️", url_path="lieux-hybrides"),
             st.Page("pages/1_Observatoire.py", title=t("nav.observatoire"), icon="📊"),
             st.Page("pages/2_Portfolio.py", title=t("nav.portfolio"), icon="✨"),
-            st.Page("pages/3_Fiche.py", title=t("nav.fiche"), icon="🔗"),
+            # url_path explicite en minuscule : sans lui, Streamlit dérive la
+            # route du nom de fichier ("Fiche", majuscule) alors que le lien
+            # généré par le bouton "🔗 Partager" (voir plus bas, /fiche en
+            # minuscule) est construit à la main — le mélange des deux
+            # produisait un "Page not found" sur CHAQUE lien de partage
+            # envoyé, la route réelle ("/Fiche") ne correspondant jamais à
+            # l'URL distribuée ("/fiche").
+            st.Page("pages/3_Fiche.py", title=t("nav.fiche"), icon="🔗", url_path="fiche"),
         ],
     }
     user_id_sonde = st.session_state.get("user_id")

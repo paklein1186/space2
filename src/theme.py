@@ -188,7 +188,7 @@ hr{{ border-color: var(--sp-border-soft) !important; }}
    partage déjà envoyés (Streamlit ne route plus vers une page absente de la
    liste) : on la garde donc dans st.navigation(), en masquant uniquement
    son lien dans le menu par CSS. */
-a[data-testid="stSidebarNavLink"][href$="/Fiche"]{{ display: none; }}
+a[data-testid="stSidebarNavLink"][href$="/fiche"]{{ display: none; }}
 </style>
 """
 
