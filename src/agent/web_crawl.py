@@ -134,7 +134,15 @@ def _normaliser_url(url: str) -> str:
     authentification dès que le document est partagé au moins en lecture —
     pas de vrai contenu récupéré si le document n'est PAS partagé (Google
     répond alors par une page de connexion, filtrée comme les autres pages
-    sans substance)."""
+    sans substance).
+
+    Ajoute aussi "https://" si absent : "www.maferme.be" collé tel quel
+    (sans http/https) fait lever une ValueError explicite à requests plutôt
+    que d'être récupéré — un répondant ou un admin qui colle un domaine nu
+    ne pense pas forcément à préciser le protocole."""
+    url = url.strip()
+    if url and not re.match(r"^https?://", url, re.IGNORECASE):
+        url = f"https://{url}"
     m = _GOOGLE_DOCS_RE.match(url)
     if m:
         return f"https://docs.google.com/document/d/{m.group(1)}/export?format=txt"
