@@ -4,3 +4,10 @@ font = "sans serif"
 
 [browser]
 gatherUsageStats = false
+
+[client]
+# "viewer" masque la barre d'outils "créateur" (Fork, lien GitHub, Deploy)
+# affichée par défaut sur les apps Streamlit Cloud publiques — sans effet
+# sur le fonctionnement de l'app elle-même, ni sur le menu ☰ habituel
+# (Rerun, Paramètres...), qui reste disponible.
+toolbarMode = "viewer"
