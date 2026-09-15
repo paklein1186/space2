@@ -248,16 +248,22 @@ def contribution_selector(store, user_id: str):
     preselect_lieu = st.session_state.pop("preselect_lieu", None)
     preselect_role = st.session_state.pop("preselect_role", None)
 
-    option_nouveau_lieu = t("contribution.nouveau_lieu_option")
-    options_lieu = [option_nouveau_lieu] + noms_existants
-    index_lieu = options_lieu.index(preselect_lieu) if preselect_lieu in options_lieu else 0
     col_lieu, col_role = st.columns(2)
     with col_lieu:
-        choix = st.selectbox(t("contribution.lieu_label"), options=options_lieu, index=index_lieu)
-        if choix == option_nouveau_lieu:
-            nom_lieu = st.text_input(t("contribution.nom_nouveau_lieu"))
-        else:
-            nom_lieu = choix
+        # Un seul champ (au lieu d'un sélecteur "— Nouveau lieu —" + un champ
+        # texte séparé) : accept_new_options fait apparaître les lieux déjà
+        # recensés correspondant à ce qui est tapé, lettre après lettre — de
+        # quoi rejoindre un lieu existant plutôt que d'en créer un doublon par
+        # inadvertance (get_or_create_tiers_lieu ne détecte que les noms
+        # rigoureusement identiques, pas une faute de frappe ou une variante).
+        # Taper un nom qui ne correspond à aucune suggestion crée un nouveau
+        # lieu, comme avant.
+        index_lieu = noms_existants.index(preselect_lieu) if preselect_lieu in noms_existants else None
+        nom_lieu = st.selectbox(
+            t("contribution.lieu_label"), options=noms_existants, index=index_lieu,
+            accept_new_options=True, placeholder=t("contribution.nom_nouveau_lieu"),
+        )
+        nom_lieu = (nom_lieu or "").strip()
 
     role_options = [r.value for r in Role]
     index_role = role_options.index(preselect_role) if preselect_role in role_options else 0
@@ -712,9 +718,18 @@ def annuaire_tab(store, est_admin: bool, user_id: str):
                 st.session_state["annuaire_open_lieu_id"] = lieu_selectionne_id
                 st.rerun()
 
-    recherche = st.text_input(
-        "Rechercher", placeholder="🔍 Nom, ville, région...", label_visibility="collapsed",
-    )
+    # selectbox + accept_new_options plutôt qu'un simple text_input : les
+    # lieux dont le nom correspond à ce qui est tapé apparaissent aussitôt en
+    # menu déroulant (filtrage instantané côté navigateur, lettre après
+    # lettre, sans aller-retour serveur) — pratique pour repérer/ouvrir un
+    # lieu déjà recensé plutôt que de parcourir toute la grille. Taper une
+    # ville ou une région ne correspond à aucune suggestion mais reste
+    # accepté comme texte libre une fois validé, et alimente le même filtre
+    # nom/région/pays que par le passé.
+    recherche = st.selectbox(
+        "Rechercher", options=sorted(l.nom for l in lieux), index=None,
+        accept_new_options=True, placeholder="🔍 Nom, ville, région...", label_visibility="collapsed",
+    ) or ""
     col_pays, col_region, col_categories = st.columns(3)
     with col_pays:
         options_pays = sorted({l.pays for l in lieux if l.pays})

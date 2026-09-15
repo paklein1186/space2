@@ -96,7 +96,6 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
     "nav.compte": {"fr": "Compte", "en": "Account"},
     "contribution.title": {"fr": "Votre contribution", "en": "Your contribution"},
     "contribution.lieu_label": {"fr": "Tiers-lieu", "en": "Hybrid space"},
-    "contribution.nouveau_lieu_option": {"fr": "— Nouveau lieu —", "en": "— New space —"},
     "contribution.nom_nouveau_lieu": {"fr": "Nom du nouveau lieu", "en": "Name of the new space"},
     "contribution.role_label": {"fr": "Votre rôle vis-à-vis de ce lieu", "en": "Your role regarding this space"},
     "contribution.choisir_pour_demarrer": {
