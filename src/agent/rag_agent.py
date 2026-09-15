@@ -6,6 +6,7 @@ les deux partagent le même store et donc les mêmes données collectées.
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
 from anthropic import Anthropic
@@ -87,24 +88,41 @@ class RagAgent:
                               "Redemandez « continue » pour la suite, ou reformulez une question plus ciblée.)*")
                 return texte
 
-            tool_results = []
-            for tu in tool_uses:
-                # Une exception non rattrapée ici laisserait ce message
-                # assistant (avec ses tool_use) sans tool_result correspondant
-                # — non seulement ça fait planter la page en cours, mais la
-                # conversation stockée dans self.messages reste corrompue :
-                # le PROCHAIN message de l'utilisateur renvoie alors une
-                # erreur 400 de l'API ("tool_use ids were found without
-                # tool_result blocks"), plantage constaté en production juste
-                # après un premier plantage sur un tool. Convertir toute
-                # exception en résultat d'erreur normal évite les deux.
+            # En parallèle plutôt qu'en séquence quand Claude demande plusieurs
+            # tools dans le même tour (ex. search_knowledge_base sur deux
+            # doc_type, ou list_datasets + query_structured_data ensemble) :
+            # ce sont tous des appels réseau indépendants et en lecture seule
+            # (Chroma/Voyage/Supabase), sans état partagé — les paralléliser
+            # réduit directement la latence perçue, qui s'additionnait
+            # sinon appel après appel (constaté en production : 20-30s sur
+            # une question déclenchant plusieurs tools).
+            def _executer(tu):
+                # Voir la note historique : une exception non rattrapée ici
+                # laisserait ce message assistant (avec ses tool_use) sans
+                # tool_result correspondant — non seulement ça fait planter
+                # la page en cours, mais la conversation stockée dans
+                # self.messages reste corrompue : le PROCHAIN message de
+                # l'utilisateur renvoie alors une erreur 400 de l'API
+                # ("tool_use ids were found without tool_result blocks").
+                # Convertir toute exception en résultat d'erreur normal
+                # évite les deux.
                 try:
-                    result = self.tool_handler.execute(tu.name, tu.input)
+                    return self.tool_handler.execute(tu.name, tu.input)
                 except Exception as exc:
-                    result = {"error": f"{type(exc).__name__}: {exc}"}
-                tool_results.append({
+                    return {"error": f"{type(exc).__name__}: {exc}"}
+
+            if len(tool_uses) == 1:
+                resultats = [_executer(tool_uses[0])]
+            else:
+                with ThreadPoolExecutor(max_workers=len(tool_uses)) as executor:
+                    resultats = list(executor.map(_executer, tool_uses))
+
+            tool_results = [
+                {
                     "type": "tool_result",
                     "tool_use_id": tu.id,
                     "content": json.dumps(result, ensure_ascii=False, default=str),
-                })
+                }
+                for tu, result in zip(tool_uses, resultats)
+            ]
             self.messages.append({"role": "user", "content": tool_results})
