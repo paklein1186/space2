@@ -11,6 +11,7 @@ fois par run)."""
 
 from __future__ import annotations
 
+import html
 import re
 import sys
 from pathlib import Path
@@ -27,6 +28,36 @@ from src.questionnaire.schema import BANDE_INTENSITE, CATEGORIES_POSSIBLES
 
 st.title(t("observatoire.title"))
 st.caption(t("observatoire.caption"))
+
+
+def _graphique_barres(series: pd.Series) -> None:
+    """Graphique en barres horizontales en HTML/CSS pur (aucune dépendance
+    externe) — remplace st.bar_chart, qui repose sur Altair et plante en
+    production : l'hébergeur (Streamlit Community Cloud) fait tourner cette
+    app sous Python 3.14 malgré runtime.txt épinglé sur 3.11 et un reboot
+    complet demandé, et le schéma vegalite d'Altair utilise une fonctionnalité
+    de typing (PEP 728, TypedDict(closed=True)) qui casse sous ce Python —
+    non résolu côté plateforme à ce jour, donc contourné ici plutôt que
+    d'attendre un correctif hors de notre contrôle."""
+    if series.empty:
+        st.caption("Aucune donnée pour l'instant.")
+        return
+    maximum = series.max()
+    lignes = []
+    for label, valeur in series.items():
+        largeur = 0 if not maximum else round(100 * valeur / maximum)
+        libelle = html.escape(str(label))
+        lignes.append(
+            '<div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:6px;">'
+            f'<div style="flex:0 0 42%; font-size:0.85rem; text-align:right; overflow:hidden; '
+            f'text-overflow:ellipsis; white-space:nowrap;" title="{libelle}">{libelle}</div>'
+            '<div style="flex:1; background:var(--sp-border-soft); border-radius:4px; height:16px;">'
+            f'<div style="width:{largeur}%; background:var(--sp-accent); height:100%; border-radius:4px;"></div>'
+            '</div>'
+            f'<div style="flex:0 0 2.5rem; font-size:0.8rem; opacity:0.8;">{valeur}</div>'
+            '</div>'
+        )
+    st.markdown(f'<div style="font-family:inherit;">{"".join(lignes)}</div>', unsafe_allow_html=True)
 
 
 def _store_pour_agregats():
@@ -104,13 +135,13 @@ with col_cat:
             [c for cats in df_lieux["categories"].dropna() for c in (cats or [])]
         ).value_counts().reindex(CATEGORIES_POSSIBLES).dropna()
         if not cat_counts.empty:
-            st.bar_chart(cat_counts)
+            _graphique_barres(cat_counts)
         else:
             st.caption("Aucune catégorie attribuée pour l'instant.")
 with col_pays:
     st.subheader("Répartition par pays")
     if "pays" in df_lieux.columns and df_lieux["pays"].notna().any():
-        st.bar_chart(df_lieux["pays"].value_counts(dropna=True))
+        _graphique_barres(df_lieux["pays"].value_counts(dropna=True))
     else:
         st.caption("Pays non renseigné pour l'instant.")
 
@@ -119,13 +150,13 @@ with col_milieu:
     st.subheader("Répartition par milieu")
     milieu_df = df_reponses_dedup[df_reponses_dedup["champ_id"] == "milieu"] if not df_reponses_dedup.empty else df_reponses_dedup
     if not milieu_df.empty:
-        st.bar_chart(milieu_df["valeur"].value_counts())
+        _graphique_barres(milieu_df["valeur"].value_counts())
     else:
         st.caption("Milieu non renseigné pour l'instant.")
 with col_region:
     st.subheader("Répartition par région")
     if "region" in df_lieux.columns and df_lieux["region"].notna().any():
-        st.bar_chart(df_lieux["region"].value_counts(dropna=True).head(15))
+        _graphique_barres(df_lieux["region"].value_counts(dropna=True).head(15))
     else:
         st.caption("Région non renseignée pour l'instant.")
 
@@ -139,7 +170,7 @@ with col_annee:
         if not dates.empty else pd.Series(dtype=object)
     annees = annees.dropna()
     if not annees.empty:
-        st.bar_chart(annees.value_counts().sort_index())
+        _graphique_barres(annees.value_counts().sort_index())
         st.caption(f"Basé sur les {len(annees)} lieu(x) ayant déclaré une date d'ouverture.")
     else:
         st.caption("Aucune date d'ouverture déclarée pour l'instant.")
@@ -147,7 +178,7 @@ with col_statut:
     st.subheader("Statut juridique")
     statuts = _valeurs("statut_juridique").dropna()
     if not statuts.empty:
-        st.bar_chart(statuts.value_counts())
+        _graphique_barres(statuts.value_counts())
         st.caption(f"Basé sur les {len(statuts)} lieu(x) ayant déclaré leur statut juridique.")
     else:
         st.caption("Aucun statut juridique déclaré pour l'instant.")
@@ -168,7 +199,7 @@ def _graphique_bandes(champ_id: str, titre: str) -> None:
         st.caption("Pas encore de réponse pour cet indicateur.")
         return
     ordonnee = valeurs.value_counts().reindex(BANDE_INTENSITE).dropna()
-    st.bar_chart(ordonnee)
+    _graphique_barres(ordonnee)
     st.caption(f"n = {len(valeurs)} lieu(x)")
 
 
@@ -185,7 +216,7 @@ with col_evol:
     evol = _valeurs("evolution_frequentation_3ans").dropna()
     st.markdown("**Évolution de la fréquentation (3 ans)**")
     if not evol.empty:
-        st.bar_chart(evol.value_counts())
+        _graphique_barres(evol.value_counts())
         st.caption(f"n = {len(evol)} lieu(x)")
     else:
         st.caption("Pas encore de réponse pour cet indicateur.")
@@ -215,7 +246,7 @@ if "mots_cles" in df_lieux.columns:
         [m for mots in df_lieux["mots_cles"].dropna() for m in (mots or [])]
     ).value_counts().head(20)
     if not mots.empty:
-        st.bar_chart(mots)
+        _graphique_barres(mots)
     else:
         st.caption("Pas encore de mots-clés générés.")
 

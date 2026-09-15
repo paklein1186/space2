@@ -78,6 +78,26 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
     },
     "voice.dicter_reponse": {"fr": "Dicter la réponse", "en": "Dictate your answer"},
     "voice.dicter_question": {"fr": "Dicter la question", "en": "Dictate your question"},
+
+    "nav.compte": {"fr": "Compte", "en": "Account"},
+    "contribution.title": {"fr": "Votre contribution", "en": "Your contribution"},
+    "contribution.lieu_label": {"fr": "Tiers-lieu", "en": "Hybrid space"},
+    "contribution.nouveau_lieu_option": {"fr": "— Nouveau lieu —", "en": "— New space —"},
+    "contribution.nom_nouveau_lieu": {"fr": "Nom du nouveau lieu", "en": "Name of the new space"},
+    "contribution.role_label": {"fr": "Votre rôle vis-à-vis de ce lieu", "en": "Your role regarding this space"},
+    "contribution.choisir_pour_demarrer": {
+        "fr": "Choisissez ou créez un tiers-lieu ci-dessus pour démarrer.",
+        "en": "Choose or create a hybrid space above to get started.",
+    },
+    "role.fondateur": {"fr": "Fondateur·rice / porteur de projet", "en": "Founder / project lead"},
+    "role.equipe": {"fr": "Équipe opérationnelle", "en": "Operational team"},
+    "role.partenaire": {"fr": "Partie prenante externe", "en": "External stakeholder"},
+    "role.usager": {"fr": "Usager régulier", "en": "Regular user"},
+    "role.steward": {
+        "fr": "Steward (je continue à nourrir ce lieu)",
+        "en": "Steward (I keep contributing to this space)",
+    },
+    "role.autre": {"fr": "Autre", "en": "Other"},
 }
 
 

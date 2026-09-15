@@ -227,7 +227,7 @@ def contribution_selector(store, user_id: str):
     QUE cet onglet (Assistant RAG, Annuaire, Administration n'en ont pas
     besoin), et le montrer dans la barre latérale le faisait apparaître sur
     tous les onglets sans raison, y compris ceux où il n'a aucun effet."""
-    st.subheader("Votre contribution")
+    st.subheader(t("contribution.title"))
     # Tous les lieux recensés (pas seulement les siens) : n'importe quel
     # utilisateur connecté peut devenir contributeur/steward d'un lieu créé
     # par quelqu'un d'autre (cf. bouton "Continuer à nourrir" de l'Annuaire).
@@ -237,13 +237,14 @@ def contribution_selector(store, user_id: str):
     preselect_lieu = st.session_state.pop("preselect_lieu", None)
     preselect_role = st.session_state.pop("preselect_role", None)
 
-    options_lieu = ["— Nouveau lieu —"] + noms_existants
+    option_nouveau_lieu = t("contribution.nouveau_lieu_option")
+    options_lieu = [option_nouveau_lieu] + noms_existants
     index_lieu = options_lieu.index(preselect_lieu) if preselect_lieu in options_lieu else 0
     col_lieu, col_role = st.columns(2)
     with col_lieu:
-        choix = st.selectbox("Tiers-lieu", options=options_lieu, index=index_lieu)
-        if choix == "— Nouveau lieu —":
-            nom_lieu = st.text_input("Nom du nouveau lieu")
+        choix = st.selectbox(t("contribution.lieu_label"), options=options_lieu, index=index_lieu)
+        if choix == option_nouveau_lieu:
+            nom_lieu = st.text_input(t("contribution.nom_nouveau_lieu"))
         else:
             nom_lieu = choix
 
@@ -251,10 +252,10 @@ def contribution_selector(store, user_id: str):
     index_role = role_options.index(preselect_role) if preselect_role in role_options else 0
     with col_role:
         role = st.selectbox(
-            "Votre rôle vis-à-vis de ce lieu",
+            t("contribution.role_label"),
             options=role_options,
             index=index_role,
-            format_func=lambda r: ROLE_LABELS[r],
+            format_func=lambda r: t(f"role.{r}"),
         )
     return nom_lieu, role
 
@@ -263,7 +264,7 @@ def entretien_tab(store, user_id: str):
     st.title(t("entretien.title"))
     nom_lieu, role = contribution_selector(store, user_id)
     if not nom_lieu:
-        st.info("Choisissez ou créez un tiers-lieu ci-dessus pour démarrer.")
+        st.info(t("contribution.choisir_pour_demarrer"))
         return
     if not os.environ.get("ANTHROPIC_API_KEY"):
         st.error("ANTHROPIC_API_KEY n'est pas configuré (voir .env.example).")
@@ -1131,7 +1132,7 @@ def main():
     }
     user_id_sonde = st.session_state.get("user_id")
     if user_id_sonde and _est_admin(_resolve_store(user_id_sonde), user_id_sonde):
-        pages["Compte"] = [
+        pages[t("nav.compte")] = [
             st.Page(page_administration, title=t("nav.administration"), icon="⚙️", url_path="administration"),
         ]
 
