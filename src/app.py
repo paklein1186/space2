@@ -340,25 +340,32 @@ def entretien_tab(store, user_id: str):
     mode_key = f"mode_entretien::{session_key}"
     if session_key not in st.session_state and mode_key not in st.session_state:
         st.subheader("Par où commencer ?")
+        # Description en légende toujours visible sous le bouton plutôt qu'en
+        # tooltip au survol (help=) : le tooltip natif de Streamlit se
+        # superposait au titre "Par où commencer ?" juste au-dessus (bug de
+        # positionnement du composant lui-même, pas une régression de ce
+        # thème) — signalé confus par un utilisateur. Une légende visible en
+        # permanence est aussi plus accessible (pas de survol sur mobile).
         campagnes_actives = store.get_active_campagnes_prioritaires()
         col1, col2, col3 = st.columns(3)
         with col1:
-            if st.button("📖 Nourrir l'histoire du lieu", use_container_width=True,
-                         help="Genèse, défis, description, fonctionnement — l'entretien complet, comme d'habitude."):
+            if st.button("📖 Nourrir l'histoire du lieu", use_container_width=True):
                 st.session_state[mode_key] = "histoire"
                 st.rerun()
+            st.caption("Genèse, défis, description, fonctionnement — l'entretien complet, comme "
+                       "d'habitude.")
         with col2:
             label_campagne = "📋 Remplir une campagne en cours" if campagnes_actives else "📋 Aucune campagne active"
-            if st.button(label_campagne, use_container_width=True, disabled=not campagnes_actives,
-                         help="Répondre en priorité à un recensement ciblé actuellement ouvert par l'équipe."):
+            if st.button(label_campagne, use_container_width=True, disabled=not campagnes_actives):
                 st.session_state[mode_key] = "campagne"
                 st.rerun()
+            st.caption("Répondre en priorité à un recensement ciblé actuellement ouvert par l'équipe.")
         with col3:
-            if st.button("📣 Rendre visibles vos besoins actuels", use_container_width=True,
-                         help="Exprimer directement de quoi le lieu aurait besoin — utilisé dans l'Annuaire et "
-                              "pour la curation du Portfolio."):
+            if st.button("📣 Rendre visibles vos besoins actuels", use_container_width=True):
                 st.session_state[mode_key] = "besoins"
                 st.rerun()
+            st.caption("Exprimer directement de quoi le lieu aurait besoin — utilisé dans l'Annuaire "
+                       "et pour la curation du Portfolio.")
         return
     mode_entretien = st.session_state.get(mode_key, "histoire")
 
