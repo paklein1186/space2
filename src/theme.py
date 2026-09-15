@@ -179,6 +179,16 @@ code, pre, [data-testid="stMetricValue"], .stCode, [data-testid="stCaptionContai
 [data-testid="column"] [data-testid="stButton"] button{{ width: 100%; }}
 
 hr{{ border-color: var(--sp-border-soft) !important; }}
+
+/* ---------- page "Fiche partagée" : masquée du menu, pas de la navigation ---------- */
+/* Cette page n'a de sens qu'ouverte via un lien de partage (?lieu=<id>) — la
+   lister dans le menu comme les autres onglets n'aboutit qu'à "Aucun lieu
+   spécifié" pour qui clique dessus par curiosité, ce qui a été rapporté
+   comme confus. La retirer de st.navigation() casserait les liens de
+   partage déjà envoyés (Streamlit ne route plus vers une page absente de la
+   liste) : on la garde donc dans st.navigation(), en masquant uniquement
+   son lien dans le menu par CSS. */
+a[data-testid="stSidebarNavLink"][href$="/Fiche"]{{ display: none; }}
 </style>
 """
 
