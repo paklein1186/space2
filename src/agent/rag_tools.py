@@ -131,7 +131,15 @@ def lieux_enrichis_dataframe(store: Store) -> pd.DataFrame:
         derive = derives.get(lieu.id)
         if not derive:
             continue
-        row = {"tiers_lieu": lieu.nom, "pays": lieu.pays, "region": lieu.region}
+        # latitude/longitude (tiers_lieux, alimentées notamment par l'import
+        # CommunECter) étaient absentes de cette vue — l'assistant RAG
+        # répondait ne disposer d'aucune donnée de géolocalisation alors
+        # qu'elle existe bel et bien pour une partie des lieux, juste jamais
+        # exposée à ce dataset.
+        row = {
+            "tiers_lieu": lieu.nom, "pays": lieu.pays, "region": lieu.region,
+            "latitude": lieu.latitude, "longitude": lieu.longitude,
+        }
         row.update(derive.donnees)
         rows.append(row)
     return pd.DataFrame(rows)
