@@ -11,6 +11,7 @@ classification rural/urbain, elle, nécessiterait une vraie donnée de densité
 
 from __future__ import annotations
 
+import re
 from typing import Optional
 
 import requests
@@ -27,7 +28,14 @@ def geocoder_adresse(adresse: str, pays: Optional[str] = None) -> Optional[tuple
     adresse = (adresse or "").strip()
     if not adresse:
         return None
-    requete = f"{adresse}, {pays}" if pays else adresse
+    # Une précision entre parenthèses ("... (à cheval sur X et Y)") fait
+    # échouer le parsing d'adresse de Nominatim — vécu sur "Ma ferme" : la
+    # réponse brute (utile telle quelle pour l'affichage) était géocodée
+    # telle quelle, échouait silencieusement, et le lieu n'apparaissait
+    # jamais sur la carte. Seule la requête de géocodage est nettoyée, la
+    # réponse enregistrée reste inchangée.
+    adresse_geocodage = re.sub(r"\s*\([^)]*\)", "", adresse).strip() or adresse
+    requete = f"{adresse_geocodage}, {pays}" if pays else adresse_geocodage
     try:
         response = requests.get(
             NOMINATIM_URL,
