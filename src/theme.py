@@ -63,7 +63,15 @@ code, pre, [data-testid="stMetricValue"], .stCode, [data-testid="stCaptionContai
 [data-testid="stSidebar"]{{
   background: var(--sp-bg-sidebar) !important; border-right: 1px solid var(--sp-border-soft);
 }}
-[data-testid="stSidebar"] *, [data-testid="stMain"] * {{ color: var(--sp-text); }}
+/* Sans !important, cette règle perdait face aux règles internes de
+   Streamlit qui fixent la couleur du texte markdown (stMarkdownContainer
+   p/li/span...) sur le gris quasi-noir du thème clair par défaut — texte
+   quasi invisible sur notre fond sombre (résumés de lieu, réponses de la
+   Bibliothèque...), signalé en production comme "illisible". Les règles
+   plus spécifiques ci-dessous (boutons, etc.) restent prioritaires malgré
+   le !important : à spécificité CSS égale sur !important, la règle la plus
+   spécifique gagne toujours, pas seulement l'ordre d'apparition. */
+[data-testid="stSidebar"] *, [data-testid="stMain"] * {{ color: var(--sp-text) !important; }}
 /* Flèche de repli de la barre latérale : en dehors de stSidebar (chrome de
    l'appli, pas son contenu), donc pas couverte par la règle générale
    ci-dessus — et son icône fixe une couleur via un attribut HTML `color=`
@@ -73,6 +81,24 @@ code, pre, [data-testid="stMetricValue"], .stCode, [data-testid="stCaptionContai
 [data-testid="stSidebarCollapseButton"] [data-testid="stIconMaterial"],
 [data-testid="stSidebarCollapseButton"] span {{ color: var(--sp-text) !important; }}
 [data-testid="stCaptionContainer"], .stCaption {{ color: var(--sp-text-muted) !important; }}
+/* st.dialog (fiche du lieu, etc.) : rendu dans un portail directement sous
+   <body>, JAMAIS à l'intérieur de stMain — aucune des règles ci-dessus ne
+   l'atteint, donc tout son texte restait sur les couleurs du thème clair
+   Streamlit par défaut (texte quasi noir), y compris en thème sombre.
+   Repéré en inspectant la chaîne de parents réelle d'un texte de fiche
+   (stDialog est un enfant direct de body), pas une supposition — même
+   classe de piège que les popovers BaseWeb (menus déroulants) déjà
+   contournée plus bas. */
+[data-testid="stDialog"] {{ background: var(--sp-bg) !important; }}
+/* La boîte modale elle-même (fond blanc Streamlit par défaut) n'a pas de
+   data-testid stable — role="dialog" (attribut d'accessibilité, posé par
+   Streamlit/BaseWeb) est le seul sélecteur fiable trouvé pour l'atteindre. */
+[data-testid="stDialog"] [role="dialog"] {{ background: var(--sp-bg-elevated) !important; }}
+[data-testid="stDialog"] * {{ color: var(--sp-text) !important; }}
+[data-testid="stDialog"] [data-testid="stCaptionContainer"] {{ color: var(--sp-text-muted) !important; }}
+[data-testid="stDialog"] [data-testid="stVerticalBlockBorderWrapper"] {{
+  background: var(--sp-bg-elevated) !important; border-color: var(--sp-border-soft) !important;
+}}
 
 /* ---------- boutons : lueur "bio-luminescente" au survol ---------- */
 [data-testid="stButton"] button, [data-testid="stFormSubmitButton"] button,
