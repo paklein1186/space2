@@ -11,6 +11,7 @@ import math
 import os
 import sys
 from pathlib import Path
+from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -293,6 +294,23 @@ def _maj_completion(store, state: dict) -> None:
     state["completion"] = state["agent"].tool_handler.campagne_completion()
 
 
+def _agent_send_surveille(agent, message: str) -> Optional[str]:
+    """Enveloppe `agent.send` : un aléa réseau/API (l'appel Claude repose sur
+    httpx/HTTP2, sujet à des coupures transitoires — voir la panne du
+    2026-09-15) faisait planter toute la conversation (entretien ou
+    Bibliothèque) avec une trace Python brute et illisible pour un
+    répondant non technique. Retourne None sur échec ; l'historique reste
+    intact côté appelant, la personne peut retenter."""
+    try:
+        return agent.send(message)
+    except Exception:
+        st.error(
+            "L'agent n'a pas pu répondre (problème réseau ou service momentanément "
+            "indisponible). Réessayez dans quelques instants — rien n'est perdu."
+        )
+        return None
+
+
 def _transmettre_source_entretien(store, state: dict, nom_lieu: str, texte_brut: str,
                                    source_label: str, label_affiche: str) -> None:
     """Fait analyser `texte_brut` (site web / fichier déposé / texte collé)
@@ -312,7 +330,9 @@ def _transmettre_source_entretien(store, state: dict, nom_lieu: str, texte_brut:
     state["history"].append(("user", label_affiche))
     message = f"[Document transmis par le répondant — {source_label}]\n\n{resume}"
     with st.spinner("L'agent réfléchit..."):
-        reply = state["agent"].send(message)
+        reply = _agent_send_surveille(state["agent"], message)
+    if reply is None:
+        return
     state["history"].append(("assistant", reply))
     _maj_completion(store, state)
     # Recap affiché une fois juste après le rerun (voir plus bas dans
@@ -344,7 +364,9 @@ def _soumettre_reponse_rapide(store, state: dict, champ_id: str, label: str, val
     state["history"].append(("user", f"⚡ {label} : {valeur_affichee}"))
     message = f"[Réponse via sélection rapide — déjà enregistrée] {label} : {valeur_affichee}"
     with st.spinner("L'agent réfléchit..."):
-        reply = state["agent"].send(message)
+        reply = _agent_send_surveille(state["agent"], message)
+    if reply is None:
+        return
     state["history"].append(("assistant", reply))
     _maj_completion(store, state)
     st.rerun()
@@ -489,11 +511,17 @@ def entretien_tab(store, user_id: str):
         # secondes), juste après avoir choisi/créé le lieu — perçu comme un
         # gel plutôt qu'un chargement.
         with st.spinner("Préparation de l'entretien..."):
-            opening = agent.send(opening_message(
+            opening = _agent_send_surveille(agent, opening_message(
                 store, tiers_lieu.id, nom_lieu=tiers_lieu.nom,
                 contributeur_id=contributeur.id, role_label=ROLE_LABELS[role],
                 mode_entretien=mode_entretien,
             ))
+        if opening is None:
+            # Rien d'affichable dans state["history"] tant que l'ouverture n'a
+            # pas réussi : on retire la session pour repartir proprement au
+            # prochain essai plutôt que de laisser un entretien à moitié amorcé.
+            del st.session_state[session_key]
+            return
         st.session_state[session_key]["history"].append(("assistant", opening))
         _maj_completion(store, st.session_state[session_key])
 
@@ -588,7 +616,12 @@ def entretien_tab(store, user_id: str):
     if state.get("reponse_en_attente"):
         reponse_en_attente = state["reponse_en_attente"]
         with st.spinner("L'agent réfléchit..."):
-            reply = state["agent"].send(reponse_en_attente)
+            reply = _agent_send_surveille(state["agent"], reponse_en_attente)
+        if reply is None:
+            # reponse_en_attente n'est pas effacée : le message du répondant
+            # reste affiché et le prochain rerun (retape, ou simple nouvelle
+            # interaction) retentera automatiquement le même envoi.
+            return
         state["history"].append(("assistant", reply))
         _maj_completion(store, state)
         state["reponse_en_attente"] = None
@@ -1668,7 +1701,9 @@ def rag_tab(store, user_id: str):
     if st.session_state.get("rag_question_en_attente"):
         question_en_attente = st.session_state["rag_question_en_attente"]
         with st.spinner("Recherche en cours..."):
-            reply = st.session_state["rag_agent"].send(question_en_attente)
+            reply = _agent_send_surveille(st.session_state["rag_agent"], question_en_attente)
+        if reply is None:
+            return
         st.session_state["rag_history"].append(("assistant", reply))
         st.session_state["rag_question_en_attente"] = None
         _sauvegarder_conversation_bibliotheque(store, user_id)
