@@ -53,13 +53,15 @@ def _store_pour_agregats():
 
 
 store = _store_pour_agregats()
-df_lieux = lieux_enrichis_dataframe(store)
+with st.spinner("Chargement des données..."):
+    df_lieux = lieux_enrichis_dataframe(store)
 
 if df_lieux.empty:
     st.info("Aucun lieu enrichi pour l'instant — revenez une fois que des synthèses auront été générées.")
     st.stop()
 
-df_reponses = reponses_long_dataframe(store)
+with st.spinner("Chargement des données..."):
+    df_reponses = reponses_long_dataframe(store)
 # Une même question a pu être répondue par plusieurs contributeurs d'un même
 # lieu (parfois avec des valeurs différentes) : un lieu ne doit compter
 # qu'une fois par champ dans les agrégats, pas une fois par contributeur.

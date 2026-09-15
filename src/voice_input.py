@@ -23,35 +23,42 @@ QUERY_PARAM = "voix"
 
 
 def bouton_dictee(lang: str = "fr-FR", *, label: str = "Dicter la réponse") -> None:
-    """Affiche un bouton micro qui déclenche la reconnaissance vocale du
+    """Affiche un bouton micro compact (icône seule, pas un gros pavé) juste
+    au-dessus du champ de saisie, qui déclenche la reconnaissance vocale du
     navigateur ; une fois la dictée terminée, recharge la page avec le
     transcript dans l'URL (lu et consommé ensuite via consume_voice_transcript(),
-    à appeler côté Python avant de rendre le champ de saisie concerné)."""
+    à appeler côté Python avant de rendre le champ de saisie concerné).
+
+    Composant volontairement petit (bouton rond icône seule + une ligne de
+    statut compacte en dessous, dans le flux normal) : un `components.html`
+    est rendu dans son propre iframe qui rogne tout ce qui dépasse sa
+    hauteur, donc un texte de statut en superposition au-dessus du bouton
+    (essayé d'abord) se retrouvait invisible, coupé par le bord de l'iframe —
+    la ligne de statut doit rester DANS la hauteur réservée, pas par-dessus."""
     html = f"""
-    <div style="margin-bottom:0.5rem; font-family:inherit;">
-      <button id="lh-voice-btn" type="button" style="
-        display:flex; align-items:center; gap:0.4rem; padding:0.4rem 0.8rem;
-        border-radius:10px; border:1px solid rgba(148,163,184,0.35);
-        background:transparent; color:inherit; font:inherit; cursor:pointer;">
+    <div style="display:flex; flex-direction:column; align-items:flex-end; font-family:inherit;">
+      <button id="lh-voice-btn" type="button" title="{label}" style="
+        display:flex; align-items:center; justify-content:center;
+        width:2.1rem; height:2.1rem; padding:0; flex:none;
+        border-radius:999px; border:1px solid rgba(148,163,184,0.4);
+        background:transparent; color:inherit; font-size:1.05rem; line-height:1; cursor:pointer;">
         <span id="lh-voice-icon">🎙️</span>
-        <span id="lh-voice-label">{label}</span>
       </button>
-      <div id="lh-voice-status" style="font-size:0.8rem; opacity:0.7; margin-top:0.25rem; min-height:1.1em;"></div>
+      <div id="lh-voice-status" style="
+        font-size:0.75rem; opacity:0.85; white-space:nowrap; max-width:260px;
+        overflow:hidden; text-overflow:ellipsis; text-align:right; margin-top:2px; height:1.1em;"></div>
     </div>
     <script>
     (function() {{
       const btn = document.getElementById("lh-voice-btn");
-      const label = document.getElementById("lh-voice-label");
       const icon = document.getElementById("lh-voice-icon");
       const status = document.getElementById("lh-voice-status");
       const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      const baseLabel = {label!r};
       if (!Recognition) {{
         btn.disabled = true;
-        btn.style.opacity = "0.5";
+        btn.style.opacity = "0.4";
         btn.style.cursor = "not-allowed";
-        label.textContent = "Dictée non disponible sur ce navigateur";
-        status.textContent = "Essayez avec Chrome, Edge ou Opera.";
+        btn.title = "Dictée non disponible sur ce navigateur (essayez Chrome, Edge ou Opera)";
         return;
       }}
       const recognition = new Recognition();
@@ -59,29 +66,41 @@ def bouton_dictee(lang: str = "fr-FR", *, label: str = "Dicter la réponse") -> 
       recognition.interimResults = true;
       recognition.maxAlternatives = 1;
       let listening = false;
+      let statusTimeout = null;
+
+      function showStatus(text, holdMs) {{
+        status.textContent = text;
+        if (statusTimeout) clearTimeout(statusTimeout);
+        if (holdMs) {{
+          statusTimeout = setTimeout(function() {{ status.textContent = ""; }}, holdMs);
+        }}
+      }}
 
       recognition.onstart = function() {{
         listening = true;
         icon.textContent = "🔴";
-        label.textContent = "Écoute... (cliquez pour arrêter)";
-        status.textContent = "";
+        showStatus("Écoute... (recliquez pour arrêter)");
       }};
       recognition.onerror = function(event) {{
-        status.textContent = event.error === "not-allowed"
-          ? "Micro refusé — autorisez l'accès au micro pour ce site."
-          : "Erreur de reconnaissance : " + event.error;
+        const messages = {{
+          "not-allowed": "Micro refusé — autorisez l'accès au micro pour ce site.",
+          "network": "Reconnaissance vocale indisponible (problème réseau côté navigateur — "
+                    + "vérifiez un bloqueur de pub/traqueurs ou un proxy qui filtrerait "
+                    + "les services Google, requis par cette API navigateur).",
+          "no-speech": "Rien entendu — réessayez.",
+        }};
+        showStatus(messages[event.error] || ("Erreur de reconnaissance : " + event.error), 6000);
       }};
       recognition.onend = function() {{
         listening = false;
         icon.textContent = "🎙️";
-        label.textContent = baseLabel;
       }};
       recognition.onresult = function(event) {{
         let transcript = "";
         for (let i = 0; i < event.results.length; i++) {{
           transcript += event.results[i][0].transcript;
         }}
-        status.textContent = transcript;
+        showStatus(transcript);
         const last = event.results[event.results.length - 1];
         if (last.isFinal && transcript.trim()) {{
           const target = window.parent || window;
@@ -100,7 +119,7 @@ def bouton_dictee(lang: str = "fr-FR", *, label: str = "Dicter la réponse") -> 
     }})();
     </script>
     """
-    components.html(html, height=72)
+    components.html(html, height=58)
 
 
 def consume_voice_transcript() -> str | None:

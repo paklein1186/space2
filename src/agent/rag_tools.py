@@ -88,10 +88,19 @@ def _load_catalog() -> dict:
 
 def reponses_long_dataframe(store: Store) -> pd.DataFrame:
     """Vue longue et interrogeable des réponses collectées par l'agent
-    d'entretien : une ligne par (lieu, contributeur, champ, valeur)."""
+    d'entretien : une ligne par (lieu, contributeur, champ, valeur).
+
+    Batch plutôt qu'un get_all_answers_by_contributeur par lieu (qui fait
+    lui-même 2 requêtes) : avec la quarantaine de lieux recensés, la version
+    en boucle faisait une centaine d'allers-retours réseau séquentiels rien
+    que pour cette vue — visible en production comme une lenteur nette de
+    l'Observatoire, et comme source d'erreurs réseau intermittentes sur l'un
+    de ces nombreux appels (httpx.ReadError constaté)."""
+    lieux = store.list_tiers_lieux()
+    reponses_par_lieu = store.get_all_answers_by_contributeur_batch([lieu.id for lieu in lieux])
     rows = []
-    for lieu in store.list_tiers_lieux():
-        par_contributeur = store.get_all_answers_by_contributeur(lieu.id)
+    for lieu in lieux:
+        par_contributeur = reponses_par_lieu.get(lieu.id, {})
         for contributeur_id, reponses in par_contributeur.items():
             for champ_id, valeur in reponses.items():
                 rows.append({
@@ -108,10 +117,18 @@ def reponses_long_dataframe(store: Store) -> pd.DataFrame:
 
 def lieux_enrichis_dataframe(store: Store) -> pd.DataFrame:
     """Vue plate des données dérivées (1 ligne par lieu) : utile pour filtrer
-    par mots-clés/enjeux/activités sans passer par la recherche vectorielle."""
+    par mots-clés/enjeux/activités sans passer par la recherche vectorielle.
+
+    Un aller-retour réseau PAR lieu (get_lieu_derive dans une boucle) rendait
+    l'Observatoire visiblement lent dès la quarantaine de lieux recensés, et
+    exposait chaque chargement de page au risque qu'un de ces N appels
+    échoue (constaté en production : httpx.ReadError intermittent) — un seul
+    appel groupé (get_lieu_derive_batch) élimine les deux problèmes."""
+    lieux = store.list_tiers_lieux()
+    derives = store.get_lieu_derive_batch([lieu.id for lieu in lieux])
     rows = []
-    for lieu in store.list_tiers_lieux():
-        derive = store.get_lieu_derive(lieu.id)
+    for lieu in lieux:
+        derive = derives.get(lieu.id)
         if not derive:
             continue
         row = {"tiers_lieu": lieu.nom, "pays": lieu.pays, "region": lieu.region}

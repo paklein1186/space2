@@ -299,10 +299,15 @@ def entretien_tab(store, user_id: str):
         handler = CollecteToolHandler(store, tiers_lieu.id, contributeur.id, session, Role(role))
         agent = CollecteAgent(handler, store=store, tiers_lieu_id=tiers_lieu.id)
         st.session_state[session_key] = {"agent": agent, "history": []}
-        opening = agent.send(opening_message(
-            store, tiers_lieu.id, nom_lieu=tiers_lieu.nom,
-            contributeur_id=contributeur.id, role_label=ROLE_LABELS[role],
-        ))
+        # Premier appel LLM (résumé d'ouverture) : sans spinner, la page
+        # restait visuellement figée le temps de cet appel (plusieurs
+        # secondes), juste après avoir choisi/créé le lieu — perçu comme un
+        # gel plutôt qu'un chargement.
+        with st.spinner("Préparation de l'entretien..."):
+            opening = agent.send(opening_message(
+                store, tiers_lieu.id, nom_lieu=tiers_lieu.nom,
+                contributeur_id=contributeur.id, role_label=ROLE_LABELS[role],
+            ))
         st.session_state[session_key]["history"].append(("assistant", opening))
 
     state = st.session_state[session_key]
@@ -644,7 +649,9 @@ def annuaire_tab(store, est_admin: bool, user_id: str):
         lieu_id = st.session_state.pop("annuaire_open_lieu_id")
         lieu_ouvert = next((l for l in lieux if l.id == lieu_id), None)
         if lieu_ouvert:
-            _fiche_dialog(store, build_fiche_lieu(store, lieu_ouvert), est_admin, user_id)
+            with st.spinner("Chargement de la fiche..."):
+                fiche = build_fiche_lieu(store, lieu_ouvert)
+            _fiche_dialog(store, fiche, est_admin, user_id)
 
     cols_par_ligne = 4
     for i in range(0, len(lieux_affiches), cols_par_ligne):
@@ -992,7 +999,8 @@ def rag_tab(store):
         from src.agent.rag_tools import RagToolHandler
 
         try:
-            st.session_state["rag_agent"] = RagAgent(RagToolHandler(store))
+            with st.spinner("Chargement de la bibliothèque..."):
+                st.session_state["rag_agent"] = RagAgent(RagToolHandler(store))
             st.session_state["rag_history"] = []
         except Exception as exc:
             # L'initialisation de ChromaDB (index vectoriel local) peut échouer

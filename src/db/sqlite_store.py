@@ -277,6 +277,15 @@ class SqliteStore(Store):
             )
         return result
 
+    def get_all_answers_by_contributeur_batch(self, tiers_lieu_ids: list) -> dict:
+        # SQLite est local (pas de latence réseau par appel) : une boucle sur
+        # la méthode déjà existante suffit, pas besoin d'une requête groupée
+        # comme pour Supabase (voir la version de supabase_store.py).
+        return {
+            tiers_lieu_id: self.get_all_answers_by_contributeur(tiers_lieu_id)
+            for tiers_lieu_id in tiers_lieu_ids
+        }
+
     def get_reponses_pour_champs(self, champ_ids: list) -> list:
         if not champ_ids:
             return []

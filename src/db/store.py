@@ -126,6 +126,15 @@ class Store(ABC):
     def get_all_answers_by_contributeur(self, tiers_lieu_id: str) -> dict: ...
 
     @abstractmethod
+    def get_all_answers_by_contributeur_batch(self, tiers_lieu_ids: list) -> dict:
+        """Version batch de get_all_answers_by_contributeur : une seule paire
+        de requêtes (contributeurs bloqués + réponses) pour plusieurs lieux à
+        la fois, clé = tiers_lieu_id, au lieu de N x 2 appels séquentiels —
+        utilisée par les vues agrégées (Observatoire) qui parcourent tous les
+        lieux d'un coup."""
+        ...
+
+    @abstractmethod
     def get_reponses_pour_champs(self, champ_ids: list) -> list:
         """Réponses à un ensemble de champs, tous lieux confondus — chaque
         élément : {tiers_lieu_id, contributeur_id, champ_id, valeur}. Utilisé

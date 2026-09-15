@@ -171,6 +171,38 @@ class SupabaseStore(Store):
             out.setdefault(r["contributeur_id"], {})[r["champ_id"]] = r["valeur"]
         return out
 
+    def get_all_answers_by_contributeur_batch(self, tiers_lieu_ids: list) -> dict:
+        if not tiers_lieu_ids:
+            return {}
+        try:
+            contributeurs_result = (
+                self.client.table("contributeurs").select("id,tiers_lieu_id")
+                .in_("tiers_lieu_id", tiers_lieu_ids).eq("bloque", False).execute()
+            )
+            actifs_par_lieu: Optional[dict] = {}
+            for c in contributeurs_result.data:
+                actifs_par_lieu.setdefault(c["tiers_lieu_id"], set()).add(c["id"])
+        except Exception:
+            # Colonne `bloque` absente avant migration : personne n'est
+            # considéré bloqué (comportement identique à avant cette feature,
+            # voir _contributeurs_non_bloques).
+            actifs_par_lieu = None
+
+        reponses_result = (
+            self.client.table("reponses")
+            .select("tiers_lieu_id,contributeur_id,champ_id,valeur")
+            .in_("tiers_lieu_id", tiers_lieu_ids)
+            .execute()
+        )
+        out: dict = {}
+        for r in reponses_result.data:
+            if actifs_par_lieu is not None:
+                actifs = actifs_par_lieu.get(r["tiers_lieu_id"], set())
+                if r["contributeur_id"] not in actifs:
+                    continue
+            out.setdefault(r["tiers_lieu_id"], {}).setdefault(r["contributeur_id"], {})[r["champ_id"]] = r["valeur"]
+        return out
+
     def get_reponses_pour_champs(self, champ_ids: list) -> list:
         if not champ_ids:
             return []
