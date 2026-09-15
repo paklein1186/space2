@@ -7,7 +7,16 @@ from typing import Optional
 
 from supabase import Client, create_client
 
-from .store import CampagnePrioritaire, Contributeur, LieuDerive, Litige, SessionEntretien, Store, TiersLieu
+from .store import (
+    CampagnePrioritaire,
+    ConversationBibliotheque,
+    Contributeur,
+    LieuDerive,
+    Litige,
+    SessionEntretien,
+    Store,
+    TiersLieu,
+)
 
 
 def _to_dataclass(cls, row: dict):
@@ -386,6 +395,62 @@ class SupabaseStore(Store):
         users = self.client.auth.admin.list_users()
         voulus = set(user_ids)
         return {u.id: u.email for u in users if u.id in voulus}
+
+    # -- historique des conversations Bibliothèque ------------------------
+    # Même repli que campagnes_prioritaires ci-dessus : table absente avant
+    # migration_003 -> dégrader silencieusement (liste vide / None / no-op)
+    # plutôt que de casser la Bibliothèque pour tout le monde tant que la
+    # migration n'a pas été exécutée.
+
+    def save_conversation_bibliotheque(self, conversation: ConversationBibliotheque) -> str:
+        from datetime import datetime, timezone
+
+        payload = {
+            "user_id": conversation.user_id,
+            "titre": conversation.titre,
+            "messages": conversation.messages,
+            "maj_le": datetime.now(timezone.utc).isoformat(),
+        }
+        try:
+            if conversation.id:
+                payload["id"] = conversation.id
+                result = self.client.table("conversations_bibliotheque").upsert(
+                    payload, on_conflict="id"
+                ).execute()
+            else:
+                result = self.client.table("conversations_bibliotheque").insert(payload).execute()
+        except Exception:
+            return conversation.id
+        return result.data[0]["id"] if result.data else conversation.id
+
+    def list_conversations_bibliotheque(self, user_id: str) -> list:
+        try:
+            result = (
+                self.client.table("conversations_bibliotheque")
+                .select("id,titre,cree_le,maj_le")
+                .eq("user_id", user_id)
+                .order("maj_le", desc=True)
+                .execute()
+            )
+        except Exception:
+            return []
+        return [_to_dataclass(ConversationBibliotheque, {**row, "user_id": user_id, "messages": []})
+                for row in result.data]
+
+    def get_conversation_bibliotheque(self, conversation_id: str) -> Optional[ConversationBibliotheque]:
+        try:
+            result = (
+                self.client.table("conversations_bibliotheque").select("*").eq("id", conversation_id).execute()
+            )
+        except Exception:
+            return None
+        return _to_dataclass(ConversationBibliotheque, result.data[0]) if result.data else None
+
+    def delete_conversation_bibliotheque(self, conversation_id: str) -> None:
+        try:
+            self.client.table("conversations_bibliotheque").delete().eq("id", conversation_id).execute()
+        except Exception:
+            pass
 
     # -- historique, stewardship, modération --------------------------------------------------
 

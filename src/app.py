@@ -1083,7 +1083,47 @@ def administration_tab(store, user_id: str) -> None:
                         st.markdown(ligne)
 
 
-def rag_tab(store):
+def _sauvegarder_conversation_bibliotheque(store, user_id: str) -> None:
+    """Auto-save après chaque échange — jamais bloquant : une conversation
+    non sauvegardée (table absente avant migration_003, erreur réseau...)
+    ne doit jamais interrompre la Bibliothèque elle-même, seul l'historique
+    en pâtit."""
+    from src.db.store import ConversationBibliotheque
+
+    historique = st.session_state.get("rag_history", [])
+    if not historique:
+        return
+    premiere_question = next((texte for role, texte in historique if role == "user"), "Conversation")
+    titre = (premiere_question[:60] + "…") if len(premiere_question) > 60 else premiere_question
+    try:
+        conv_id = store.save_conversation_bibliotheque(ConversationBibliotheque(
+            id=st.session_state.get("rag_conversation_id", ""),
+            user_id=user_id, titre=titre,
+            messages=[{"role": role, "content": texte} for role, texte in historique],
+        ))
+        st.session_state["rag_conversation_id"] = conv_id
+    except Exception:
+        pass
+
+
+def _ouvrir_conversation_bibliotheque(store, conversation_id: str) -> None:
+    conv = store.get_conversation_bibliotheque(conversation_id)
+    if conv is None:
+        return
+    st.session_state["rag_history"] = [(m["role"], m["content"]) for m in conv.messages]
+    st.session_state["rag_conversation_id"] = conv.id
+    # Reconstruit un contexte simplifié (texte seul, sans les blocs tool_use/
+    # tool_result des échanges passés) plutôt que l'état exact de l'API — un
+    # nouvel appel de tool se refait naturellement si besoin pour la
+    # question suivante ; largement suffisant pour que l'agent continue la
+    # conversation de façon cohérente.
+    if "rag_agent" in st.session_state:
+        st.session_state["rag_agent"].messages = [
+            {"role": m["role"], "content": m["content"]} for m in conv.messages
+        ]
+
+
+def rag_tab(store, user_id: str):
     st.title(t("bibliotheque.title"))
     st.caption(t("bibliotheque.caption"))
     if not RAG_DISPONIBLE:
@@ -1115,6 +1155,28 @@ def rag_tab(store):
             st.error(f"Bibliothèque temporairement indisponible : {exc}")
             return
 
+    with st.expander(t("bibliotheque.conversations_titre"), expanded=False):
+        if st.button(t("bibliotheque.nouvelle_conversation")):
+            st.session_state["rag_history"] = []
+            st.session_state["rag_agent"].messages = []
+            st.session_state.pop("rag_conversation_id", None)
+            st.rerun()
+        conversations = store.list_conversations_bibliotheque(user_id)
+        if not conversations:
+            st.caption(t("bibliotheque.aucune_conversation"))
+        for conv in conversations:
+            col_titre, col_ouvrir, col_suppr = st.columns([6, 2, 1])
+            with col_titre:
+                st.caption(f"{conv.titre or 'Conversation'} · {(conv.maj_le or '')[:16]}")
+            with col_ouvrir:
+                if st.button("Ouvrir", key=f"ouvrir_conv_{conv.id}", use_container_width=True):
+                    _ouvrir_conversation_bibliotheque(store, conv.id)
+                    st.rerun()
+            with col_suppr:
+                if st.button("🗑️", key=f"suppr_conv_{conv.id}"):
+                    store.delete_conversation_bibliotheque(conv.id)
+                    st.rerun()
+
     for speaker, text in st.session_state["rag_history"]:
         with st.chat_message(speaker):
             st.write(text)
@@ -1140,6 +1202,7 @@ def rag_tab(store):
             reply = st.session_state["rag_agent"].send(question_en_attente)
         st.session_state["rag_history"].append(("assistant", reply))
         st.session_state["rag_question_en_attente"] = None
+        _sauvegarder_conversation_bibliotheque(store, user_id)
         st.rerun()
 
 
@@ -1224,7 +1287,7 @@ def page_bibliotheque() -> None:
     if not user_id:
         return
     store = _resolve_store(user_id)
-    _rendre_isole("Bibliothèque", rag_tab, store)
+    _rendre_isole("Bibliothèque", rag_tab, store, user_id)
 
 
 def page_lieux_hybrides() -> None:

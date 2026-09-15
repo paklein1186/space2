@@ -94,6 +94,23 @@ class Litige:
     resolu_le: Optional[str] = None
 
 
+@dataclass
+class ConversationBibliotheque:
+    """Historique de chat de l'assistant Bibliothèque, par utilisateur —
+    jamais rattaché à un lieu précis (la Bibliothèque interroge l'ensemble
+    du corpus). `messages` : liste de {"role": "user"|"assistant", "content": str},
+    format d'affichage simplifié (pas le format brut de l'API Anthropic —
+    une conversation rouverte redémarre avec un contexte simplifié plutôt
+    que de reconstruire l'état exact des appels de tools passés)."""
+
+    user_id: str
+    messages: list
+    id: str = ""  # vide = création (id généré par le store)
+    titre: Optional[str] = None
+    cree_le: Optional[str] = None
+    maj_le: Optional[str] = None
+
+
 class Store(ABC):
     @abstractmethod
     def get_or_create_tiers_lieu(self, owner_user_id: str, nom: str) -> TiersLieu: ...
@@ -191,6 +208,27 @@ class Store(ABC):
     @abstractmethod
     def log_llm_call(self, type_appel: str, model: str, tokens_in: int, tokens_out: int,
                       cout_estime: float, tiers_lieu_id: Optional[str] = None) -> None: ...
+
+    # -- historique des conversations Bibliothèque ------------------------
+
+    @abstractmethod
+    def save_conversation_bibliotheque(self, conversation: ConversationBibliotheque) -> str:
+        """Crée (id vide) ou met à jour (id renseigné) une conversation.
+        Renvoie l'id (généré à la création)."""
+        ...
+
+    @abstractmethod
+    def list_conversations_bibliotheque(self, user_id: str) -> list:
+        """Conversations d'un utilisateur, les plus récemment mises à jour
+        en premier — pour les lister sans charger le contenu complet de
+        chacune (utiliser get_conversation_bibliotheque pour le détail)."""
+        ...
+
+    @abstractmethod
+    def get_conversation_bibliotheque(self, conversation_id: str) -> Optional[ConversationBibliotheque]: ...
+
+    @abstractmethod
+    def delete_conversation_bibliotheque(self, conversation_id: str) -> None: ...
 
     # -- administration --------------------------------------------------
 

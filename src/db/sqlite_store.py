@@ -10,7 +10,16 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-from .store import CampagnePrioritaire, Contributeur, LieuDerive, Litige, SessionEntretien, Store, TiersLieu
+from .store import (
+    CampagnePrioritaire,
+    ConversationBibliotheque,
+    Contributeur,
+    LieuDerive,
+    Litige,
+    SessionEntretien,
+    Store,
+    TiersLieu,
+)
 
 DDL = """
 create table if not exists tiers_lieux (
@@ -96,6 +105,14 @@ create table if not exists journal_modifications (
     champ_id text,
     valeur text,
     cree_le text not null default (datetime('now'))
+);
+create table if not exists conversations_bibliotheque (
+    id text primary key,
+    user_id text not null,
+    titre text,
+    messages text not null default '[]',
+    cree_le text not null default (datetime('now')),
+    maj_le text not null default (datetime('now'))
 );
 create table if not exists litiges (
     id text primary key,
@@ -471,6 +488,47 @@ class SqliteStore(Store):
         # (mode dev sans Supabase) ou une valeur de convenance
         # (LOCAL_DEV_AUTOLOGIN) — simple passthrough.
         return {uid: uid for uid in user_ids}
+
+    # -- historique des conversations Bibliothèque ------------------------
+
+    def save_conversation_bibliotheque(self, conversation: ConversationBibliotheque) -> str:
+        conv_id = conversation.id or str(uuid.uuid4())
+        self.conn.execute(
+            "insert into conversations_bibliotheque (id, user_id, titre, messages, maj_le) "
+            "values (?, ?, ?, ?, datetime('now')) "
+            "on conflict(id) do update set titre = excluded.titre, messages = excluded.messages, "
+            "maj_le = excluded.maj_le",
+            (conv_id, conversation.user_id, conversation.titre,
+             json.dumps(conversation.messages, ensure_ascii=False)),
+        )
+        self.conn.commit()
+        return conv_id
+
+    def list_conversations_bibliotheque(self, user_id: str) -> list:
+        rows = self.conn.execute(
+            "select id, user_id, titre, cree_le, maj_le from conversations_bibliotheque "
+            "where user_id = ? order by maj_le desc",
+            (user_id,),
+        ).fetchall()
+        return [ConversationBibliotheque(id=r["id"], user_id=r["user_id"], titre=r["titre"],
+                                          messages=[], cree_le=r["cree_le"], maj_le=r["maj_le"])
+                for r in rows]
+
+    def get_conversation_bibliotheque(self, conversation_id: str) -> Optional[ConversationBibliotheque]:
+        row = self.conn.execute(
+            "select * from conversations_bibliotheque where id = ?", (conversation_id,)
+        ).fetchone()
+        if row is None:
+            return None
+        d = dict(row)
+        return ConversationBibliotheque(
+            id=d["id"], user_id=d["user_id"], titre=d["titre"],
+            messages=json.loads(d["messages"]), cree_le=d["cree_le"], maj_le=d["maj_le"],
+        )
+
+    def delete_conversation_bibliotheque(self, conversation_id: str) -> None:
+        self.conn.execute("delete from conversations_bibliotheque where id = ?", (conversation_id,))
+        self.conn.commit()
 
     # -- historique, stewardship, modération --------------------------------------------------
 

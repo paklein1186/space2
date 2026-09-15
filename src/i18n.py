@@ -79,6 +79,14 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
     "voice.dicter_reponse": {"fr": "Dicter la réponse", "en": "Dictate your answer"},
     "voice.dicter_question": {"fr": "Dicter la question", "en": "Dictate your question"},
 
+    "bibliotheque.conversations_titre": {"fr": "Vos conversations", "en": "Your conversations"},
+    "bibliotheque.nouvelle_conversation": {"fr": "＋ Nouvelle conversation", "en": "＋ New conversation"},
+    "bibliotheque.aucune_conversation": {
+        "fr": "Aucune conversation précédente — posez une question pour commencer.",
+        "en": "No previous conversation yet — ask a question to get started.",
+    },
+    "bibliotheque.supprimer_conversation": {"fr": "Supprimer", "en": "Delete"},
+
     "nav.compte": {"fr": "Compte", "en": "Account"},
     "contribution.title": {"fr": "Votre contribution", "en": "Your contribution"},
     "contribution.lieu_label": {"fr": "Tiers-lieu", "en": "Hybrid space"},
