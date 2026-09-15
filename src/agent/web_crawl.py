@@ -83,10 +83,29 @@ ARTICLES_TROIS_TIERS_IDS = [
 TROIS_TIERS_ARTICLE_URL = "https://www.troistiers.space/knowledge/article/{id}"
 
 
+_GOOGLE_DOCS_RE = re.compile(r"^https?://docs\.google\.com/document/d/([a-zA-Z0-9_-]+)")
+
+
+def _normaliser_url(url: str) -> str:
+    """Un lien Google Docs tel que copié depuis la barre d'adresse (.../edit)
+    ne renvoie qu'une coquille JS vide sans être connecté à Google — donnait
+    à tort "rien d'exploitable" pour un document par ailleurs public. Son
+    export texte brut (.../export?format=txt), lui, est accessible sans
+    authentification dès que le document est partagé au moins en lecture —
+    pas de vrai contenu récupéré si le document n'est PAS partagé (Google
+    répond alors par une page de connexion, filtrée comme les autres pages
+    sans substance)."""
+    m = _GOOGLE_DOCS_RE.match(url)
+    if m:
+        return f"https://docs.google.com/document/d/{m.group(1)}/export?format=txt"
+    return url
+
+
 def fetch_page_text(url: str) -> str:
     """Récupère le texte visible d'une page (hors script/style/nav/footer),
     nettoyé des espaces superflus. Lève une exception explicite en cas
     d'échec réseau/HTTP plutôt que de renvoyer un texte vide silencieux."""
+    url = _normaliser_url(url)
     response = requests.get(url, timeout=TIMEOUT_S, headers={"User-Agent": USER_AGENT})
     response.raise_for_status()
     soup = BeautifulSoup(response.text, "html.parser")
