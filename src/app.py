@@ -315,6 +315,12 @@ def _transmettre_source_entretien(store, state: dict, nom_lieu: str, texte_brut:
         reply = state["agent"].send(message)
     state["history"].append(("assistant", reply))
     _maj_completion(store, state)
+    # Recap affiché une fois juste après le rerun (voir plus bas dans
+    # entretien_tab), et l'encart forcé à se refermer : sans ces deux points,
+    # le formulaire restait ouvert et occupait l'écran, masquant la réponse
+    # de l'agent qui suit juste en dessous dans l'historique.
+    state["dernier_apport"] = {"label": label_affiche, "resume": resume}
+    state["panneau_source_version"] = state.get("panneau_source_version", 0) + 1
     st.rerun()
 
 
@@ -384,12 +390,13 @@ def _widget_reponse_rapide(store, state: dict, field: dict) -> None:
 
 
 def _panneau_choix_rapide(store, state: dict) -> None:
-    """Cases à cocher/boutons pour les questions à choix (booléen, choix
-    simple/multiple, échelle 1-5) de la section en cours, en alternative à
-    taper une réponse — l'agent choisit librement l'ordre dans lequel il
-    pose les questions d'une section, donc ce panneau propose TOUTES les
-    questions à choix pas encore répondues de la section, pas seulement
-    celle que l'agent vient de formuler dans son dernier message."""
+    """Case à cocher/boutons pour LA prochaine question à choix (booléen,
+    choix simple/multiple, échelle 1-5) de la section en cours, en
+    alternative à taper une réponse. Une seule à la fois — comme l'agent
+    lui-même n'en pose jamais plusieurs d'un coup — même si get_current_
+    section en renvoie plusieurs : répondre à celle-ci fait apparaître la
+    suivante au tour suivant, jamais une pile de plusieurs questions
+    d'un coup."""
     try:
         section = state["agent"].tool_handler.execute("get_current_section", {})
     except Exception:
@@ -398,10 +405,7 @@ def _panneau_choix_rapide(store, state: dict) -> None:
     if not champs:
         return
     with st.expander("⚡ Réponse rapide", expanded=False):
-        for i, field in enumerate(champs):
-            _widget_reponse_rapide(store, state, field)
-            if i < len(champs) - 1:
-                st.divider()
+        _widget_reponse_rapide(store, state, champs[0])
 
 
 def entretien_tab(store, user_id: str):
@@ -501,7 +505,15 @@ def entretien_tab(store, user_id: str):
             text=f"Formulaire de cette campagne complété à {completion['pourcentage']}% "
                  f"({completion['repondus']}/{completion['total']} questions)",
         )
-    with st.expander("📎 Transmettre un site, un document, ou un texte", expanded=False):
+    # Suffixe invisible (espaces de largeur nulle) qui change à chaque analyse
+    # réussie : st.expander n'a pas de paramètre `key` dans cette version de
+    # Streamlit, et le frontend mémorise l'état ouvert/fermé par identité
+    # implicite (position + libellé) — sans ce changement d'identité,
+    # `expanded=False` serait ignoré et l'encart resterait ouvert après coup.
+    label_panneau_source = "📎 Transmettre un site, un document, ou un texte" + (
+        "​" * state.get("panneau_source_version", 0)
+    )
+    with st.expander(label_panneau_source, expanded=False):
         st.caption(
             "De quoi enrichir l'entretien sans tout retaper : un lien vers votre site, un document "
             "existant (charte, plaquette, rapport...), ou un texte collé. L'agent en tire ce qui est "
@@ -546,6 +558,13 @@ def entretien_tab(store, user_id: str):
                 store, state, nom_lieu, texte_colle.strip(), "un texte collé par le répondant",
                 "📎 Texte collé transmis",
             )
+
+    # Affiché une seule fois, juste après l'analyse d'une source transmise
+    # (voir _transmettre_source_entretien) — retiré du state immédiatement
+    # après ce rendu pour ne pas ressurgir aux tours suivants.
+    dernier_apport = state.pop("dernier_apport", None)
+    if dernier_apport:
+        st.success(f"**Intégré à l'entretien** — {dernier_apport['label']}\n\n{dernier_apport['resume']}")
 
     for speaker, text in state["history"]:
         with st.chat_message(speaker):
