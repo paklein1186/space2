@@ -317,6 +317,92 @@ def _transmettre_source_entretien(store, state: dict, nom_lieu: str, texte_brut:
     st.rerun()
 
 
+TYPES_CHOIX_RAPIDE = {"boolean", "single_choice", "multi_choice", "scale_1_5"}
+
+
+def _soumettre_reponse_rapide(store, state: dict, champ_id: str, label: str, valeur) -> None:
+    """Enregistre directement (comme le ferait l'agent via save_answer, sans
+    passer par un aller-retour LLM pour la sauvegarde elle-même), puis
+    informe la conversation en cours pour qu'elle réagisse et enchaîne
+    naturellement — voir la règle dédiée dans collecte_agent.SYSTEM_PROMPT
+    pour que l'agent ne réenregistre jamais cette réponse lui-même."""
+    handler = state["agent"].tool_handler
+    handler.execute("save_answer", {"champ_id": champ_id, "valeur": valeur})
+    if isinstance(valeur, list):
+        valeur_affichee = ", ".join(str(v) for v in valeur) if valeur else "(aucun)"
+    elif isinstance(valeur, bool):
+        valeur_affichee = "Oui" if valeur else "Non"
+    else:
+        valeur_affichee = str(valeur)
+    state["history"].append(("user", f"⚡ {label} : {valeur_affichee}"))
+    message = f"[Réponse via sélection rapide — déjà enregistrée] {label} : {valeur_affichee}"
+    with st.spinner("L'agent réfléchit..."):
+        reply = state["agent"].send(message)
+    state["history"].append(("assistant", reply))
+    _maj_completion(store, state)
+    st.rerun()
+
+
+def _widget_reponse_rapide(store, state: dict, field: dict) -> None:
+    champ_id = field["id"]
+    label = field["label"]
+    cle = f"qr::{state['tiers_lieu_id']}::{champ_id}"
+    type_champ = field["type"]
+
+    if type_champ == "boolean":
+        st.caption(label)
+        col_oui, col_non = st.columns(2)
+        with col_oui:
+            if st.button("✅ Oui", key=f"{cle}::oui", use_container_width=True):
+                _soumettre_reponse_rapide(store, state, champ_id, label, True)
+        with col_non:
+            if st.button("❌ Non", key=f"{cle}::non", use_container_width=True):
+                _soumettre_reponse_rapide(store, state, champ_id, label, False)
+        return
+
+    if type_champ == "single_choice":
+        options = field.get("options") or []
+        choix = st.radio(label, options=options, key=f"{cle}::radio", index=None)
+        if choix is not None and st.button("Répondre", key=f"{cle}::btn"):
+            _soumettre_reponse_rapide(store, state, champ_id, label, choix)
+        return
+
+    if type_champ == "multi_choice":
+        options = field.get("options") or []
+        choix = st.multiselect(label, options=options, key=f"{cle}::multi",
+                                max_selections=field.get("max_choices"))
+        if st.button("Répondre", key=f"{cle}::btn", disabled=not choix):
+            _soumettre_reponse_rapide(store, state, champ_id, label, choix)
+        return
+
+    if type_champ == "scale_1_5":
+        valeur = st.select_slider(label, options=[1, 2, 3, 4, 5], key=f"{cle}::scale")
+        if st.button("Répondre", key=f"{cle}::btn"):
+            _soumettre_reponse_rapide(store, state, champ_id, label, valeur)
+        return
+
+
+def _panneau_choix_rapide(store, state: dict) -> None:
+    """Cases à cocher/boutons pour les questions à choix (booléen, choix
+    simple/multiple, échelle 1-5) de la section en cours, en alternative à
+    taper une réponse — l'agent choisit librement l'ordre dans lequel il
+    pose les questions d'une section, donc ce panneau propose TOUTES les
+    questions à choix pas encore répondues de la section, pas seulement
+    celle que l'agent vient de formuler dans son dernier message."""
+    try:
+        section = state["agent"].tool_handler.execute("get_current_section", {})
+    except Exception:
+        return
+    champs = [f for f in (section or {}).get("fields", []) if f["type"] in TYPES_CHOIX_RAPIDE]
+    if not champs:
+        return
+    with st.expander("⚡ Réponse rapide", expanded=False):
+        for i, field in enumerate(champs):
+            _widget_reponse_rapide(store, state, field)
+            if i < len(champs) - 1:
+                st.divider()
+
+
 def entretien_tab(store, user_id: str):
     st.title(t("entretien.title"))
     nom_lieu, role = contribution_selector(store, user_id)
@@ -463,6 +549,8 @@ def entretien_tab(store, user_id: str):
     for speaker, text in state["history"]:
         with st.chat_message(speaker):
             st.write(text)
+
+    _panneau_choix_rapide(store, state)
 
     # En deux temps (message ajouté + rerun immédiat, appel LLM au rerun
     # suivant) — voir la même note dans rag_tab : sans ça, la réponse de
