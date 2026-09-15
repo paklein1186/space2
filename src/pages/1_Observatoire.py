@@ -268,3 +268,76 @@ if "categories" in df_lieux.columns:
                     st.caption(f"Besoins : {row['besoins']}")
     if not au_moins_une:
         st.caption("Aucune catégorie attribuée pour l'instant.")
+
+st.divider()
+st.subheader("Besoins par sphère")
+st.caption(
+    "Vue synthétique des besoins déclarés à l'entretien (« 📣 Rendre visibles vos besoins "
+    "actuels »), regroupés par grande sphère plutôt que listés un par un — dépliez un besoin "
+    "pour voir quels lieux précisément l'ont exprimé."
+)
+# Regroupement en trois sphères (cadre systémique large, pas une catégorie du
+# questionnaire) : Sociosphère (gouvernance, collectif, réseau, cadre légal),
+# Technosphère (argent, outils, infrastructure, savoir-faire technique),
+# Biosphère (vivant, énergie, alimentation, écologie). "Aucun besoin
+# identifié" et "Autre" ne sont pas de vrais besoins classifiables, exclus.
+SPHERES_BESOINS = {
+    "Gouvernance / gestion de collectif": "Sociosphère",
+    "Médiation de conflits": "Sociosphère",
+    "Repenser l'organisationnel et les processus de décision": "Sociosphère",
+    "Communication": "Sociosphère",
+    "Activation de communauté d'usagers": "Sociosphère",
+    "Ancrage territorial / partenariats": "Sociosphère",
+    "Événementiel (conception ou production d'événements)": "Sociosphère",
+    "Aide juridique": "Sociosphère",
+    "Gestion de projet": "Sociosphère",
+    "Structure d'accueil de bénévoles": "Sociosphère",
+    "Montée en compétence de l'équipe": "Sociosphère",
+    "Mise en réseau avec d'autres tiers-lieux": "Sociosphère",
+    "Comment implémenter des services publics": "Sociosphère",
+    "Plan financier et pérennisation": "Technosphère",
+    "Développement entrepreneurial / rapport à l'argent des usagers": "Technosphère",
+    "Lancement de services de proximité": "Technosphère",
+    "Usages d'outils numériques": "Technosphère",
+    "Gestion financière, administrative et comptabilité": "Technosphère",
+    "Ressources pratiques et inspirations (modèles, fieldtrips...)": "Technosphère",
+    "Rénovation / obstacles architecturaux": "Technosphère",
+    "Centre logistique ou compostage": "Technosphère",
+    "Aide sur systèmes énergétiques/hydriques": "Biosphère",
+    "Innovation low-tech, éco-construction ou économie circulaire": "Biosphère",
+    "Activités agricoles ou alimentaires": "Biosphère",
+}
+ORDRE_SPHERES = ["Sociosphère", "Technosphère", "Biosphère"]
+
+besoins_df = (
+    df_reponses_dedup[df_reponses_dedup["champ_id"] == "types_soutien_souhaites"]
+    if not df_reponses_dedup.empty else df_reponses_dedup
+)
+lignes_besoins = [
+    {"lieu": row["tiers_lieu"], "besoin": besoin, "sphere": SPHERES_BESOINS[besoin]}
+    for _, row in besoins_df.iterrows()
+    for besoin in (row["valeur"] or [])
+    if besoin in SPHERES_BESOINS
+]
+if not lignes_besoins:
+    st.caption("Aucun besoin déclaré pour l'instant.")
+else:
+    df_spheres = pd.DataFrame(lignes_besoins)
+    cols_spheres = st.columns(3)
+    for col, sphere in zip(cols_spheres, ORDRE_SPHERES):
+        with col:
+            st.markdown(f"**{sphere}**")
+            sous = df_spheres[df_spheres["sphere"] == sphere]
+            if sous.empty:
+                st.caption("Aucun besoin déclaré dans cette sphère pour l'instant.")
+                continue
+            par_besoin = sorted(
+                (
+                    (besoin, sorted(set(groupe["lieu"])))
+                    for besoin, groupe in sous.groupby("besoin")
+                ),
+                key=lambda t: len(t[1]), reverse=True,
+            )
+            for besoin, lieux_concernes in par_besoin:
+                with st.expander(f"{besoin} ({len(lieux_concernes)})"):
+                    st.caption(", ".join(lieux_concernes))
