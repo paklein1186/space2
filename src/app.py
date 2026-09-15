@@ -36,7 +36,7 @@ from src.auth_session import clear_session_cookie, read_session_cookie, save_ses
 from src.db.factory import get_admin_store, get_store
 from src.db.store import Litige
 from src.i18n import language_toggle, t
-from src.questionnaire.resolver import completion_stats, country_code_for
+from src.questionnaire.resolver import campagne_completion_stats, completion_stats, country_code_for
 from src.questionnaire.schema import QUESTIONNAIRE, CATEGORIES_POSSIBLES, Role, all_fields
 from src.theme import apply_theme
 from src.voice_input import bouton_dictee, consume_voice_transcript
@@ -1403,23 +1403,35 @@ def administration_tab(store, user_id: str) -> None:
         st.caption(
             "Pour chaque lieu, part des questions actuellement actives (tous rôles confondus, "
             "compte tenu du pays et des branches déjà révélées par les réponses) qui ont une "
-            "réponse — mesure la profondeur du recensement, pas seulement le minimum obligatoire."
+            "réponse — mesure la profondeur du recensement, pas seulement le minimum obligatoire. "
+            "Triés du plus complété au moins complété. La colonne Campagnes ne liste que les "
+            "campagnes auxquelles le lieu a effectivement répondu, pas toutes les campagnes."
         )
         tous_les_lieux_completion = sorted(store.list_tiers_lieux(), key=lambda l: l.nom.lower())
         if not tous_les_lieux_completion:
             st.caption("Aucun lieu recensé pour l'instant.")
         else:
+            toutes_campagnes = store.list_campagnes_prioritaires()
             lignes_completion = []
             for lieu in tous_les_lieux_completion:
                 answers = store.get_answers(lieu.id)
                 country_code = country_code_for(answers.get("pays") or lieu.pays)
                 stats = completion_stats(answers, None, country_code)
+                badges_campagnes = []
+                for campagne in toutes_campagnes:
+                    stats_campagne = campagne_completion_stats(answers, campagne.champ_ids)
+                    if stats_campagne and stats_campagne["repondus"] > 0:
+                        badges_campagnes.append(
+                            f"{campagne.titre} : {stats_campagne['repondus']}/{stats_campagne['total']} "
+                            f"({stats_campagne['pourcentage']}%)"
+                        )
                 lignes_completion.append({
                     "Lieu": lieu.nom, "Complétion": stats["pourcentage"],
                     "Questions répondues": f"{stats['repondus']}/{stats['total']}",
+                    "Campagnes": "; ".join(badges_campagnes) if badges_campagnes else "—",
                 })
             st.dataframe(
-                pd.DataFrame(lignes_completion).sort_values("Complétion"),
+                pd.DataFrame(lignes_completion).sort_values("Complétion", ascending=False),
                 use_container_width=True, hide_index=True,
                 column_config={"Complétion": st.column_config.ProgressColumn(
                     "Complétion", min_value=0, max_value=100, format="%d%%",

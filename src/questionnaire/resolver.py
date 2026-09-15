@@ -11,7 +11,7 @@ import hashlib
 from dataclasses import dataclass
 from typing import Optional
 
-from .schema import QUESTIONNAIRE, Field, Module, Role, Section
+from .schema import QUESTIONNAIRE, Field, Module, Role, Section, get_field
 
 COUNTRY_NAME_TO_CODE = {"France": "FR", "Belgique": "BE"}
 
@@ -167,6 +167,35 @@ def completion_stats(answers: dict, role: Optional[Role], country_code: Optional
         "pourcentage": round(100 * repondus / total) if total else 0,
         "par_module": par_module,
     }
+
+
+def campagne_completion_stats(answers: dict, champ_ids: list) -> Optional[dict]:
+    """% de complétion d'une liste de champs de campagne prioritaire pour un
+    état de réponses donné, tous rôles confondus (role=None, même logique
+    que completion_stats pour la vue admin — les réponses d'un lieu viennent
+    typiquement de plusieurs contributeurs de rôles différents). Seuls les
+    champs actuellement actifs comptent (une question de dossier qui dépend
+    d'une réponse de cadrage pas encore donnée ne pénalise pas le score).
+
+    Les champs "libre::" (questions ad hoc collées par un admin, hors
+    schéma) sont ignorés : leur réponse part en note libre, pas en réponse
+    structurée, donc rien ici ne permet de savoir si elles ont été traitées
+    en dehors d'une session d'entretien active. None si la campagne ne
+    contient aucun champ de schéma réel (uniquement des "libre::")."""
+    total = 0
+    repondus = 0
+    for champ_id in champ_ids:
+        if champ_id.startswith("libre::"):
+            continue
+        f = get_field(champ_id)
+        if f is None or not field_is_active(f, answers, None):
+            continue
+        total += 1
+        if answers.get(champ_id) is not None:
+            repondus += 1
+    if total == 0:
+        return None
+    return {"total": total, "repondus": repondus, "pourcentage": round(100 * repondus / total)}
 
 
 def next_module(current_module_id: Optional[str]) -> Optional[Module]:
