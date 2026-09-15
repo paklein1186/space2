@@ -22,6 +22,7 @@ from dotenv import load_dotenv
 from src.agent.collecte_agent import CollecteAgent, opening_message
 from src.agent.collecte_tools import CollecteToolHandler
 from src.annuaire import (
+    besoins_chips_html,
     build_fiche_lieu,
     category_chips_html,
     default_visual,
@@ -644,6 +645,10 @@ def _fiche_dialog(store, fiche, est_admin: bool, user_id: str):
             for t in fiche["temoignages"]:
                 st.markdown(f"> {t['texte']}")
 
+    if derive and _est_steward_ou_admin(store, lieu.id, user_id, est_admin):
+        st.divider()
+        _besoins_mis_en_avant_form(store, lieu, derive)
+
     if est_admin:
         st.divider()
         _admin_portfolio_form(store, lieu, derive)
@@ -883,10 +888,53 @@ def annuaire_tab(store, est_admin: bool, user_id: str):
                         st.markdown(vignette_html(emoji, couleur), unsafe_allow_html=True)
                     if donnees.get("categories"):
                         st.markdown(category_chips_html(donnees["categories"]), unsafe_allow_html=True)
+                    if derive and derive.besoins_mis_en_avant:
+                        st.markdown(besoins_chips_html(derive.besoins_mis_en_avant), unsafe_allow_html=True)
                     if st.button(lieu.nom, key=f"open_{lieu.id}", use_container_width=True):
                         st.session_state["annuaire_open_lieu_id"] = lieu.id
                         st.rerun()
                     st.caption(lieu.pays or "—")
+
+
+def _est_steward_ou_admin(store, lieu_id: str, user_id: str, est_admin: bool) -> bool:
+    """Un admin peut toujours curer n'importe quel lieu ; un steward/fondateur/
+    équipe (ROLES_INTERNES) ne peut curer QUE les lieux dont il est
+    contributeur — évite qu'un simple usager connecté puisse changer les
+    besoins mis en avant d'un lieu qui n'est pas le sien."""
+    if est_admin:
+        return True
+    contributeurs = store.list_contributeurs(lieu_id)
+    return any(c.user_id == user_id and c.role in ROLES_INTERNES and not c.bloque for c in contributeurs)
+
+
+def _besoins_mis_en_avant_form(store, lieu, derive) -> None:
+    """Le steward (ou un admin) choisit, parmi les besoins déclarés à
+    l'entretien ("Rendre visibles vos besoins actuels" → types_soutien_
+    souhaites), lesquels mettre en avant publiquement sur la fiche du lieu
+    (Annuaire) et dans le Portfolio — la liste brute déclarée peut être
+    longue et pas destinée telle quelle à un affichage public."""
+    st.markdown("**Besoins mis en avant**")
+    answers = store.get_answers(lieu.id)
+    besoins_declares = answers.get("types_soutien_souhaites") or []
+    if not besoins_declares:
+        st.caption(
+            "Aucun besoin déclaré pour l'instant — répondez à « 📣 Rendre visibles vos besoins "
+            "actuels » dans l'entretien pour pouvoir en mettre en avant ici."
+        )
+        return
+    st.caption(
+        "Cochez ceux à afficher publiquement (Annuaire et Portfolio) — les autres besoins "
+        "déclarés restent enregistrés mais ne sont pas montrés."
+    )
+    with st.form(f"besoins_avant_{lieu.id}"):
+        choix = st.multiselect(
+            "Besoins à mettre en avant", options=besoins_declares,
+            default=[b for b in (derive.besoins_mis_en_avant or []) if b in besoins_declares],
+        )
+        if st.form_submit_button("Enregistrer"):
+            store.update_besoins_mis_en_avant(lieu.id, choix)
+            st.success("Besoins mis en avant mis à jour.")
+            st.rerun()
 
 
 def _admin_portfolio_form(store, lieu, derive) -> None:
@@ -1341,7 +1389,7 @@ def administration_tab(store, user_id: str) -> None:
             "suite, sans passer par un lieu ni un enrichissement) — même mécanisme que le "
             "bouton « 🧠 Nourrir l'intelligence » de la Bibliothèque."
         )
-        from src.agent.web_crawl import ARTICLES_TROIS_TIERS_IDS
+        from src.agent.web_crawl import ARTICLES_TROIS_TIERS_IDS, dernier_ajout_connaissance
 
         st.markdown("**Base de connaissances Trois-Tiers**")
         st.caption(
@@ -1349,6 +1397,9 @@ def administration_tab(store, user_id: str) -> None:
             "troistiers.space/knowledge — liste figée au moment où elle a été relevée, pas de "
             "découverte automatique des nouveaux articles pour l'instant."
         )
+        dernier_scan = dernier_ajout_connaissance("connaissance_trois_tiers")
+        st.caption(f"🕓 Dernier scan : {dernier_scan[:16].replace('T', ' ')}" if dernier_scan
+                   else "🕓 Jamais scanné sur cette base.")
         if st.button("Scanner la base de connaissances Trois-Tiers"):
             from src.agent.web_crawl import crawler_trois_tiers
 

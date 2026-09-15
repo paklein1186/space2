@@ -27,3 +27,11 @@ class ChromaStore:
 
     def count(self) -> int:
         return self.collection.count()
+
+    def get_metadatas(self, where: dict) -> list:
+        """Métadonnées de tous les documents correspondant à `where`, sans
+        recherche par similarité (pas de embedding à fournir) — utilisé pour
+        des besoins d'introspection (ex. date du dernier document ajouté
+        pour un doc_type donné), pas pour retrouver du contenu pertinent."""
+        result = self.collection.get(where=where, include=["metadatas"])
+        return result.get("metadatas") or []

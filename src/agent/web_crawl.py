@@ -204,6 +204,7 @@ def ajouter_connaissance(store: Store, texte_brut: str, source_label: str,
     même convention que `extraire_et_enregistrer`, pour ne jamais interrompre
     un scan groupé sur un texte individuel en échec."""
     import uuid
+    from datetime import datetime, timezone
 
     from .embeddings import VoyageEmbedder
     from .vectorstore import ChromaStore
@@ -218,11 +219,29 @@ def ajouter_connaissance(store: Store, texte_brut: str, source_label: str,
             ids=[f"connaissance_{uuid.uuid4()}"],
             embeddings=[embedding],
             documents=[resume],
-            metadatas=[{"doc_type": doc_type, "source_file": source_label}],
+            metadatas=[{
+                "doc_type": doc_type, "source_file": source_label,
+                "date_ajout": datetime.now(timezone.utc).isoformat(),
+            }],
         )
     except Exception as exc:
         return f"erreur: {type(exc).__name__}: {exc}"
     return "ajoute"
+
+
+def dernier_ajout_connaissance(doc_type: str) -> str | None:
+    """Date (ISO) du document le plus récent de ce doc_type dans l'index
+    vectoriel, ou None si la base de connaissances est vide pour ce
+    doc_type — pour afficher "dernier scan" côté admin sans avoir à tenir
+    un état séparé (la date est déjà portée par chaque document)."""
+    from .vectorstore import ChromaStore
+
+    try:
+        metadatas = ChromaStore().get_metadatas({"doc_type": doc_type})
+    except Exception:
+        return None
+    dates = [m["date_ajout"] for m in metadatas if m.get("date_ajout")]
+    return max(dates) if dates else None
 
 
 def crawler_trois_tiers(store: Store, client=None, callback=None) -> dict:
