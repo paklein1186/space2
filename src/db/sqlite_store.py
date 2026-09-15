@@ -268,9 +268,12 @@ class SqliteStore(Store):
              json.dumps(valeur, ensure_ascii=False)),
         )
 
-    def _contributeurs_non_bloques(self, tiers_lieu_id: str) -> set:
+    def _contributeurs_bloques(self, tiers_lieu_id: str) -> set:
+        """Ids explicitement bloqués (pas l'inverse : une réponse dont le
+        contributeur n'a plus de ligne dans `contributeurs` doit rester
+        visible — voir la même note dans supabase_store.py)."""
         rows = self.conn.execute(
-            "select id from contributeurs where tiers_lieu_id = ? and bloque = 0", (tiers_lieu_id,)
+            "select id from contributeurs where tiers_lieu_id = ? and bloque = 1", (tiers_lieu_id,)
         ).fetchall()
         return {r["id"] for r in rows}
 
@@ -280,7 +283,7 @@ class SqliteStore(Store):
         les conditions du schéma pendant une session. Un contributeur bloqué
         (modération) n'alimente plus cette vue (l'app empêche par ailleurs un
         contributeur bloqué de démarrer une nouvelle session d'entretien)."""
-        actifs = self._contributeurs_non_bloques(tiers_lieu_id)
+        bloques = self._contributeurs_bloques(tiers_lieu_id)
         rows = self.conn.execute(
             "select contributeur_id, champ_id, valeur from reponses where tiers_lieu_id = ? "
             "order by (contributeur_id = ?) asc",
@@ -288,20 +291,20 @@ class SqliteStore(Store):
         ).fetchall()
         merged = {}
         for r in rows:
-            if r["contributeur_id"] not in actifs:
+            if r["contributeur_id"] in bloques:
                 continue
             merged[r["champ_id"]] = json.loads(r["valeur"]) if r["valeur"] is not None else None
         return merged
 
     def get_all_answers_by_contributeur(self, tiers_lieu_id: str) -> dict:
-        actifs = self._contributeurs_non_bloques(tiers_lieu_id)
+        bloques = self._contributeurs_bloques(tiers_lieu_id)
         rows = self.conn.execute(
             "select contributeur_id, champ_id, valeur from reponses where tiers_lieu_id = ?",
             (tiers_lieu_id,),
         ).fetchall()
         result: dict = {}
         for r in rows:
-            if r["contributeur_id"] not in actifs:
+            if r["contributeur_id"] in bloques:
                 continue
             result.setdefault(r["contributeur_id"], {})[r["champ_id"]] = (
                 json.loads(r["valeur"]) if r["valeur"] is not None else None

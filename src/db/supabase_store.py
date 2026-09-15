@@ -147,34 +147,40 @@ class SupabaseStore(Store):
             # échouer une sauvegarde de réponse à cause du journal d'audit.
             pass
 
-    def _contributeurs_non_bloques(self, tiers_lieu_id: str) -> set:
+    def _contributeurs_bloques(self, tiers_lieu_id: str) -> set:
+        """Ids explicitement bloqués (pas l'inverse : une réponse dont le
+        contributeur n'a plus de ligne dans `contributeurs` — vu en
+        production le 2026-09-15, cause encore non élucidée — doit rester
+        visible. Un ancien filtre `actifs = non-bloqués` cachait purement et
+        simplement toutes ces réponses orphelines au lieu de ne cacher que
+        celles réellement bloquées."""
         try:
             rows = (
                 self.client.table("contributeurs").select("id")
-                .eq("tiers_lieu_id", tiers_lieu_id).eq("bloque", False).execute()
+                .eq("tiers_lieu_id", tiers_lieu_id).eq("bloque", True).execute()
             )
         except Exception:
             # Colonne `bloque` absente avant migration : personne n'est
             # considéré bloqué (comportement identique à avant cette feature).
-            return None
+            return set()
         return {r["id"] for r in rows.data}
 
     def get_answers(self, tiers_lieu_id: str, contributeur_id: Optional[str] = None) -> dict:
-        actifs = self._contributeurs_non_bloques(tiers_lieu_id)
+        bloques = self._contributeurs_bloques(tiers_lieu_id)
         result = (
             self.client.table("reponses")
             .select("contributeur_id,champ_id,valeur")
             .eq("tiers_lieu_id", tiers_lieu_id)
             .execute()
         )
-        rows = result.data if actifs is None else [r for r in result.data if r["contributeur_id"] in actifs]
+        rows = [r for r in result.data if r["contributeur_id"] not in bloques]
         # Les réponses du contributeur courant sont ré-appliquées en dernier pour primer
         # en cas de divergence (même logique que SqliteStore).
         rows = sorted(rows, key=lambda r: r["contributeur_id"] == contributeur_id)
         return {r["champ_id"]: r["valeur"] for r in rows}
 
     def get_all_answers_by_contributeur(self, tiers_lieu_id: str) -> dict:
-        actifs = self._contributeurs_non_bloques(tiers_lieu_id)
+        bloques = self._contributeurs_bloques(tiers_lieu_id)
         result = (
             self.client.table("reponses")
             .select("contributeur_id,champ_id,valeur")
@@ -183,7 +189,7 @@ class SupabaseStore(Store):
         )
         out: dict = {}
         for r in result.data:
-            if actifs is not None and r["contributeur_id"] not in actifs:
+            if r["contributeur_id"] in bloques:
                 continue
             out.setdefault(r["contributeur_id"], {})[r["champ_id"]] = r["valeur"]
         return out
@@ -194,16 +200,16 @@ class SupabaseStore(Store):
         try:
             contributeurs_result = (
                 self.client.table("contributeurs").select("id,tiers_lieu_id")
-                .in_("tiers_lieu_id", tiers_lieu_ids).eq("bloque", False).execute()
+                .in_("tiers_lieu_id", tiers_lieu_ids).eq("bloque", True).execute()
             )
-            actifs_par_lieu: Optional[dict] = {}
+            bloques_par_lieu: dict = {}
             for c in contributeurs_result.data:
-                actifs_par_lieu.setdefault(c["tiers_lieu_id"], set()).add(c["id"])
+                bloques_par_lieu.setdefault(c["tiers_lieu_id"], set()).add(c["id"])
         except Exception:
             # Colonne `bloque` absente avant migration : personne n'est
             # considéré bloqué (comportement identique à avant cette feature,
-            # voir _contributeurs_non_bloques).
-            actifs_par_lieu = None
+            # voir _contributeurs_bloques).
+            bloques_par_lieu = {}
 
         reponses_result = (
             self.client.table("reponses")
@@ -213,10 +219,9 @@ class SupabaseStore(Store):
         )
         out: dict = {}
         for r in reponses_result.data:
-            if actifs_par_lieu is not None:
-                actifs = actifs_par_lieu.get(r["tiers_lieu_id"], set())
-                if r["contributeur_id"] not in actifs:
-                    continue
+            bloques = bloques_par_lieu.get(r["tiers_lieu_id"], set())
+            if r["contributeur_id"] in bloques:
+                continue
             out.setdefault(r["tiers_lieu_id"], {}).setdefault(r["contributeur_id"], {})[r["champ_id"]] = r["valeur"]
         return out
 
