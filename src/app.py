@@ -272,19 +272,18 @@ def contribution_selector(store, user_id: str):
 
 
 def _maj_completion(store, state: dict) -> None:
-    """Recalcule et stocke le % de complétion dans `state`, appelé une seule
-    fois par tour de conversation (pas à chaque re-render de la page) — même
-    logique que la résolution de tiers_lieu/contributeur juste au-dessus :
-    un `get_answers` de plus par tour est négligeable à côté de l'appel LLM
-    qui vient de se produire, mais en ajouter un à chaque rerun de la page
-    (bien plus fréquent) réintroduirait exactement la lenteur déjà corrigée
-    ailleurs dans cet onglet."""
-    tiers_lieu_id = state["tiers_lieu_id"]
-    contributeur_id = state["contributeur_id"]
-    answers = store.get_answers(tiers_lieu_id, contributeur_id)
-    role = Role(state["role"])
-    country_code = country_code_for(answers.get("pays"))
-    state["completion"] = completion_stats(answers, role, country_code)
+    """Recalcule et stocke le % de complétion du formulaire de campagne en
+    cours dans `state` (None si on n'est pas en train de répondre à une
+    campagne prioritaire — voir CollecteToolHandler.campagne_completion) :
+    l'entretien général n'a pas de ligne d'arrivée, une barre de progression
+    dessus induirait en erreur plutôt que d'aider. Appelé une seule fois par
+    tour de conversation (pas à chaque re-render de la page) — même logique
+    que la résolution de tiers_lieu/contributeur juste au-dessus : un appel
+    de plus par tour est négligeable à côté de l'appel LLM qui vient de se
+    produire, mais en ajouter un à chaque rerun de la page (bien plus
+    fréquent) réintroduirait exactement la lenteur déjà corrigée ailleurs
+    dans cet onglet."""
+    state["completion"] = state["agent"].tool_handler.campagne_completion()
 
 
 def _transmettre_source_entretien(store, state: dict, nom_lieu: str, texte_brut: str,
@@ -399,8 +398,8 @@ def entretien_tab(store, user_id: str):
     if completion:
         st.progress(
             completion["pourcentage"] / 100,
-            text=f"Entretien complété à {completion['pourcentage']}% "
-                 f"({completion['repondus']}/{completion['total']} questions actives)",
+            text=f"Formulaire de cette campagne complété à {completion['pourcentage']}% "
+                 f"({completion['repondus']}/{completion['total']} questions)",
         )
     with st.expander("📎 Transmettre un site, un document, ou un texte", expanded=False):
         st.caption(

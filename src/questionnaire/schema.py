@@ -303,8 +303,6 @@ section_acteurs_origine = Section(
               options=["Un collectif citoyen", "Une association existante", "Un entrepreneur ou une entreprise",
                        "Une université ou un établissement scolaire", "Une collectivité publique",
                        "Je ne sais pas", "Autre"]),
-        Field("statut_juridique", "Statut juridique de la structure porteuse", FieldType.SINGLE_CHOICE,
-              options=STATUT_JURIDIQUE, roles=ROLES_INTERNES),
         Field("valeurs", "Quelles valeurs le lieu cherche-t-il à incarner ? (jusqu'à 4)", FieldType.MULTI_CHOICE,
               options=["Accueil", "Apprentissage", "Convivialité", "Coopération", "Créativité", "Durabilité",
                        "Écologie", "Entraide", "Inclusivité", "Partage", "Transmission", "Expérimentation",
@@ -581,6 +579,16 @@ section_gouvernance = Section(
     id="gouvernance",
     title="Gouvernance",
     fields=[
+        # Déplacé depuis section_acteurs_origine : demandé juste après
+        # "d'où vient le projet / quelles valeurs", il créait une rupture de
+        # thème perçue comme incohérente par les répondants ("on parlait de
+        # genèse et de valeurs, pourquoi une question juridique ?"). Il
+        # gate déjà plusieurs champs plus bas dans CETTE section (coopérative
+        # ou non) — le placer ici règle la rupture ET rapproche le champ de
+        # ses propres dépendants, dans la même section plutôt qu'entre deux
+        # sections différentes.
+        Field("statut_juridique", "Statut juridique de la structure porteuse", FieldType.SINGLE_CHOICE,
+              options=STATUT_JURIDIQUE, roles=ROLES_INTERNES),
         Field("mode_gouvernance", "Comment le lieu est-il géré ?", FieldType.SINGLE_CHOICE,
               options=["Une structure porteuse unique", "Une structure porteuse avec des usagers impliqués",
                        "Plusieurs structures co-porteuses", "Autre"]),

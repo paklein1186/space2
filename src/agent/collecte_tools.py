@@ -142,6 +142,35 @@ class CollecteToolHandler:
         # traitées d'un appel à l'autre.
         self._libres_repondues: set = set()
 
+    def campagne_completion(self) -> Optional[dict]:
+        """% de complétion du formulaire de campagne prioritaire en cours —
+        None si le mode n'est pas "campagne" ou qu'aucune campagne n'est
+        active, pour que l'appelant n'affiche une barre de progression que
+        quand elle porte sur un formulaire borné et concret. Pour
+        l'entretien général ("histoire"/"besoins"), le % équivalent calculé
+        sur tout le schéma (126 questions) n'a pas de ligne d'arrivée
+        naturelle et se lit comme décourageant plutôt qu'utile — pas affiché
+        du tout dans ce cas plutôt que d'induire en erreur sur ce qu'il
+        mesure. Seuls les champs actuellement actifs comptent dans le total
+        (même logique que resolver.completion_stats) : un champ de suivi
+        conditionnel pas encore débloqué ne doit pas pénaliser le score."""
+        if self.mode_entretien != "campagne" or not self._priority_field_ids:
+            return None
+        answers = self._current_answers()
+        total = 0
+        repondus = 0
+        for champ_id in self._priority_field_ids:
+            if not champ_id.startswith("libre::"):
+                f = get_field(champ_id)
+                if f is None or not field_is_active(f, answers, self.role):
+                    continue
+            total += 1
+            if self._priority_field_done(champ_id, answers):
+                repondus += 1
+        if total == 0:
+            return None
+        return {"total": total, "repondus": repondus, "pourcentage": round(100 * repondus / total)}
+
     def _compute_priority_field_ids(self) -> list:
         ids: list = []
         for campagne in self.store.get_active_campagnes_prioritaires():
