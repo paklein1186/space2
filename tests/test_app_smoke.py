@@ -38,8 +38,12 @@ def main():
     check("Session bien auto-loguée en admin", "test-smoke@localhost" in page)
     check("Email affiché dans la barre latérale", any("test-smoke@localhost" in c.value for c in at.caption))
     check("Bouton de déconnexion présent", any(b.label == "Se déconnecter" for b in at.button))
-    check("Section Administration présente (compte admin)",
-          any(e.label == "⚙️ Administration" for e in at.expander))
+    # Administration vit sur sa propre page (st.Page/st.navigation) plutôt
+    # que dans le contenu de la page par défaut — AppTest.switch_page()
+    # n'accepte que des pages basées sur un fichier, pas les pages basées sur
+    # une fonction comme page_administration ; sa présence dans le menu (et
+    # son contenu une fois ouverte) est vérifiée manuellement dans le
+    # navigateur plutôt qu'ici.
 
     print("\nTous les tests sont passés.")
 

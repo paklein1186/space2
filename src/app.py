@@ -920,41 +920,59 @@ def page_lieux_hybrides() -> None:
     _rendre_isole("Lieux hybrides", annuaire_tab, store, est_admin, user_id)
 
 
+def page_administration() -> None:
+    user_id = auth_screen()
+    if not user_id:
+        return
+    store = _resolve_store(user_id)
+    if not _est_admin(store, user_id):
+        st.error("Cette page est réservée aux administrateurs.")
+        return
+    _rendre_isole("Administration", administration_tab, store, user_id)
+
+
 def main():
-    # Barre latérale "compte" : rendue une fois, avant st.navigation(), pour
-    # apparaître sur toutes les pages (pas seulement celle sélectionnée).
-    # Administration y vit en expander plutôt qu'en page à part entière —
-    # réservée aux admins, elle n'a pas sa place dans le menu général à côté
-    # de Compléter l'histoire / Bibliothèque / Lieux hybrides.
+    # Administration est une page comme les autres (rendue dans la zone
+    # principale, pas coincée dans la colonne étroite de la barre latérale —
+    # un expander y suffisait pour un lien, pas pour des formulaires entiers)
+    # mais reléguée à sa propre section de navigation, séparée de la section
+    # principale, plutôt que mélangée à Compléter l'histoire / Bibliothèque /
+    # Lieux hybrides — visible seulement pour un admin déjà identifié.
     #
-    # pg.run() s'exécute AVANT ce bloc compte plutôt qu'après : sur le tout
-    # premier passage d'une session (LOCAL_DEV_AUTOLOGIN, ou restauration de
-    # cookie sans rerun explicite), user_id n'existe pas encore en
-    # session_state tant que la page sélectionnée n'a pas elle-même appelé
-    # auth_screen() — le lire avant pg.run() affichait un instant sans
-    # bouton "Se déconnecter" ni email, le temps d'un rerun de rattrapage.
-    pages = [
-        st.Page(page_entretien, title="Compléter l'histoire", icon="📝",
-                url_path="entretien", default=True),
-        st.Page(page_bibliotheque, title="Bibliothèque", icon="📚", url_path="bibliotheque"),
-        st.Page(page_lieux_hybrides, title="Lieux hybrides", icon="🏘️", url_path="lieux-hybrides"),
-        st.Page("pages/1_Observatoire.py", title="Observatoire", icon="📊"),
-        st.Page("pages/2_Portfolio.py", title="Portfolio", icon="✨"),
-    ]
+    # Ce "sondage" d'admin AVANT st.navigation() peut être en retard d'un
+    # rerun sur le tout premier passage d'une session (même limite que pour
+    # le bloc compte plus bas) : la section Administration n'apparaît qu'au
+    # rerun suivant la connexion, jamais avant.
+    pages = {
+        "": [
+            st.Page(page_entretien, title="Compléter l'histoire", icon="📝",
+                    url_path="entretien", default=True),
+            st.Page(page_bibliotheque, title="Bibliothèque", icon="📚", url_path="bibliotheque"),
+            st.Page(page_lieux_hybrides, title="Lieux hybrides", icon="🏘️", url_path="lieux-hybrides"),
+            st.Page("pages/1_Observatoire.py", title="Observatoire", icon="📊"),
+            st.Page("pages/2_Portfolio.py", title="Portfolio", icon="✨"),
+        ],
+    }
+    user_id_sonde = st.session_state.get("user_id")
+    if user_id_sonde and _est_admin(_resolve_store(user_id_sonde), user_id_sonde):
+        pages["Compte"] = [
+            st.Page(page_administration, title="Administration", icon="⚙️", url_path="administration"),
+        ]
+
     pg = st.navigation(pages)
     pg.run()
 
+    # Barre latérale "compte" : rendue après pg.run() (pas avant), pour que
+    # user_id reflète bien ce que la page sélectionnée vient de résoudre via
+    # auth_screen() sur CE passage — le lire avant pg.run() affichait un
+    # instant sans bouton "Se déconnecter" ni email, le temps d'un rerun de
+    # rattrapage (LOCAL_DEV_AUTOLOGIN notamment, qui ne force pas de rerun).
     user_id = st.session_state.get("user_id")
     if user_id:
-        store = _resolve_store(user_id)
-        est_admin = _est_admin(store, user_id)
         with st.sidebar:
             if st.session_state.get("use_admin_store"):
                 st.warning("Mode admin local (LOCAL_DEV_AUTOLOGIN) — accès complet sans RLS.")
             st.caption(f"Connecté·e : {st.session_state.get('user_email') or user_id}")
-            if est_admin:
-                with st.expander("⚙️ Administration"):
-                    _rendre_isole("Administration", administration_tab, store, user_id)
             if st.button("Se déconnecter", use_container_width=True):
                 clear_session_cookie()
                 for key in ("user_id", "user_email", "otp_sent_to", "cookie_restore_failed",
