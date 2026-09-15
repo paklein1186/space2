@@ -38,6 +38,7 @@ from src.questionnaire.schema import Role
 DEFAULT_URL = "https://www.communecter.org/api/organization/get/key/tierslieuxbelgique"
 OWNER_ID_LOCAL = "import-communecter"
 NOTE_SECTION_TAGS = "import_communecter_tags"
+PAYS_PAR_CODE = {"BE": "Belgique", "FR": "France"}
 
 
 def _service_owner_id(store) -> str:
@@ -51,6 +52,12 @@ def _service_owner_id(store) -> str:
 
         return get_or_create_service_user(store.client, OWNER_ID_LOCAL)
     return OWNER_ID_LOCAL
+
+
+def _adresse_lisible(entity: dict) -> str:
+    addr = entity.get("address") or {}
+    parts = [addr.get("streetAddress", ""), addr.get("postalCode", ""), addr.get("addressLocality", "")]
+    return ", ".join(p.strip() for p in parts if p and p.strip())
 
 
 def _note_tags(entity: dict) -> str:
@@ -80,6 +87,37 @@ def merge_entity(store, owner_user_id: str, entity: dict, lieux_existants: dict)
         return None  # pas de lieu correspondant déjà recensé : on n'en crée pas ici
 
     contributeur = store.get_or_create_contributeur(owner_user_id, lieu.id, Role.AUTRE.value)
+
+    # CommunECter fournit une adresse structurée ET des coordonnées GPS
+    # précises pour chaque organisation — jamais exploitées jusqu'ici (seuls
+    # les tags l'étaient), alors que c'est une meilleure source que ce qu'un
+    # contributeur ou une extrapolation basique fourniraient. Jamais
+    # écrasé : uniquement les champs encore vides, même logique que
+    # import_csv_directory.py.
+    addr = entity.get("address") or {}
+    geo = entity.get("geo") or {}
+    pays = PAYS_PAR_CODE.get((addr.get("addressCountry") or "").strip().upper())
+    locality = (addr.get("addressLocality") or "").strip()
+    lat_brut, lon_brut = geo.get("latitude"), geo.get("longitude")
+
+    maj_lieu = {}
+    if pays and not lieu.pays:
+        maj_lieu["pays"] = pays
+    if locality and not lieu.region:
+        maj_lieu["region"] = locality
+    if lat_brut and not lieu.latitude:
+        maj_lieu["latitude"] = float(lat_brut)
+    if lon_brut and not lieu.longitude:
+        maj_lieu["longitude"] = float(lon_brut)
+    if maj_lieu:
+        store.update_tiers_lieu(lieu.id, **maj_lieu)
+
+    deja_repondu = store.get_answers(lieu.id, contributeur.id)
+    adresse_lisible = _adresse_lisible(entity)
+    if adresse_lisible and deja_repondu.get("adresse") is None:
+        store.save_answer(lieu.id, contributeur.id, "adresse", adresse_lisible)
+    if pays and deja_repondu.get("pays") is None:
+        store.save_answer(lieu.id, contributeur.id, "pays", pays)
 
     note_tags = _note_tags(entity)
     if note_tags:
