@@ -1040,10 +1040,30 @@ def rag_tab(store):
         st.rerun()
 
 
+def _garder_session_supabase_active(client) -> None:
+    """Le jeton d'accès Supabase (JWT) expire par défaut après ~1h. La
+    librairie rafraîchit automatiquement la session dans get_session() si
+    elle est expirée ou proche de l'être (via le refresh_token déjà posé en
+    cookie à la connexion) — mais seulement si get_session() est appelée.
+    Rien dans l'app ne l'appelait après la connexion initiale, donc un
+    onglet resté ouvert plus d'une heure voyait toute requête Supabase
+    suivante échouer avec "JWT expired" (PGRST303), constaté en production
+    sur la Bibliothèque. Appelé ici, à chaque résolution de store (donc à
+    chaque rendu de page), pour que ça n'arrive plus."""
+    try:
+        session = client.auth.get_session()
+    except Exception:
+        return
+    if session and session.refresh_token:
+        save_session_cookie(session.refresh_token)
+
+
 def _resolve_store(user_id: str):
     if st.session_state.get("use_admin_store"):
         return get_admin_store()
     supabase_client = st.session_state.get("supabase_client") if SUPABASE_CONFIGURED else None
+    if supabase_client is not None:
+        _garder_session_supabase_active(supabase_client)
     return get_store(client=supabase_client)
 
 
