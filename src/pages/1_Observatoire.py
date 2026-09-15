@@ -1,7 +1,13 @@
 """Page publique : statistiques quantitatives et qualitatives agrégées sur
 l'ensemble des lieux recensés. Aucune connexion requise — s'appuie sur les
 policies RLS publiques de lieu_derive/tiers_lieux/reponses non confidentielles
-(cf. migration_002_steward_and_liens.sql)."""
+(cf. migration_002_steward_and_liens.sql).
+
+Sélectionnée via st.Page dans src/app.py (menu de navigation unifié) : le
+set_page_config()/apply_theme()/load_dotenv() de app.py s'appliquent déjà
+avant que cette page ne s'exécute, donc pas besoin de les refaire ici — les
+répéter lèverait une erreur (set_page_config ne peut être appelé qu'une
+fois par run)."""
 
 from __future__ import annotations
 
@@ -12,16 +18,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import pandas as pd
 import streamlit as st
-from dotenv import load_dotenv
 
 from src.agent.rag_tools import lieux_enrichis_dataframe, reponses_long_dataframe
 from src.db.factory import get_store
 from src.questionnaire.schema import CATEGORIES_POSSIBLES
-from src.theme import apply_theme
-
-load_dotenv()
-st.set_page_config(page_title="Observatoire — Lieux hybrides et territoires", layout="wide")
-apply_theme()
 
 st.title("Observatoire des lieux hybrides et territoires")
 st.caption("Relevés statistiques, publics, sur l'ensemble des lieux recensés dans l'Annuaire.")

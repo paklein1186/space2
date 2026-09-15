@@ -1,7 +1,13 @@
 """Page publique : vitrine en lecture seule des lieux sélectionnés par un
 administrateur pour y présenter leur campagne de besoins. Aucune connexion
 requise — la curation (cocher "inclure au Portfolio", éditer la campagne) se
-fait depuis l'Annuaire, section Administration."""
+fait depuis l'Annuaire, section Administration.
+
+Sélectionnée via st.Page dans src/app.py (menu de navigation unifié) : le
+set_page_config()/apply_theme()/load_dotenv() de app.py s'appliquent déjà
+avant que cette page ne s'exécute, donc pas besoin de les refaire ici — les
+répéter lèverait une erreur (set_page_config ne peut être appelé qu'une
+fois par run)."""
 
 from __future__ import annotations
 
@@ -11,7 +17,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import streamlit as st
-from dotenv import load_dotenv
 
 from src.annuaire import (
     SECTIONS_SYNTHESE,
@@ -22,11 +27,6 @@ from src.annuaire import (
     vignette_html,
 )
 from src.db.factory import get_store
-from src.theme import apply_theme
-
-load_dotenv()
-st.set_page_config(page_title="Portfolio — Lieux hybrides et territoires", layout="wide")
-apply_theme()
 
 
 @st.dialog("Fiche du lieu", width="large")

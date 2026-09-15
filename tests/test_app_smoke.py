@@ -36,7 +36,10 @@ def main():
 
     page = str(at)
     check("Session bien auto-loguée en admin", "test-smoke@localhost" in page)
-    check("Les 3 onglets sont présents", all(t in page for t in ["Entretien", "Assistant RAG", "Annuaire"]))
+    check("Email affiché dans la barre latérale", any("test-smoke@localhost" in c.value for c in at.caption))
+    check("Bouton de déconnexion présent", any(b.label == "Se déconnecter" for b in at.button))
+    check("Section Administration présente (compte admin)",
+          any(e.label == "⚙️ Administration" for e in at.expander))
 
     print("\nTous les tests sont passés.")
 

@@ -56,6 +56,10 @@ code, pre, [data-testid="stMetricValue"], .stCode, [data-testid="stCaptionContai
   background: var(--sp-bg) !important; color: var(--sp-text) !important;
 }}
 [data-testid="stHeader"]{{ background: transparent !important; }}
+/* Barre basse fixe de st.chat_input (Entretien, Bibliothèque) : son
+   conteneur parent (sans data-testid propre) garde un fond blanc Streamlit
+   par défaut, visible derrière le champ pourtant transparent lui-même. */
+[data-testid="stBottomBlockContainer"]{{ background: var(--sp-bg) !important; }}
 [data-testid="stSidebar"]{{
   background: var(--sp-bg-sidebar) !important; border-right: 1px solid var(--sp-border-soft);
 }}
@@ -103,12 +107,37 @@ code, pre, [data-testid="stMetricValue"], .stCode, [data-testid="stCaptionContai
   border-color: var(--sp-border-soft) !important; border-radius: 10px !important;
   background: var(--sp-bg-elevated) !important;
 }}
+/* Le <summary> (en-tête cliquable) a son propre fond explicite par défaut
+   (gris très clair) qui recouvre celui du conteneur parent ci-dessus — sans
+   ceci, l'en-tête de chaque expander (ex. "⚙️ Administration") restait
+   illisible en thème sombre alors que son contenu, une fois déplié, était
+   déjà correctement sombre. */
+[data-testid="stExpander"] summary{{
+  background: var(--sp-bg-elevated) !important; color: var(--sp-text) !important;
+}}
 
 /* ---------- champs de saisie ---------- */
 [data-testid="stTextInput"] input, [data-testid="stTextArea"] textarea,
 [data-baseweb="select"] > div {{
   background: var(--sp-bg-elevated) !important; color: var(--sp-text) !important;
   border-color: var(--sp-border-soft) !important;
+}}
+
+/* ---------- menus déroulants (selectbox/multiselect) ---------- */
+/* Le popup d'options (BaseWeb) n'est PAS imbriqué dans stSidebar/stMain —
+   il se monte dans son propre portail — donc les règles ci-dessus ne
+   l'atteignent jamais : sans ceci, il gardait un fond blanc BaseWeb par
+   défaut, illisible/disparate sur le reste de l'interface en thème sombre. */
+[data-baseweb="popover"]{{ background: var(--sp-bg-elevated) !important; }}
+[data-testid="stSelectboxVirtualDropdown"]{{
+  background: var(--sp-bg-elevated) !important;
+}}
+[data-testid="stSelectboxVirtualDropdown"] li[role="option"]{{
+  background: var(--sp-bg-elevated) !important; color: var(--sp-text) !important;
+}}
+[data-testid="stSelectboxVirtualDropdown"] li[role="option"]:hover,
+[data-testid="stSelectboxVirtualDropdown"] li[aria-selected="true"]{{
+  background: var(--sp-border-soft) !important;
 }}
 
 /* ---------- alignement : boutons en colonne à largeur homogène ---------- */

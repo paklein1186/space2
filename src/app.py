@@ -80,6 +80,7 @@ def auth_screen() -> str | None:
         # get_admin_store() (clé service_role, contourne RLS) plutôt qu'un
         # client anonyme qui serait de toute façon rejeté par les policies.
         st.session_state["user_id"] = LOCAL_DEV_ADMIN_EMAIL
+        st.session_state["user_email"] = LOCAL_DEV_ADMIN_EMAIL
         st.session_state["use_admin_store"] = True
         return st.session_state["user_id"]
 
@@ -103,6 +104,7 @@ def auth_screen() -> str | None:
             submitted = st.form_submit_button("Continuer")
         if submitted and email:
             st.session_state["user_id"] = email
+            st.session_state["user_email"] = email
             save_session_cookie(email)
             st.rerun()
         return None
@@ -122,6 +124,7 @@ def auth_screen() -> str | None:
                 result = None
             if result and result.user:
                 st.session_state["user_id"] = result.user.id
+                st.session_state["user_email"] = result.user.email
                 if result.session and result.session.refresh_token:
                     save_session_cookie(result.session.refresh_token)
                 st.rerun()
@@ -174,6 +177,7 @@ def auth_screen() -> str | None:
         if result.user:
             st.session_state.pop("otp_sent_to", None)
             st.session_state["user_id"] = result.user.id
+            st.session_state["user_email"] = result.user.email
             if result.session and result.session.refresh_token:
                 save_session_cookie(result.session.refresh_token)
             st.rerun()
@@ -252,6 +256,7 @@ def contribution_selector(store, user_id: str):
 
 
 def entretien_tab(store, user_id: str):
+    st.title("Compléter l'histoire")
     nom_lieu, role = contribution_selector(store, user_id)
     if not nom_lieu:
         st.info("Choisissez ou créez un tiers-lieu ci-dessus pour démarrer.")
@@ -519,7 +524,8 @@ def _historique_et_moderation(store, lieu, contributeurs_lieu: list, est_admin: 
 
 
 def annuaire_tab(store, est_admin: bool, user_id: str):
-    st.subheader("Annuaire des lieux recensés")
+    st.title("Lieux hybrides")
+    st.caption("L'annuaire de l'ensemble des tiers-lieux recensés.")
     # Ordre alphabétique par défaut plutôt que l'ordre d'insertion en base,
     # peu significatif pour qui parcourt la liste.
     lieux = sorted(store.list_tiers_lieux(), key=lambda l: l.nom.lower())
@@ -802,7 +808,8 @@ def administration_tab(store, user_id: str) -> None:
 
 
 def rag_tab(store):
-    st.subheader("Assistant RAG")
+    st.title("Bibliothèque")
+    st.caption("Interrogez en langage naturel l'ensemble des lieux recensés et des documents déposés.")
     if not RAG_DISPONIBLE:
         st.info(
             "VOYAGE_API_KEY n'est pas configuré (voir .env.example) : l'assistant "
@@ -828,7 +835,7 @@ def rag_tab(store):
             # ne doit jamais faire planter tout le script (et donc les autres
             # onglets, qui s'exécutent dans le même passage) pour un onglet
             # secondaire.
-            st.error(f"Assistant RAG temporairement indisponible : {exc}")
+            st.error(f"Bibliothèque temporairement indisponible : {exc}")
             return
 
     for speaker, text in st.session_state["rag_history"]:
@@ -856,55 +863,104 @@ def rag_tab(store):
         st.rerun()
 
 
-def main():
+def _resolve_store(user_id: str):
+    if st.session_state.get("use_admin_store"):
+        return get_admin_store()
+    supabase_client = st.session_state.get("supabase_client") if SUPABASE_CONFIGURED else None
+    return get_store(client=supabase_client)
+
+
+def _est_admin(store, user_id: str) -> bool:
+    # En LOCAL_DEV_AUTOLOGIN, le store est déjà admin (service_role) : pas de
+    # table `admins` à consulter, l'accès complet est déjà acquis par construction.
+    return bool(st.session_state.get("use_admin_store")) or store.is_admin(user_id)
+
+
+def _rendre_isole(nom_page: str, fonction, *args) -> None:
+    # Chaque page est rendue défensivement : une erreur y reste locale,
+    # affichée sur place, sans jamais empêcher les autres pages de
+    # fonctionner normalement (héritage de l'ancien découpage en onglets,
+    # où st.tabs() exécutait tout dans le même passage de script — avec
+    # st.navigation(), chaque page a déjà son propre passage isolé, mais on
+    # garde ce filet dans le doute plutôt que de laisser une trace brute).
+    try:
+        fonction(*args)
+    except Exception as exc:
+        st.error(f"« {nom_page} » a rencontré une erreur : {exc}")
+
+
+# --- Pages nécessitant une connexion : chacune vérifie l'authentification
+# elle-même (auth_screen() est idempotent — renvoie immédiatement l'id déjà
+# en session_state si une page précédente s'est déjà authentifiée) plutôt que
+# de la gater au niveau de st.navigation(), pour qu'Observatoire et Portfolio
+# restent accessibles sans connexion dans le même menu de navigation.
+
+def page_entretien() -> None:
     user_id = auth_screen()
     if not user_id:
         return
+    store = _resolve_store(user_id)
+    _rendre_isole("Compléter l'histoire", entretien_tab, store, user_id)
 
-    if st.session_state.get("use_admin_store"):
-        store = get_admin_store()
-        st.sidebar.warning("Mode admin local (LOCAL_DEV_AUTOLOGIN) — accès complet sans RLS.")
-    else:
-        supabase_client = st.session_state.get("supabase_client") if SUPABASE_CONFIGURED else None
-        store = get_store(client=supabase_client)
 
-    if st.sidebar.button("Se déconnecter", use_container_width=True):
-        clear_session_cookie()
-        for key in ("user_id", "otp_sent_to", "cookie_restore_failed", "use_admin_store", "supabase_client"):
-            st.session_state.pop(key, None)
-        st.rerun()
+def page_bibliotheque() -> None:
+    user_id = auth_screen()
+    if not user_id:
+        return
+    store = _resolve_store(user_id)
+    _rendre_isole("Bibliothèque", rag_tab, store)
 
-    # En LOCAL_DEV_AUTOLOGIN, le store est déjà admin (service_role) : pas de
-    # table `admins` à consulter, l'accès complet est déjà acquis par construction.
-    est_admin = bool(st.session_state.get("use_admin_store")) or store.is_admin(user_id)
 
-    onglets = ["Entretien", "Assistant RAG", "Annuaire"]
-    if est_admin:
-        onglets.append("Administration")
-    tabs = st.tabs(onglets)
+def page_lieux_hybrides() -> None:
+    user_id = auth_screen()
+    if not user_id:
+        return
+    store = _resolve_store(user_id)
+    est_admin = _est_admin(store, user_id)
+    _rendre_isole("Lieux hybrides", annuaire_tab, store, est_admin, user_id)
 
-    # `st.tabs` ne crée pas de contextes d'exécution isolés : tous les onglets
-    # sont rendus dans le même passage de script. Un bug non intercepté dans
-    # UN SEUL onglet (ex. RAG) arrêterait sinon tout le script avant même
-    # d'atteindre les onglets suivants — l'Annuaire pourrait ainsi sembler
-    # "vide" alors que le vrai problème est ailleurs. Chaque onglet est donc
-    # rendu défensivement : une erreur y reste locale, affichée sur place,
-    # sans jamais empêcher les autres de s'afficher normalement.
-    def _rendre_isole(nom_onglet: str, fonction, *args) -> None:
-        try:
-            fonction(*args)
-        except Exception as exc:
-            st.error(f"L'onglet « {nom_onglet} » a rencontré une erreur : {exc}")
 
-    with tabs[0]:
-        _rendre_isole("Entretien", entretien_tab, store, user_id)
-    with tabs[1]:
-        _rendre_isole("Assistant RAG", rag_tab, store)
-    with tabs[2]:
-        _rendre_isole("Annuaire", annuaire_tab, store, est_admin, user_id)
-    if est_admin:
-        with tabs[3]:
-            _rendre_isole("Administration", administration_tab, store, user_id)
+def main():
+    # Barre latérale "compte" : rendue une fois, avant st.navigation(), pour
+    # apparaître sur toutes les pages (pas seulement celle sélectionnée).
+    # Administration y vit en expander plutôt qu'en page à part entière —
+    # réservée aux admins, elle n'a pas sa place dans le menu général à côté
+    # de Compléter l'histoire / Bibliothèque / Lieux hybrides.
+    #
+    # pg.run() s'exécute AVANT ce bloc compte plutôt qu'après : sur le tout
+    # premier passage d'une session (LOCAL_DEV_AUTOLOGIN, ou restauration de
+    # cookie sans rerun explicite), user_id n'existe pas encore en
+    # session_state tant que la page sélectionnée n'a pas elle-même appelé
+    # auth_screen() — le lire avant pg.run() affichait un instant sans
+    # bouton "Se déconnecter" ni email, le temps d'un rerun de rattrapage.
+    pages = [
+        st.Page(page_entretien, title="Compléter l'histoire", icon="📝",
+                url_path="entretien", default=True),
+        st.Page(page_bibliotheque, title="Bibliothèque", icon="📚", url_path="bibliotheque"),
+        st.Page(page_lieux_hybrides, title="Lieux hybrides", icon="🏘️", url_path="lieux-hybrides"),
+        st.Page("pages/1_Observatoire.py", title="Observatoire", icon="📊"),
+        st.Page("pages/2_Portfolio.py", title="Portfolio", icon="✨"),
+    ]
+    pg = st.navigation(pages)
+    pg.run()
+
+    user_id = st.session_state.get("user_id")
+    if user_id:
+        store = _resolve_store(user_id)
+        est_admin = _est_admin(store, user_id)
+        with st.sidebar:
+            if st.session_state.get("use_admin_store"):
+                st.warning("Mode admin local (LOCAL_DEV_AUTOLOGIN) — accès complet sans RLS.")
+            st.caption(f"Connecté·e : {st.session_state.get('user_email') or user_id}")
+            if est_admin:
+                with st.expander("⚙️ Administration"):
+                    _rendre_isole("Administration", administration_tab, store, user_id)
+            if st.button("Se déconnecter", use_container_width=True):
+                clear_session_cookie()
+                for key in ("user_id", "user_email", "otp_sent_to", "cookie_restore_failed",
+                            "use_admin_store", "supabase_client"):
+                    st.session_state.pop(key, None)
+                st.rerun()
 
 
 if __name__ == "__main__":
