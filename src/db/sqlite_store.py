@@ -340,6 +340,12 @@ class SqliteStore(Store):
         ).fetchall()
         return [dict(r) for r in rows]
 
+    def get_notes_by_section_id(self, section_id: str) -> list:
+        rows = self.conn.execute(
+            "select * from notes_libres where section_id = ? order by id", (section_id,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
     def update_free_text_note(self, note_id: str, texte: str) -> None:
         self.conn.execute("update notes_libres set texte = ? where id = ?", (texte, note_id))
         self.conn.commit()

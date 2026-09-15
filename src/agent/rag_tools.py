@@ -145,6 +145,30 @@ def lieux_enrichis_dataframe(store: Store) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def bonnes_pratiques_dataframe(store: Store) -> pd.DataFrame:
+    """Retours d'expérience concrets et comparables entre lieux (montages
+    financiers, partenariats, dispositifs de gouvernance...), capturés par
+    l'agent d'entretien via `save_free_text_note(section_id="bonne_pratique")`
+    quand un répondant mentionne un résultat chiffré ou nommé — voir la règle
+    dédiée dans collecte_agent.SYSTEM_PROMPT. Conçu pour les échanges
+    d'expérience entre lieux via la Bibliothèque, distinct des notes libres
+    génériques (anecdotes, ressenti) qui ne sont pas exposées ici."""
+    notes = store.get_notes_by_section_id("bonne_pratique")
+    if not notes:
+        return pd.DataFrame(columns=["tiers_lieu", "pays", "region", "texte"])
+    lieux = {lieu.id: lieu for lieu in store.list_tiers_lieux()}
+    rows = []
+    for note in notes:
+        lieu = lieux.get(note["tiers_lieu_id"])
+        rows.append({
+            "tiers_lieu": lieu.nom if lieu else None,
+            "pays": lieu.pays if lieu else None,
+            "region": lieu.region if lieu else None,
+            "texte": note["texte"],
+        })
+    return pd.DataFrame(rows)
+
+
 def _rendre_hashable(df: pd.DataFrame) -> pd.DataFrame:
     """Convertit toute colonne contenant des valeurs liste (ex. réponse à un
     champ multi_choice) en chaîne jointe — pandas a besoin de valeurs
@@ -195,6 +219,17 @@ class RagToolHandler:
                              "elles sont connues (~37 lieux, via l'import CommunECter) — colonnes tiers_lieux, "
                              "jamais posées comme question du questionnaire donc absentes de reponses_tiers_lieux."),
         })
+        datasets.append({
+            "name": "bonnes_pratiques",
+            "type": "notes",
+            "columns": ["tiers_lieu", "pays", "region", "texte"],
+            "description": ("Retours d'expérience concrets et comparables entre lieux (montages financiers, "
+                             "partenariats, dispositifs de gouvernance, pivots de modèle économique...), "
+                             "recueillis par l'agent d'entretien quand un répondant mentionne un résultat "
+                             "chiffré ou nommé. À utiliser en priorité pour répondre à une question du type "
+                             "\"comment tel lieu a-t-il fait pour...\" ou pour un partage d'expérience entre "
+                             "lieux — plus précis que le résumé général de lieux_enrichis sur ce type de sujet."),
+        })
         return {"datasets": datasets, "geodata": geodata}
 
     def _load_dataframe(self, dataset_name: str) -> Optional[pd.DataFrame]:
@@ -202,6 +237,8 @@ class RagToolHandler:
             return reponses_long_dataframe(self.store)
         if dataset_name == "lieux_enrichis":
             return lieux_enrichis_dataframe(self.store)
+        if dataset_name == "bonnes_pratiques":
+            return bonnes_pratiques_dataframe(self.store)
         catalog = _load_catalog()
         entry = catalog.get("datasets", {}).get(dataset_name)
         if not entry:

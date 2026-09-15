@@ -37,8 +37,12 @@ def section_is_active(section: Section, answers: dict) -> bool:
     return section.condition.evaluate(answers)
 
 
-def field_is_active(f: Field, answers: dict, role: Role) -> bool:
-    if not f.allowed_for(role):
+def field_is_active(f: Field, answers: dict, role: Optional[Role]) -> bool:
+    """`role=None` ignore la restriction de rôle (traite le champ comme actif
+    pour n'importe qui) — utilisé pour une vue agrégée tous-rôles-confondus,
+    par exemple la complétion d'un lieu dont les réponses viennent de
+    plusieurs contributeurs de rôles différents."""
+    if role is not None and not f.allowed_for(role):
         return False
     if f.condition is None:
         return True
@@ -78,6 +82,53 @@ def next_incomplete_section(module: Module, answers: dict, role: Role, country_c
 def module_is_complete(module: Module, answers: dict, role: Role, country_code: Optional[str],
                         completed_section_ids: set) -> bool:
     return next_incomplete_section(module, answers, role, country_code, completed_section_ids) is None
+
+
+def completion_stats(answers: dict, role: Optional[Role], country_code: Optional[str]) -> dict:
+    """Taux de complétion du questionnaire pour cet état de réponses : parmi
+    les champs actuellement ACTIFS (compte tenu du rôle, du pays, et des
+    branches conditionnelles déjà révélées par les réponses données), quelle
+    proportion a une réponse. Un champ dont la condition n'est pas encore
+    remplie ne compte pas dans le total — il ne pénalise pas le répondant
+    pour une branche qui ne le concerne pas (ou pas encore).
+
+    Volontairement basé sur TOUS les champs actifs (pas seulement les
+    champs requis) : la demande est une mesure de profondeur ("à quel degré
+    de profondeur" un lieu a été complété), pas juste de savoir si le
+    minimum obligatoire est rempli.
+
+    `role=None` (vue admin) agrège tous rôles confondus : les réponses d'un
+    lieu proviennent typiquement de plusieurs contributeurs de rôles
+    différents (voir Store.get_answers, vue fusionnée), donc restreindre à
+    UN rôle sous-compterait les champs réservés aux autres.
+    """
+    total = 0
+    repondus = 0
+    par_module = []
+    for module in QUESTIONNAIRE:
+        m_total = 0
+        m_repondus = 0
+        for section in module.sections:
+            if not section_is_active(section, answers):
+                continue
+            for f in section.fields:
+                if not field_is_active(f, answers, role):
+                    continue
+                m_total += 1
+                if answers.get(f.id) is not None:
+                    m_repondus += 1
+        par_module.append({
+            "module_id": module.id, "titre": module.title,
+            "total": m_total, "repondus": m_repondus,
+            "pourcentage": round(100 * m_repondus / m_total) if m_total else 0,
+        })
+        total += m_total
+        repondus += m_repondus
+    return {
+        "total": total, "repondus": repondus,
+        "pourcentage": round(100 * repondus / total) if total else 0,
+        "par_module": par_module,
+    }
 
 
 def next_module(current_module_id: Optional[str]) -> Optional[Module]:

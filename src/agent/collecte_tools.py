@@ -67,7 +67,15 @@ TOOL_DEFINITIONS = [
             "type": "object",
             "properties": {
                 "texte": {"type": "string"},
-                "section_id": {"type": "string", "description": "section en cours, si pertinent"},
+                "section_id": {
+                    "type": "string",
+                    "description": (
+                        "section en cours, si pertinent. Utiliser \"bonne_pratique\" à la place "
+                        "quand le texte capturé est un retour d'expérience concret et réutilisable "
+                        "par un autre lieu (montage financier, partenariat, dispositif de "
+                        "gouvernance...), plutôt qu'une anecdote générique."
+                    ),
+                },
             },
             "required": ["texte"],
         },

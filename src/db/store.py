@@ -167,6 +167,15 @@ class Store(ABC):
     def get_free_text_notes(self, tiers_lieu_id: str) -> list: ...
 
     @abstractmethod
+    def get_notes_by_section_id(self, section_id: str) -> list:
+        """Notes libres tous lieux confondus portant ce `section_id` — utilisé
+        pour retrouver les retours d'expérience taggués "bonne_pratique" par
+        l'agent d'entretien (voir collecte_agent.SYSTEM_PROMPT), indépendamment
+        du lieu, pour les exposer à la Bibliothèque comme un jeu de données
+        comparable entre lieux."""
+        ...
+
+    @abstractmethod
     def update_free_text_note(self, note_id: str, texte: str) -> None:
         """Édite le texte d'une note libre existante (import ou saisie
         conversationnelle) — utilisé par la vue admin "Données brutes"."""

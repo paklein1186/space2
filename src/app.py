@@ -36,6 +36,7 @@ from src.auth_session import clear_session_cookie, read_session_cookie, save_ses
 from src.db.factory import get_admin_store, get_store
 from src.db.store import Litige
 from src.i18n import language_toggle, t
+from src.questionnaire.resolver import completion_stats, country_code_for
 from src.questionnaire.schema import QUESTIONNAIRE, CATEGORIES_POSSIBLES, Role, all_fields
 from src.theme import apply_theme
 from src.voice_input import bouton_dictee, consume_voice_transcript
@@ -270,6 +271,22 @@ def contribution_selector(store, user_id: str):
     return nom_lieu, role
 
 
+def _maj_completion(store, state: dict) -> None:
+    """Recalcule et stocke le % de complétion dans `state`, appelé une seule
+    fois par tour de conversation (pas à chaque re-render de la page) — même
+    logique que la résolution de tiers_lieu/contributeur juste au-dessus :
+    un `get_answers` de plus par tour est négligeable à côté de l'appel LLM
+    qui vient de se produire, mais en ajouter un à chaque rerun de la page
+    (bien plus fréquent) réintroduirait exactement la lenteur déjà corrigée
+    ailleurs dans cet onglet."""
+    tiers_lieu_id = state["tiers_lieu_id"]
+    contributeur_id = state["contributeur_id"]
+    answers = store.get_answers(tiers_lieu_id, contributeur_id)
+    role = Role(state["role"])
+    country_code = country_code_for(answers.get("pays"))
+    state["completion"] = completion_stats(answers, role, country_code)
+
+
 def entretien_tab(store, user_id: str):
     st.title(t("entretien.title"))
     nom_lieu, role = contribution_selector(store, user_id)
@@ -335,7 +352,10 @@ def entretien_tab(store, user_id: str):
         handler = CollecteToolHandler(store, tiers_lieu.id, contributeur.id, session, Role(role),
                                        mode_entretien=mode_entretien)
         agent = CollecteAgent(handler, store=store, tiers_lieu_id=tiers_lieu.id)
-        st.session_state[session_key] = {"agent": agent, "history": []}
+        st.session_state[session_key] = {
+            "agent": agent, "history": [],
+            "tiers_lieu_id": tiers_lieu.id, "contributeur_id": contributeur.id, "role": role,
+        }
         # Premier appel LLM (résumé d'ouverture) : sans spinner, la page
         # restait visuellement figée le temps de cet appel (plusieurs
         # secondes), juste après avoir choisi/créé le lieu — perçu comme un
@@ -347,8 +367,16 @@ def entretien_tab(store, user_id: str):
                 mode_entretien=mode_entretien,
             ))
         st.session_state[session_key]["history"].append(("assistant", opening))
+        _maj_completion(store, st.session_state[session_key])
 
     state = st.session_state[session_key]
+    completion = state.get("completion")
+    if completion:
+        st.progress(
+            completion["pourcentage"] / 100,
+            text=f"Entretien complété à {completion['pourcentage']}% "
+                 f"({completion['repondus']}/{completion['total']} questions actives)",
+        )
     for speaker, text in state["history"]:
         with st.chat_message(speaker):
             st.write(text)
@@ -371,6 +399,7 @@ def entretien_tab(store, user_id: str):
         with st.spinner("L'agent réfléchit..."):
             reply = state["agent"].send(reponse_en_attente)
         state["history"].append(("assistant", reply))
+        _maj_completion(store, state)
         state["reponse_en_attente"] = None
         st.rerun()
 
@@ -1052,6 +1081,33 @@ def administration_tab(store, user_id: str) -> None:
                     st.warning(message + f" {len(erreurs)} erreur(s) :\n" + "\n".join(erreurs))
                 else:
                     st.success(message)
+
+    with st.expander("Complétion des lieux (profondeur du questionnaire)", expanded=False):
+        st.caption(
+            "Pour chaque lieu, part des questions actuellement actives (tous rôles confondus, "
+            "compte tenu du pays et des branches déjà révélées par les réponses) qui ont une "
+            "réponse — mesure la profondeur du recensement, pas seulement le minimum obligatoire."
+        )
+        tous_les_lieux_completion = sorted(store.list_tiers_lieux(), key=lambda l: l.nom.lower())
+        if not tous_les_lieux_completion:
+            st.caption("Aucun lieu recensé pour l'instant.")
+        else:
+            lignes_completion = []
+            for lieu in tous_les_lieux_completion:
+                answers = store.get_answers(lieu.id)
+                country_code = country_code_for(answers.get("pays") or lieu.pays)
+                stats = completion_stats(answers, None, country_code)
+                lignes_completion.append({
+                    "Lieu": lieu.nom, "Complétion": stats["pourcentage"],
+                    "Questions répondues": f"{stats['repondus']}/{stats['total']}",
+                })
+            st.dataframe(
+                pd.DataFrame(lignes_completion).sort_values("Complétion"),
+                use_container_width=True, hide_index=True,
+                column_config={"Complétion": st.column_config.ProgressColumn(
+                    "Complétion", min_value=0, max_value=100, format="%d%%",
+                )},
+            )
 
     with st.expander("Schéma de l'entretien (lecture seule)", expanded=False):
         for module in QUESTIONNAIRE:

@@ -142,6 +142,7 @@ create table if not exists llm_calls (
 
 create index if not exists idx_reponses_tiers_lieu on reponses(tiers_lieu_id);
 create index if not exists idx_notes_libres_tiers_lieu on notes_libres(tiers_lieu_id);
+create index if not exists idx_notes_libres_section on notes_libres(section_id);
 create index if not exists idx_sessions_contributeur on sessions_entretien(contributeur_id);
 create index if not exists idx_journal_tiers_lieu on journal_modifications(tiers_lieu_id, cree_le desc);
 create index if not exists idx_litiges_tiers_lieu on litiges(tiers_lieu_id);

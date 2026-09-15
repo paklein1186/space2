@@ -243,6 +243,13 @@ class SupabaseStore(Store):
         )
         return result.data
 
+    def get_notes_by_section_id(self, section_id: str) -> list:
+        result = (
+            self.client.table("notes_libres").select("*")
+            .eq("section_id", section_id).order("id").execute()
+        )
+        return result.data
+
     def update_free_text_note(self, note_id: str, texte: str) -> None:
         self.client.table("notes_libres").update({"texte": texte}).eq("id", note_id).execute()
 
