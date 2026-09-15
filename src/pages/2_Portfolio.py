@@ -20,6 +20,7 @@ import streamlit as st
 
 from src.annuaire import (
     SECTIONS_SYNTHESE,
+    besoins_chips_html,
     category_chips_html,
     default_visual,
     photo_html,
@@ -50,6 +51,8 @@ def _fiche_publique_dialog(lieu, derive) -> None:
         st.caption(f"{lieu.pays or ''} — {lieu.region or ''}")
         if donnees.get("categories"):
             st.markdown(category_chips_html(donnees["categories"]), unsafe_allow_html=True)
+        if derive and derive.besoins_mis_en_avant:
+            st.markdown(besoins_chips_html(derive.besoins_mis_en_avant), unsafe_allow_html=True)
 
     if derive and derive.campagne_texte:
         st.divider()
@@ -151,6 +154,8 @@ for i in range(0, len(lieux_affiches), cols_par_ligne):
                     st.markdown(vignette_html(emoji, couleur), unsafe_allow_html=True)
                 if donnees.get("categories"):
                     st.markdown(category_chips_html(donnees["categories"]), unsafe_allow_html=True)
+                if derive and derive.besoins_mis_en_avant:
+                    st.markdown(besoins_chips_html(derive.besoins_mis_en_avant), unsafe_allow_html=True)
                 if st.button(lieu.nom, key=f"open_portfolio_{lieu.id}", use_container_width=True):
                     st.session_state["portfolio_open_lieu_id"] = lieu.id
                     st.rerun()

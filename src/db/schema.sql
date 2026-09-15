@@ -79,6 +79,7 @@ create table if not exists lieu_derive (
     campagne_texte text,             -- appel/campagne de besoins (Portfolio public)
     campagne_objectif text,
     campagne_contact text,
+    besoins_mis_en_avant jsonb not null default '[]'::jsonb,  -- sous-ensemble de types_soutien_souhaites choisi par le steward/admin, affiché publiquement
     genere_le timestamptz not null default now()
 );
 

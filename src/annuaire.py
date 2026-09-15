@@ -103,6 +103,22 @@ def category_chips_html(categories: list) -> str:
     return f'<div style="margin:4px 0;">{chips}</div>'
 
 
+def besoins_chips_html(besoins: list) -> str:
+    """Besoins mis en avant par le steward/admin (lieu_derive.besoins_mis_en_
+    avant, sous-ensemble curé de types_soutien_souhaites) — couleur distincte
+    des catégories (ambre plutôt que la palette par thème) pour se lire
+    comme un appel plutôt qu'une classification."""
+    if not besoins:
+        return ""
+    chips = "".join(
+        f'<span style="background:#D97706;color:#fff;font-size:0.72rem;'
+        f'padding:2px 8px;border-radius:10px;margin-right:4px;display:inline-block;'
+        f'margin-bottom:4px;">📣 {b}</span>'
+        for b in besoins
+    )
+    return f'<div style="margin:4px 0;">{chips}</div>'
+
+
 _LABELS_BY_FIELD_ID = {f.id: f.label for _, _, f in all_fields()}
 
 # Ordre et libellés d'affichage des sections homogénéisées de l'Annuaire —
@@ -217,6 +233,8 @@ def render_fiche_header(lieu, derive, nombre_contributeurs: int | None = None) -
         )
         if donnees.get("categories"):
             st.markdown(category_chips_html(donnees["categories"]), unsafe_allow_html=True)
+        if derive and derive.besoins_mis_en_avant:
+            st.markdown(besoins_chips_html(derive.besoins_mis_en_avant), unsafe_allow_html=True)
         if derive:
             st.write(donnees.get("resume", ""))
             if derive.lien_externe:

@@ -82,6 +82,7 @@ create table if not exists lieu_derive (
     campagne_texte text,
     campagne_objectif text,
     campagne_contact text,
+    besoins_mis_en_avant text not null default '[]',
     genere_le text not null default (datetime('now'))
 );
 create table if not exists admins (
@@ -471,6 +472,13 @@ class SqliteStore(Store):
         )
         self.conn.commit()
 
+    def update_besoins_mis_en_avant(self, tiers_lieu_id: str, besoins: list) -> None:
+        self.conn.execute(
+            "update lieu_derive set besoins_mis_en_avant = ? where tiers_lieu_id = ?",
+            (json.dumps(besoins, ensure_ascii=False), tiers_lieu_id),
+        )
+        self.conn.commit()
+
     def list_lieux_portfolio(self) -> list:
         rows = self.conn.execute(
             "select tiers_lieu_id from lieu_derive where inclus_portfolio = 1"
@@ -645,6 +653,7 @@ def _lieu_derive_from_row(data: dict) -> LieuDerive:
         campagne_texte=data["campagne_texte"],
         campagne_objectif=data["campagne_objectif"],
         campagne_contact=data["campagne_contact"],
+        besoins_mis_en_avant=json.loads(data["besoins_mis_en_avant"]) if data.get("besoins_mis_en_avant") else [],
         genere_le=data["genere_le"],
     )
 

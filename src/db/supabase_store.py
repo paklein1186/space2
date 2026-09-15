@@ -361,6 +361,11 @@ class SupabaseStore(Store):
             "campagne_contact": campagne_contact,
         }).eq("tiers_lieu_id", tiers_lieu_id).execute()
 
+    def update_besoins_mis_en_avant(self, tiers_lieu_id: str, besoins: list) -> None:
+        self.client.table("lieu_derive").update({
+            "besoins_mis_en_avant": besoins,
+        }).eq("tiers_lieu_id", tiers_lieu_id).execute()
+
     def list_lieux_portfolio(self) -> list:
         try:
             derive_rows = (

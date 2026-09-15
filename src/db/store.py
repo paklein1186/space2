@@ -63,6 +63,10 @@ class LieuDerive:
     campagne_texte: Optional[str] = None
     campagne_objectif: Optional[str] = None
     campagne_contact: Optional[str] = None
+    # Sous-ensemble de types_soutien_souhaites choisi par le steward/admin
+    # pour l'affichage public (Annuaire + Portfolio) — distinct de la liste
+    # brute déclarée à l'entretien, qui peut être longue et non filtrée.
+    besoins_mis_en_avant: list = field(default_factory=list)
     genere_le: Optional[str] = None
 
 
@@ -272,6 +276,14 @@ class Store(ABC):
     def update_portfolio_entry(self, tiers_lieu_id: str, inclus_portfolio: bool,
                                 campagne_texte: Optional[str], campagne_objectif: Optional[str],
                                 campagne_contact: Optional[str]) -> None: ...
+
+    @abstractmethod
+    def update_besoins_mis_en_avant(self, tiers_lieu_id: str, besoins: list) -> None:
+        """Remplace la liste des besoins mis en avant publiquement pour ce
+        lieu (sous-ensemble choisi par un steward/admin de types_soutien_
+        souhaites) — n'affecte jamais donnees/sources (cycle d'enrichissement
+        automatique), comme campagne_texte et les autres champs curés."""
+        ...
 
     @abstractmethod
     def list_lieux_portfolio(self) -> list:
