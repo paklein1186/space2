@@ -116,6 +116,26 @@ def fetch_page_text(url: str) -> str:
     return texte[:MAX_TEXTE_BRUT]
 
 
+def fetch_page_text_complet(url: str) -> str:
+    """Comme fetch_page_text, mais SANS tronquer à MAX_TEXTE_BRUT et en
+    conservant une frontière de paragraphe par ligne (chaque ligne non vide
+    devient un paragraphe séparé par une ligne blanche) — nécessaire à
+    chunk_text pour découper correctement. À réserver à l'ingestion d'un
+    document long (rapport, guide) : fetch_page_text seule, en résumant en
+    quelques phrases un texte tronqué à 8000 caractères, avait réduit un
+    rapport de 179 000 caractères documentant 23 accompagnements individuels
+    à un unique paragraphe global — perdant l'essentiel du détail."""
+    url = _normaliser_url(url)
+    response = requests.get(url, timeout=TIMEOUT_S, headers={"User-Agent": USER_AGENT})
+    response.raise_for_status()
+    soup = BeautifulSoup(response.text, "html.parser")
+    for tag in soup(["script", "style", "nav", "footer", "noscript"]):
+        tag.decompose()
+    texte = soup.get_text(separator="\n")
+    lignes = [re.sub(r"[ \t]+", " ", l).strip() for l in texte.split("\n")]
+    return "\n\n".join(l for l in lignes if l)
+
+
 def extraire_texte_fichier(uploaded_file) -> str:
     """Texte brut d'un fichier déposé via st.file_uploader (txt/docx/pdf) —
     réutilise l'extraction déjà écrite pour l'ingestion admin (loaders.py),
@@ -227,6 +247,50 @@ def ajouter_connaissance(store: Store, texte_brut: str, source_label: str,
     except Exception as exc:
         return f"erreur: {type(exc).__name__}: {exc}"
     return "ajoute"
+
+
+def ajouter_connaissance_longue(store: Store, texte_complet: str, source_label: str,
+                                 doc_type: str = "connaissance_bibliotheque") -> dict:
+    """Découpe `texte_complet` en chunks (même mécanisme que l'indexation
+    des documents déposés dans data/raw/, voir ingest/chunking.py) et les
+    embedde tels quels, sans résumé intermédiaire. Contrairement à
+    `ajouter_connaissance` (pensée pour une page web courte, réduite à
+    quelques phrases), celle-ci préserve le détail d'un document long —
+    vécu : un rapport de 179 000 caractères documentant 23 accompagnements
+    individuels distincts, réduit par l'autre chemin à un unique paragraphe
+    global, avait perdu tout le détail nominatif par lieu. Renvoie
+    {"chunks": n} ou {"erreur": ...}."""
+    from datetime import datetime, timezone
+    from hashlib import sha256
+
+    from ..ingest.chunking import chunk_text
+    from .embeddings import VoyageEmbedder
+    from .vectorstore import ChromaStore
+
+    texte_complet = (texte_complet or "").strip()
+    if not texte_complet:
+        return {"chunks": 0}
+
+    chunks = chunk_text(texte_complet, metadata={
+        "doc_type": doc_type, "source_file": source_label,
+        "date_ajout": datetime.now(timezone.utc).isoformat(),
+    })
+    if not chunks:
+        return {"chunks": 0}
+    try:
+        embedder = VoyageEmbedder()
+        embeddings = embedder.embed_documents([c.text for c in chunks])
+        # Id stable par source + position : ré-ingérer le même lien met à
+        # jour ses chunks (upsert) plutôt que d'en créer des doublons.
+        source_hash = sha256(source_label.encode("utf-8")).hexdigest()[:12]
+        ids = [f"connaissance_longue_{source_hash}_{c.metadata['chunk_index']}" for c in chunks]
+        ChromaStore().upsert(
+            ids=ids, embeddings=embeddings,
+            documents=[c.text for c in chunks], metadatas=[c.metadata for c in chunks],
+        )
+    except Exception as exc:
+        return {"erreur": f"{type(exc).__name__}: {exc}"}
+    return {"chunks": len(chunks)}
 
 
 def dernier_ajout_connaissance(doc_type: str) -> str | None:

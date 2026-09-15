@@ -1423,32 +1423,34 @@ def administration_tab(store, user_id: str) -> None:
         st.divider()
         st.markdown("**Ajouter une connaissance depuis un lien**")
         st.caption(
-            "Pour une recherche ponctuelle sur un sujet : trouvez la page vous-même (Google, un "
-            "site spécialisé...) et collez son lien ici — analysé et versé dans la base de "
-            "connaissances générale, comme le crawl ci-dessus."
+            "Pour une recherche ponctuelle sur un sujet, ou un document long (rapport, guide) : "
+            "trouvez la page ou le document vous-même (Google, un Google Docs partagé, un site "
+            "spécialisé...) et collez son lien ici. Découpé en plusieurs passages plutôt que réduit "
+            "à un seul résumé — un rapport détaillant plusieurs cas garde le détail de chacun, "
+            "cherchable individuellement, au lieu d'être noyé dans une synthèse globale."
         )
         url_connaissance = st.text_input("URL à analyser", key="admin_connaissance_url")
         if st.button("Analyser et ajouter") and url_connaissance.strip():
-            from src.agent.web_crawl import ajouter_connaissance, fetch_page_text
+            from src.agent.web_crawl import ajouter_connaissance_longue, fetch_page_text_complet
 
             url_connaissance = url_connaissance.strip()
             try:
-                with st.spinner("Récupération de la page..."):
-                    texte_brut = fetch_page_text(url_connaissance)
+                with st.spinner("Récupération du document..."):
+                    texte_complet = fetch_page_text_complet(url_connaissance)
             except Exception as exc:
-                st.error(f"Impossible de récupérer cette page : {exc}")
-                texte_brut = None
-            if texte_brut:
-                with st.spinner("Analyse et ajout à la base de connaissances..."):
-                    statut = ajouter_connaissance(
-                        admin_store, texte_brut, f"une recherche ponctuelle ({url_connaissance})",
+                st.error(f"Impossible de récupérer ce document : {exc}")
+                texte_complet = None
+            if texte_complet:
+                with st.spinner("Découpage et ajout à la base de connaissances..."):
+                    resultat = ajouter_connaissance_longue(
+                        admin_store, texte_complet, f"une recherche ponctuelle ({url_connaissance})",
                     )
-                if statut == "ajoute":
-                    st.success("Ajouté à la base de connaissances.")
-                elif statut == "rien_d_utile":
-                    st.info("Rien d'exploitable n'a été trouvé sur cette page.")
+                if resultat.get("erreur"):
+                    st.error(resultat["erreur"])
+                elif resultat.get("chunks"):
+                    st.success(f"Ajouté à la base de connaissances : {resultat['chunks']} passage(s).")
                 else:
-                    st.error(statut)
+                    st.info("Aucun contenu exploitable trouvé sur ce lien.")
 
     with st.expander("Complétion des lieux (profondeur du questionnaire)", expanded=False):
         st.caption(
