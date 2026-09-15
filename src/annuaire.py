@@ -225,24 +225,33 @@ def render_fiche_header(lieu, derive, nombre_contributeurs: int | None = None) -
             st.info("Pas encore de synthèse générée pour ce lieu.")
 
 
-def render_fiche_sections(store: Store, lieu, derive) -> None:
-    """Grille « Activités / Publics / Territoire... » avec sources — même
-    contenu, même mise en page dans le dialogue Annuaire et la page de
-    partage publique. Ne montre jamais les réponses brutes/témoignages
-    (contrairement au dialogue Annuaire, réservé aux utilisateurs connectés) :
-    ici, seules les synthèses déjà curées par l'enrichissement IA sont
-    affichées, jamais le détail nominatif des réponses."""
+def render_fiche_sections(store: Store, lieu, derive, montrer_sources: bool = True) -> None:
+    """Grille « Activités / Publics / Territoire... » — même contenu, même
+    mise en page dans le dialogue Annuaire et la page de partage publique.
+
+    `montrer_sources=False` (page de partage publique, sans connexion) :
+    n'affiche que les synthèses déjà curées par l'enrichissement IA, jamais
+    le popover "Sources" ni les réponses brutes/témoignages sous-jacents —
+    et ne va même pas les chercher, pour ne jamais exposer de détail
+    nominatif à un visiteur anonyme via ce chemin (get_free_text_notes /
+    get_all_answers_by_contributeur passent par le store admin sur cette
+    page, voir 3_Fiche.py, donc contournent RLS)."""
     if not derive:
         return
     st.divider()
     donnees = derive.donnees
-    notes_lieu = store.get_free_text_notes(lieu.id)
-    reponses_lieu = store.get_all_answers_by_contributeur(lieu.id)
     sections_avec_sources = []
-    for cle, titre in SECTIONS_SYNTHESE[1:]:  # sans "resume", déjà affiché par render_fiche_header
-        sources = source_items_for_section(cle, derive, notes_lieu, reponses_lieu)
-        if sources:
-            sections_avec_sources.append((cle, titre, sources))
+    if montrer_sources:
+        notes_lieu = store.get_free_text_notes(lieu.id)
+        reponses_lieu = store.get_all_answers_by_contributeur(lieu.id)
+        for cle, titre in SECTIONS_SYNTHESE[1:]:  # sans "resume", déjà affiché par render_fiche_header
+            sources = source_items_for_section(cle, derive, notes_lieu, reponses_lieu)
+            if sources:
+                sections_avec_sources.append((cle, titre, sources))
+    else:
+        sections_avec_sources = [
+            (cle, titre, None) for cle, titre in SECTIONS_SYNTHESE[1:] if donnees.get(cle)
+        ]
 
     if sections_avec_sources:
         cols = st.columns(3)
@@ -251,9 +260,10 @@ def render_fiche_sections(store: Store, lieu, derive) -> None:
             with cols[i % 3]:
                 st.markdown(f"**{titre}**")
                 st.caption(texte_en_points(texte))
-                with st.popover("Sources", use_container_width=True):
-                    for s in sources:
-                        st.markdown(f"**{s['label']}** : {s['valeur']}")
+                if montrer_sources:
+                    with st.popover("Sources", use_container_width=True):
+                        for s in sources:
+                            st.markdown(f"**{s['label']}** : {s['valeur']}")
     else:
         st.caption("Pas encore assez d'informations déclarées pour détailler ce lieu par thème.")
 
