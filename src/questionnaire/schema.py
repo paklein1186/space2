@@ -240,6 +240,26 @@ BANDE_INTENSITE = [
     "Nul (0%)", "Limité (< 25%)", "Peu élevé (25 à 50%)", "Assez élevé (50 à 75%)", "Très élevé (> 75%)",
 ]
 
+# Réutilisée par diagnostic_besoins_futurs ET learning_expedition_europe (les
+# besoins associés à un futur axe de développement sont la même taxonomie
+# que les besoins d'accompagnement généraux — pas de raison d'avoir deux
+# listes différentes pour la même notion).
+OPTIONS_SOUTIEN_ACCOMPAGNEMENT = [
+    "Plan financier et pérennisation", "Gouvernance / gestion de collectif", "Médiation de conflits",
+    "Repenser l'organisationnel et les processus de décision", "Communication",
+    "Activation de communauté d'usagers", "Ancrage territorial / partenariats",
+    "Événementiel (conception ou production d'événements)", "Aide juridique", "Gestion de projet",
+    "Structure d'accueil de bénévoles", "Développement entrepreneurial / rapport à l'argent des usagers",
+    "Lancement de services de proximité", "Usages d'outils numériques",
+    "Gestion financière, administrative et comptabilité", "Montée en compétence de l'équipe",
+    "Ressources pratiques et inspirations (modèles, fieldtrips...)",
+    "Mise en réseau avec d'autres tiers-lieux", "Aide sur systèmes énergétiques/hydriques",
+    "Centre logistique ou compostage", "Rénovation / obstacles architecturaux",
+    "Innovation low-tech, éco-construction ou économie circulaire",
+    "Activités agricoles ou alimentaires", "Comment implémenter des services publics",
+    "Aucun besoin identifié", "Autre",
+]
+
 
 # ---------------------------------------------------------------------------
 # Module 1 — Socle (obligatoire)
@@ -845,20 +865,7 @@ section_diagnostic_besoins_futurs = Section(
     title="Diagnostic — besoins des 3 prochaines années",
     fields=[
         Field("types_soutien_souhaites", "De quels types de soutien auriez-vous besoin ces 3 prochaines années ?",
-              FieldType.MULTI_CHOICE,
-              options=["Plan financier et pérennisation", "Gouvernance / gestion de collectif", "Médiation de conflits",
-                       "Repenser l'organisationnel et les processus de décision", "Communication",
-                       "Activation de communauté d'usagers", "Ancrage territorial / partenariats",
-                       "Événementiel (conception ou production d'événements)", "Aide juridique", "Gestion de projet",
-                       "Structure d'accueil de bénévoles", "Développement entrepreneurial / rapport à l'argent des usagers",
-                       "Lancement de services de proximité", "Usages d'outils numériques",
-                       "Gestion financière, administrative et comptabilité", "Montée en compétence de l'équipe",
-                       "Ressources pratiques et inspirations (modèles, fieldtrips...)",
-                       "Mise en réseau avec d'autres tiers-lieux", "Aide sur systèmes énergétiques/hydriques",
-                       "Centre logistique ou compostage", "Rénovation / obstacles architecturaux",
-                       "Innovation low-tech, éco-construction ou économie circulaire",
-                       "Activités agricoles ou alimentaires", "Comment implémenter des services publics",
-                       "Aucun besoin identifié", "Autre"]),
+              FieldType.MULTI_CHOICE, options=OPTIONS_SOUTIEN_ACCOMPAGNEMENT),
         Field("priorites_principales", "Parmi ces besoins, quelles sont vos 2 à 3 priorités ?", FieldType.TEXTAREA),
     ],
 )
@@ -886,6 +893,34 @@ section_learning_expedition = Section(
         Field("candidat_disponibilite",
               "Sur quelle période votre équipe serait-elle disponible pour ce déplacement ?", FieldType.TEXT,
               condition=Condition("interet_learning_expedition", "eq", "Oui, je souhaite déposer un dossier")),
+        # Deuxième palier, hiérarchisé sous les 4 questions ci-dessus (le
+        # dossier minimal) : approfondir n'est proposé qu'à qui le souhaite,
+        # plutôt que d'allonger le dossier de base pour tout le monde.
+        Field("candidat_approfondir_dossier",
+              "Souhaitez-vous dès à présent détailler davantage votre candidature (quelques questions "
+              "supplémentaires) ? Vous pourrez aussi le faire plus tard.", FieldType.BOOLEAN,
+              condition=Condition("interet_learning_expedition", "eq", "Oui, je souhaite déposer un dossier")),
+        Field("candidat_cooperations_actuelles",
+              "Décrivez brièvement vos coopérations territoriales actuelles : avec qui, sur quoi ?",
+              FieldType.TEXTAREA,
+              help_text="Complète ce qui est déjà connu via les partenariats déclarés (section "
+                        "Partenariats territoriaux) — inutile de tout relister, l'idée est de mettre en "
+                        "avant ce qui est le plus pertinent pour une learning expedition.",
+              condition=Condition("candidat_approfondir_dossier", "eq", True)),
+        Field("candidat_perennite",
+              "En quoi votre lieu est-il aujourd'hui pérenne, ou vise-t-il à le devenir ? Qu'est-ce qui "
+              "vous rend confiant·e (ou non) sur la durabilité du projet ?", FieldType.TEXTAREA,
+              help_text="Peut faire écho à ce qui a déjà été dit sur les difficultés financières ou la "
+                        "dépendance à un financeur unique (section Modèle économique).",
+              condition=Condition("candidat_approfondir_dossier", "eq", True)),
+        Field("candidat_angle_deploiement",
+              "Quel est le prochain axe de développement que vous envisagez pour le lieu ?", FieldType.TEXTAREA,
+              help_text="En lien avec la vision à 5 ans si elle a déjà été exprimée (module Diagnostic).",
+              condition=Condition("candidat_approfondir_dossier", "eq", True)),
+        Field("candidat_besoins_deploiement",
+              "Quels types de besoins sont associés à ce développement ?", FieldType.MULTI_CHOICE,
+              options=OPTIONS_SOUTIEN_ACCOMPAGNEMENT,
+              condition=Condition("candidat_approfondir_dossier", "eq", True)),
     ],
 )
 
