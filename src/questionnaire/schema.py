@@ -216,6 +216,9 @@ DIFFICULTES_SOCIALES = [
     "Discrimination raciale",
     "Immigration / accueil des primo-arrivants",
     "Parentalité / famille",
+    "Citoyenneté",
+    "Éthique au travail",
+    "Sans-abrisme",
     "Aucune",
     "Autre",
 ]
@@ -331,6 +334,25 @@ section_activites_alimentaires = Section(
     ],
 )
 
+section_culture_detail = Section(
+    id="culture_detail",
+    title="Approfondissement — culture et arts",
+    condition=Condition("activites_principales", "contains", "Activités culturelles ou artistiques"),
+    fields=[
+        Field("domaines_artistiques", "Quels domaines artistiques le lieu accueille-t-il ?", FieldType.MULTI_CHOICE,
+              options=["Arts plastiques", "Spectacles vivants", "Musique", "Écriture / littérature",
+                       "Architecture et patrimoine", "Autre"]),
+        Field("types_activites_artistiques", "Quels types d'activités artistiques le lieu propose-t-il ?",
+              FieldType.MULTI_CHOICE,
+              options=["Diffusion (spectacles, expositions)", "Pratiques amateurs", "Médiation culturelle",
+                       "Création artistique", "Accueil d'artistes en résidence",
+                       "Administration / production de projets culturels", "Éducation artistique et culturelle",
+                       "Formation professionnelle artistique", "Autre"]),
+        Field("nombre_evenements_culturels_an", "Combien d'événements culturels/artistiques ouverts au public le "
+                                                  "lieu organise-t-il par an, environ ?", FieldType.NUMBER),
+    ],
+)
+
 section_services_detailles = Section(
     id="services_detailles",
     title="Détail des services proposés",
@@ -346,6 +368,26 @@ section_services_detailles = Section(
               condition=Condition("services_proposes", "contains", "Domiciliation d'entreprises")),
         Field("nombre_associations_accueillies", "Combien d'associations sont accueillies au lieu ?", FieldType.NUMBER,
               condition=Condition("services_proposes", "contains", "Accueil d'associations")),
+        Field("repartition_structures_hebergees", "Parmi les structures hébergées ou domiciliées, quels types "
+                                                    "sont représentés ?", FieldType.MULTI_CHOICE,
+              options=["Entrepreneurs / indépendants individuels", "Associations", "PME / TPE", "Coopératives",
+                       "SARL ou équivalent", "Artistes", "Autre"],
+              condition=Condition("services_proposes", "contains", "Domiciliation d'entreprises")),
+        Field("activite_incubation_pepiniere", "Le lieu a-t-il une activité d'incubateur, de pépinière ou "
+                                                 "d'accélérateur d'entreprises ?", FieldType.BOOLEAN),
+        Field("part_teletravail_coworking", "Quelle part des usagers du coworking sont des salarié·es en "
+                                             "télétravail (plutôt qu'indépendants) ?", FieldType.SINGLE_CHOICE,
+              options=BANDE_INTENSITE,
+              condition=Condition("services_proposes", "contains", "Espaces de télétravail")),
+        Field("types_production", "Le lieu dispose-t-il d'outils ou d'espaces dédiés à l'un de ces types de "
+                                   "production ?", FieldType.MULTI_CHOICE,
+              options=["Production / transformation alimentaire", "Production agricole",
+                       "Production de produits du quotidien non alimentaires", "Fabrication 3D / numérique",
+                       "Travail du bois", "Travail du métal", "Production graphique (gravure, sérigraphie...)",
+                       "Production textile", "Céramique / terre", "Travail du cuir", "Production médicale",
+                       "Autre métier d'art", "Aucune", "Autre"]),
+        Field("dispose_materiautheque_ressourcerie", "Le lieu dispose-t-il d'une matériauthèque ou d'une "
+                                                       "ressourcerie ?", FieldType.BOOLEAN),
         Field("modalites_acces", "Comment les usagers accèdent-ils principalement aux services du lieu ?",
               FieldType.MULTI_CHOICE,
               options=["Gratuit / libre accès", "Adhésion", "Abonnement", "Paiement à l'usage",
@@ -356,6 +398,31 @@ section_services_detailles = Section(
               FieldType.SINGLE_CHOICE,
               options=["Moins de 20h/semaine", "20 à 40h/semaine", "40 à 60h/semaine",
                        "Plus de 60h/semaine", "Ouvert en continu (7j/7)"]),
+    ],
+)
+
+section_formations = Section(
+    id="formations",
+    title="Formations et apprentissages",
+    fields=[
+        Field("propose_formations", "Le lieu propose-t-il des formations, ateliers ou temps d'apprentissage "
+                                     "entre pairs ?", FieldType.BOOLEAN),
+        Field("themes_formations", "Sur quels thèmes portent ces formations ?", FieldType.MULTI_CHOICE,
+              condition=Condition("propose_formations", "eq", True),
+              options=["Numérique / informatique / programmation", "Entrepreneuriat", "Fabrication numérique",
+                       "Intelligence collective / gouvernance partagée", "Écologie", "Artisanat / métiers d'art",
+                       "Bien-être / coaching", "Culture / arts", "Communication / marketing",
+                       "Administratif / gestion / finance", "Agriculture / biodiversité / apiculture",
+                       "Réemploi", "Langues", "Autre"]),
+        Field("origine_formations", "Comment ces formations sont-elles produites ?", FieldType.MULTI_CHOICE,
+              condition=Condition("propose_formations", "eq", True),
+              options=["Produites par le lieu lui-même", "Produites par d'autres structures",
+                       "Produites par les membres/usagers", "Co-produites avec un organisme de formation"]),
+        Field("nombre_personnes_formees_an", "Combien de personnes ont bénéficié d'une formation dans le lieu, "
+                                              "environ par an ?", FieldType.NUMBER,
+              condition=Condition("propose_formations", "eq", True)),
+        Field("reconnu_education_permanente", "Le lieu est-il reconnu au titre de l'éducation permanente ou d'un "
+                                               "dispositif équivalent ?", FieldType.BOOLEAN),
     ],
 )
 
@@ -435,6 +502,13 @@ section_publics = Section(
               FieldType.SINGLE_CHOICE,
               options=["Quotidienne", "2 à 4 fois par semaine", "Une fois par semaine",
                        "Quelques fois par mois", "Une fois par mois ou moins", "Je ne sais pas"]),
+        Field("accessibilite_dimensions", "Au-delà de l'accessibilité physique (PMR), sur quelles autres dimensions "
+                                           "le lieu veille-t-il à rester accessible ?", FieldType.MULTI_CHOICE,
+              options=["Accessibilité financière (tarifs adaptés, gratuité...)",
+                       "Accessibilité cognitive (signalétique claire, accompagnement...)",
+                       "Aucune démarche particulière", "Autre"]),
+        Field("sentiment_inclusion_confiance", "Comment décririez-vous le sentiment d'inclusion, d'appartenance et de "
+                                                "confiance entre les usagers du lieu ?", FieldType.TEXTAREA),
     ],
 )
 
@@ -506,6 +580,14 @@ section_gouvernance = Section(
                        "Sociocratie / gouvernance partagée", "Autre"], roles=ROLES_INTERNES),
         Field("difficulte_gouvernance", "Rencontrez-vous des difficultés particulières liées à la gouvernance ou "
                                          "à la prise de décision ?", FieldType.TEXTAREA, roles=ROLES_INTERNES),
+        Field("nombre_adherents_cooperateurs", "Combien d'adhérents (association) ou de coopérateurs (coopérative) "
+                                                "compte le lieu ?", FieldType.NUMBER, roles=ROLES_INTERNES,
+              condition=Condition("statut_juridique", "in",
+                                   ["Association / organisation à but non lucratif", "Association loi 1901", "ASBL",
+                                    "SCIC", "SCOP", "Coopérative", "Coopérative (SC / SCRL)"])),
+        Field("gouvernance_multiniveau", "Le lieu s'inscrit-il dans un modèle de gouvernance multi-niveau "
+                                          "(commune, région, réseau européen...) ?", FieldType.BOOLEAN,
+              roles=ROLES_INTERNES),
     ],
 )
 
@@ -539,7 +621,9 @@ section_modele_economique = Section(
         Field("sources_financement_fonctionnement", "Quelles sont les principales sources de financement du fonctionnement (par ordre d'importance) ?",
               FieldType.MULTI_CHOICE, roles=ROLES_INTERNES,
               options=["Subvention(s) publique(s)", "Adhésions / cotisations", "Location d'espaces", "Ateliers / formations",
-                       "Restauration / débit de boissons", "Dons / mécénat", "Vente de produits", "Prêt bancaire", "Autre"]),
+                       "Restauration / débit de boissons", "Dons / mécénat", "Vente de produits", "Prêt bancaire",
+                       "Billetterie", "Location de machines ou d'outils", "Crowdfunding", "Offre d'hébergement",
+                       "Conseil / accompagnement / ingénierie de projets", "Autre"]),
         Field("subventionneurs_publics", "Si des subventions publiques sont perçues, de quels niveaux proviennent-elles ?",
               FieldType.MULTI_CHOICE, options=SUBVENTIONNEURS_PUBLICS, roles=ROLES_INTERNES,
               condition=Condition("sources_financement_fonctionnement", "contains", "Subvention(s) publique(s)")),
@@ -547,6 +631,29 @@ section_modele_economique = Section(
               FieldType.BOOLEAN, roles=ROLES_INTERNES),
         Field("difficulte_financiere_actuelle", "Le lieu traverse-t-il actuellement une difficulté financière ?",
               FieldType.BOOLEAN, roles=ROLES_INTERNES),
+        Field("chiffre_affaires_annuel", "Quel est le chiffre d'affaires annuel approximatif du lieu (€) ?",
+              FieldType.NUMBER, roles=ROLES_INTERNES),
+        Field("resultat_annuel", "Quel est le résultat annuel approximatif (bénéfice ou perte, en €) ?",
+              FieldType.NUMBER, roles=ROLES_INTERNES,
+              help_text="Un nombre négatif pour une perte."),
+        Field("pourcentage_subside_rentrees", "Quelle part (%) des rentrées du lieu provient de subsides ?",
+              FieldType.NUMBER, roles=ROLES_INTERNES,
+              help_text="Aide à situer si le modèle atteint l'équilibre sans subside ou non."),
+        Field("sources_financement_investissement", "Quelles ont été les principales sources de financement de "
+                                                      "l'investissement de départ (locaux, gros équipements) ?",
+              FieldType.MULTI_CHOICE, roles=ROLES_INTERNES,
+              options=["Fonds propres", "Subventions publiques", "Prêt bancaire", "Mécénat / fondations",
+                       "Investissement en capital par les fondateurs ou proches", "Crowdfunding",
+                       "Investissement en capital par des entreprises", "Autre"]),
+        Field("postes_depenses_significatifs", "Quels sont les postes de dépenses de fonctionnement les plus "
+                                                "significatifs ?", FieldType.MULTI_CHOICE, roles=ROLES_INTERNES,
+              options=["Charges de fonctionnement (loyer, électricité, eau, internet, assurance...)",
+                       "Rémunérations du personnel", "Investissement matériel (mobilier, équipement...)",
+                       "Communication", "Travaux (peinture, menuiserie, sol...)", "Autre"]),
+        Field("modeles_economiques_emergents", "Le lieu a-t-il mis en place l'un de ces modèles économiques "
+                                                "émergents ?", FieldType.MULTI_CHOICE, roles=ROLES_INTERNES,
+              options=["Coopérative (SCIC ou équivalent)", "Modèle contributif", "Monnaie locale",
+                       "Aucun de ceux-ci", "Autre"]),
     ],
 )
 
@@ -572,7 +679,9 @@ module_socle = Module(
         section_acteurs_origine,
         section_activites,
         section_activites_alimentaires,
+        section_culture_detail,
         section_services_detailles,
+        section_formations,
         section_milieu_rural,
         section_milieu_urbain,
         section_foncier,
@@ -607,6 +716,13 @@ section_impact_mobilite = Section(
               FieldType.SINGLE_CHOICE, options=BANDE_INTENSITE),
         Field("usagers_mode_transport_commun", "Quelle part des usagers vient en transport en commun ?",
               FieldType.SINGLE_CHOICE, options=BANDE_INTENSITE),
+        Field("isolation_ressentie", "Comment jugez-vous l'isolation du/des bâtiment(s) occupé(s) (toit, murs, sol) ?",
+              FieldType.SINGLE_CHOICE, options=["Bien isolé", "Moyennement isolé", "Mal isolé", "Je ne sais pas"]),
+        Field("actions_efficacite_energetique", "Quelles actions ont été mises en place pour améliorer l'efficacité "
+                                                 "énergétique des bâtiments (réhabilitation, isolation, énergies "
+                                                 "renouvelables...) ?", FieldType.TEXTAREA),
+        Field("mise_normes_realisee", "Des mises aux normes (incendie, AFSCA...) ont-elles été réalisées récemment ? "
+                                       "Lesquelles ?", FieldType.TEXTAREA),
     ],
 )
 
@@ -662,6 +778,10 @@ section_impact_resilience = Section(
               FieldType.BOOLEAN),
         Field("rayonnement_exemples", "Pouvez-vous donner un exemple ?", FieldType.TEXTAREA,
               condition=Condition("rayonnement_large", "eq", True)),
+        Field("effets_revitalisation_quartier", "Le lieu a-t-il contribué à revitaliser un quartier ou un village "
+                                                  "(friche réhabilitée, bâtiment ou gare désaffectée...) ou à attirer "
+                                                  "de nouveaux profils (freelances, artistes, néo-ruraux...) ?",
+              FieldType.TEXTAREA),
     ],
 )
 
@@ -690,6 +810,12 @@ section_diagnostic_vision = Section(
         Field("vision_5_ans", "Quelle est votre vision du lieu dans 5 ans ?", FieldType.TEXTAREA),
         Field("obstacles_anticipes", "Quels obstacles anticipez-vous pour réaliser cette vision ?", FieldType.TEXTAREA),
         Field("besoin_aide_vision", "À quel point une aide sur la vision/le positionnement vous serait-elle utile ?", FieldType.SCALE_1_5),
+        Field("stade_developpement", "Parmi ces étapes, lesquelles considérez-vous comme déjà franchies par le lieu ?",
+              FieldType.MULTI_CHOICE,
+              options=["Vision et raison d'être établies", "Foncier acquis ou occupé", "Budget consolidé",
+                       "Communauté d'usagers mobilisée", "Partenariats noués", "Activités lancées",
+                       "Quelques années d'expériences", "Expansion planifiée",
+                       "Tiers-lieu abouti, solide et renforcé"]),
     ],
 )
 
@@ -721,10 +847,18 @@ section_diagnostic_besoins_futurs = Section(
         Field("types_soutien_souhaites", "De quels types de soutien auriez-vous besoin ces 3 prochaines années ?",
               FieldType.MULTI_CHOICE,
               options=["Plan financier et pérennisation", "Gouvernance / gestion de collectif", "Médiation de conflits",
-                       "Communication", "Activation de communauté d'usagers", "Ancrage territorial / partenariats",
-                       "Aide juridique", "Gestion de projet", "Montée en compétence de l'équipe",
+                       "Repenser l'organisationnel et les processus de décision", "Communication",
+                       "Activation de communauté d'usagers", "Ancrage territorial / partenariats",
+                       "Événementiel (conception ou production d'événements)", "Aide juridique", "Gestion de projet",
+                       "Structure d'accueil de bénévoles", "Développement entrepreneurial / rapport à l'argent des usagers",
+                       "Lancement de services de proximité", "Usages d'outils numériques",
+                       "Gestion financière, administrative et comptabilité", "Montée en compétence de l'équipe",
+                       "Ressources pratiques et inspirations (modèles, fieldtrips...)",
                        "Mise en réseau avec d'autres tiers-lieux", "Aide sur systèmes énergétiques/hydriques",
-                       "Rénovation / obstacles architecturaux", "Aucun besoin identifié", "Autre"]),
+                       "Centre logistique ou compostage", "Rénovation / obstacles architecturaux",
+                       "Innovation low-tech, éco-construction ou économie circulaire",
+                       "Activités agricoles ou alimentaires", "Comment implémenter des services publics",
+                       "Aucun besoin identifié", "Autre"]),
         Field("priorites_principales", "Parmi ces besoins, quelles sont vos 2 à 3 priorités ?", FieldType.TEXTAREA),
     ],
 )
