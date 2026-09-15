@@ -277,6 +277,25 @@ class SqliteStore(Store):
             )
         return result
 
+    def get_reponses_pour_champs(self, champ_ids: list) -> list:
+        if not champ_ids:
+            return []
+        placeholders = ",".join("?" * len(champ_ids))
+        rows = self.conn.execute(
+            f"select tiers_lieu_id, contributeur_id, champ_id, valeur from reponses "
+            f"where champ_id in ({placeholders})",
+            champ_ids,
+        ).fetchall()
+        return [
+            {
+                "tiers_lieu_id": r["tiers_lieu_id"],
+                "contributeur_id": r["contributeur_id"],
+                "champ_id": r["champ_id"],
+                "valeur": json.loads(r["valeur"]) if r["valeur"] is not None else None,
+            }
+            for r in rows
+        ]
+
     # -- notes libres --------------------------------------------------
 
     def save_free_text_note(self, tiers_lieu_id: str, contributeur_id: str, section_id: Optional[str],
@@ -422,6 +441,12 @@ class SqliteStore(Store):
     def delete_campagne_prioritaire(self, campagne_id: str) -> None:
         self.conn.execute("delete from campagnes_prioritaires where id = ?", (campagne_id,))
         self.conn.commit()
+
+    def map_user_emails(self, user_ids: list) -> dict:
+        # Pas de système d'auth séparé en local : user_id EST déjà l'email
+        # (mode dev sans Supabase) ou une valeur de convenance
+        # (LOCAL_DEV_AUTOLOGIN) — simple passthrough.
+        return {uid: uid for uid in user_ids}
 
     # -- historique, stewardship, modération --------------------------------------------------
 

@@ -171,6 +171,17 @@ class SupabaseStore(Store):
             out.setdefault(r["contributeur_id"], {})[r["champ_id"]] = r["valeur"]
         return out
 
+    def get_reponses_pour_champs(self, champ_ids: list) -> list:
+        if not champ_ids:
+            return []
+        result = (
+            self.client.table("reponses")
+            .select("tiers_lieu_id,contributeur_id,champ_id,valeur")
+            .in_("champ_id", champ_ids)
+            .execute()
+        )
+        return result.data
+
     def save_free_text_note(self, tiers_lieu_id: str, contributeur_id: str, section_id: Optional[str],
                              texte: str) -> None:
         self.client.table("notes_libres").insert({
@@ -326,6 +337,13 @@ class SupabaseStore(Store):
 
     def delete_campagne_prioritaire(self, campagne_id: str) -> None:
         self.client.table("campagnes_prioritaires").delete().eq("id", campagne_id).execute()
+
+    def map_user_emails(self, user_ids: list) -> dict:
+        if not user_ids:
+            return {}
+        users = self.client.auth.admin.list_users()
+        voulus = set(user_ids)
+        return {u.id: u.email for u in users if u.id in voulus}
 
     # -- historique, stewardship, modération --------------------------------------------------
 

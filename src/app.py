@@ -26,6 +26,7 @@ from src.annuaire import (
     build_fiche_lieu,
     category_chips_html,
     default_visual,
+    field_label,
     lieux_avec_coordonnees,
     photo_html,
     source_items_for_section,
@@ -725,6 +726,49 @@ def _condition_text(condition) -> str | None:
     return f"{condition.field_id} {label} {condition.value!r}"
 
 
+def _tableau_repondants_campagne(admin_store, champ_ids: list) -> None:
+    """Tableau des répondants à une campagne prioritaire (email, lieu, rôle,
+    et leurs réponses aux champs de la campagne) — tous lieux confondus,
+    puisqu'une campagne prioritaire n'est pas limitée à un seul lieu."""
+    lignes = admin_store.get_reponses_pour_champs(champ_ids)
+    if not lignes:
+        st.caption("Aucune réponse pour l'instant.")
+        return
+
+    # Regroupe par (lieu, contributeur) : plusieurs lignes brutes (une par
+    # champ) deviennent une seule ligne de tableau avec une colonne par champ.
+    par_repondant: dict = {}
+    for l in lignes:
+        cle = (l["tiers_lieu_id"], l["contributeur_id"])
+        par_repondant.setdefault(cle, {})[l["champ_id"]] = l["valeur"]
+
+    tiers_lieu_ids = {tlid for tlid, _ in par_repondant}
+    noms_lieux = {l.id: l.nom for l in admin_store.list_tiers_lieux() if l.id in tiers_lieu_ids}
+
+    contributeurs_par_lieu: dict = {}
+    for tlid in tiers_lieu_ids:
+        for c in admin_store.list_contributeurs(tlid):
+            contributeurs_par_lieu[c.id] = c
+
+    user_ids = {c.user_id for c in contributeurs_par_lieu.values()}
+    emails = admin_store.map_user_emails(list(user_ids))
+
+    lignes_tableau = []
+    for (tlid, cid), reponses in par_repondant.items():
+        contributeur = contributeurs_par_lieu.get(cid)
+        ligne = {
+            "Lieu": noms_lieux.get(tlid, "—"),
+            "Rôle": ROLE_LABELS.get(contributeur.role, contributeur.role) if contributeur else "—",
+            "Email": emails.get(contributeur.user_id, "—") if contributeur else "—",
+        }
+        for champ_id in champ_ids:
+            valeur = reponses.get(champ_id)
+            ligne[field_label(champ_id)] = ", ".join(valeur) if isinstance(valeur, list) else (valeur or "—")
+        lignes_tableau.append(ligne)
+
+    st.dataframe(pd.DataFrame(lignes_tableau), use_container_width=True, hide_index=True)
+
+
 def administration_tab(store, user_id: str) -> None:
     st.subheader("Administration")
     admin_store = _admin_store_or_error()
@@ -764,6 +808,8 @@ def administration_tab(store, user_id: str) -> None:
                     if st.button("Supprimer", key=f"del_campagne_{c.id}"):
                         admin_store.delete_campagne_prioritaire(c.id)
                         st.rerun()
+                with st.expander(f"Voir les répondants — {c.titre}"):
+                    _tableau_repondants_campagne(admin_store, c.champ_ids)
         else:
             st.caption("Aucune campagne prioritaire pour l'instant.")
 

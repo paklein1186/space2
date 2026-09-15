@@ -11,6 +11,7 @@ fois par run)."""
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -20,23 +21,76 @@ import pandas as pd
 import streamlit as st
 
 from src.agent.rag_tools import lieux_enrichis_dataframe, reponses_long_dataframe
-from src.db.factory import get_store
-from src.questionnaire.schema import CATEGORIES_POSSIBLES
+from src.db.factory import get_admin_store, get_store
+from src.questionnaire.schema import BANDE_INTENSITE, CATEGORIES_POSSIBLES
 
 st.title("Observatoire des lieux hybrides et territoires")
 st.caption("Relevés statistiques, publics, sur l'ensemble des lieux recensés dans l'Annuaire.")
 
-store = get_store()
+
+def _store_pour_agregats():
+    """Statistiques publiques : utilise le store admin (service_role) plutôt
+    que le store public pour cette page. Raison — pas un choix de facilité :
+    reponses_long_dataframe() passe par get_all_answers_by_contributeur(),
+    qui filtre d'abord les contributeurs bloqués via une lecture de la table
+    `contributeurs` ; or RLS n'y autorise un utilisateur qu'à voir SES
+    PROPRES lignes (user_id = auth.uid()) — pour un visiteur anonyme,
+    auth.uid() est nul, cette lecture ne renvoie donc jamais aucune ligne, et
+    le filtre "contributeur actif" exclut alors TOUTES les réponses par
+    excès de prudence. Résultat concret constaté : les graphiques "Milieu",
+    "Statut juridique", "Année d'ouverture" restaient vides pour tout
+    visiteur non connecté, alors que `reponses` a bien une policy RLS
+    publique — seule la vérification de blocage, en amont, coupait tout.
+    Seuls des agrégats (comptages, distributions) quittent cette page,
+    jamais de donnée nominative, donc contourner RLS ici reste sûr. Repli
+    sur le store public si la clé service_role n'est pas configurée, pour ne
+    jamais faire planter une page publique pour cette seule raison."""
+    try:
+        return get_admin_store()
+    except RuntimeError:
+        return get_store()
+
+
+store = _store_pour_agregats()
 df_lieux = lieux_enrichis_dataframe(store)
 
 if df_lieux.empty:
     st.info("Aucun lieu enrichi pour l'instant — revenez une fois que des synthèses auront été générées.")
     st.stop()
 
-col1, col2, col3 = st.columns(3)
+df_reponses = reponses_long_dataframe(store)
+# Une même question a pu être répondue par plusieurs contributeurs d'un même
+# lieu (parfois avec des valeurs différentes) : un lieu ne doit compter
+# qu'une fois par champ dans les agrégats, pas une fois par contributeur.
+df_reponses_dedup = (
+    df_reponses.drop_duplicates(subset=["tiers_lieu", "champ_id"]) if not df_reponses.empty else df_reponses
+)
+
+
+def _valeurs(champ_id: str) -> pd.Series:
+    """Valeurs déclarées pour un champ donné, une seule fois par lieu."""
+    if df_reponses_dedup.empty:
+        return pd.Series(dtype=object)
+    return df_reponses_dedup[df_reponses_dedup["champ_id"] == champ_id]["valeur"]
+
+
+col1, col2, col3, col4, col5 = st.columns(5)
 col1.metric("Lieux recensés", len(df_lieux))
 col2.metric("Pays représentés", int(df_lieux["pays"].nunique(dropna=True)) if "pays" in df_lieux else 0)
 col3.metric("Régions représentées", int(df_lieux["region"].nunique(dropna=True)) if "region" in df_lieux else 0)
+
+surfaces = pd.to_numeric(_valeurs("surface_batie_m2"), errors="coerce").dropna()
+col4.metric(
+    "Surface bâtie connue", f"{int(surfaces.sum()):,} m²".replace(",", " ") if not surfaces.empty else "—",
+    help=f"Somme sur les {len(surfaces)} lieu(x) ayant renseigné leur surface — sous-estimée, "
+         "la plupart des lieux ne l'ont pas encore déclarée." if not surfaces.empty else None,
+)
+etp = pd.to_numeric(_valeurs("etp_geres"), errors="coerce").dropna()
+col5.metric(
+    "ETP gérés connus", f"{etp.sum():g}" if not etp.empty else "—",
+    help=f"Somme sur les {len(etp)} lieu(x) ayant renseigné leurs ETP — sous-estimée, "
+         "la plupart des lieux ne l'ont pas encore déclaré." if not etp.empty else None,
+)
 
 st.divider()
 col_cat, col_pays = st.columns(2)
@@ -57,11 +111,6 @@ with col_pays:
     else:
         st.caption("Pays non renseigné pour l'instant.")
 
-df_reponses = reponses_long_dataframe(store)
-df_reponses_dedup = (
-    df_reponses.drop_duplicates(subset=["tiers_lieu", "champ_id"]) if not df_reponses.empty else df_reponses
-)
-
 col_milieu, col_region = st.columns(2)
 with col_milieu:
     st.subheader("Répartition par milieu")
@@ -76,6 +125,85 @@ with col_region:
         st.bar_chart(df_lieux["region"].value_counts(dropna=True).head(15))
     else:
         st.caption("Région non renseignée pour l'instant.")
+
+st.divider()
+col_annee, col_statut = st.columns(2)
+with col_annee:
+    st.subheader("Évolution du réseau dans le temps")
+    st.caption("Nombre de lieux ouverts par année (année extraite de la date déclarée).")
+    dates = _valeurs("date_ouverture").dropna().astype(str)
+    annees = dates.apply(lambda d: (re.search(r"(19|20)\d{2}", d) or [None]).group() if re.search(r"(19|20)\d{2}", d) else None) \
+        if not dates.empty else pd.Series(dtype=object)
+    annees = annees.dropna()
+    if not annees.empty:
+        st.bar_chart(annees.value_counts().sort_index())
+        st.caption(f"Basé sur les {len(annees)} lieu(x) ayant déclaré une date d'ouverture.")
+    else:
+        st.caption("Aucune date d'ouverture déclarée pour l'instant.")
+with col_statut:
+    st.subheader("Statut juridique")
+    statuts = _valeurs("statut_juridique").dropna()
+    if not statuts.empty:
+        st.bar_chart(statuts.value_counts())
+        st.caption(f"Basé sur les {len(statuts)} lieu(x) ayant déclaré leur statut juridique.")
+    else:
+        st.caption("Aucun statut juridique déclaré pour l'instant.")
+
+st.divider()
+st.subheader("Fréquentation, mobilité et rayonnement")
+st.caption(
+    "Indicateurs récemment ajoutés au questionnaire (fréquentation, provenance des usagers, "
+    "modes de déplacement) — ils s'affichent automatiquement ici au fur et à mesure que des "
+    "lieux y répondent."
+)
+
+
+def _graphique_bandes(champ_id: str, titre: str) -> None:
+    valeurs = _valeurs(champ_id).dropna()
+    st.markdown(f"**{titre}**")
+    if valeurs.empty:
+        st.caption("Pas encore de réponse pour cet indicateur.")
+        return
+    ordonnee = valeurs.value_counts().reindex(BANDE_INTENSITE).dropna()
+    st.bar_chart(ordonnee)
+    st.caption(f"n = {len(valeurs)} lieu(x)")
+
+
+col_freq, col_evol = st.columns(2)
+with col_freq:
+    freq = pd.to_numeric(_valeurs("frequentation_semaine_type"), errors="coerce").dropna()
+    st.markdown("**Fréquentation moyenne sur une bonne semaine**")
+    if not freq.empty:
+        st.metric("Passages / semaine (moyenne des lieux répondants)", f"{freq.mean():.0f}")
+        st.caption(f"n = {len(freq)} lieu(x)")
+    else:
+        st.caption("Pas encore de réponse pour cet indicateur.")
+with col_evol:
+    evol = _valeurs("evolution_frequentation_3ans").dropna()
+    st.markdown("**Évolution de la fréquentation (3 ans)**")
+    if not evol.empty:
+        st.bar_chart(evol.value_counts())
+        st.caption(f"n = {len(evol)} lieu(x)")
+    else:
+        st.caption("Pas encore de réponse pour cet indicateur.")
+
+col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+with col_m1:
+    _graphique_bandes("usagers_mode_voiture", "Part venant en voiture")
+with col_m2:
+    _graphique_bandes("usagers_mode_velo", "Part venant à vélo")
+with col_m3:
+    _graphique_bandes("usagers_mode_pied", "Part venant à pied")
+with col_m4:
+    _graphique_bandes("usagers_mode_transport_commun", "Part en transport en commun")
+
+col_p1, col_p2, col_p3 = st.columns(3)
+with col_p1:
+    _graphique_bandes("provenance_usagers_commune", "Provenance : commune d'implantation")
+with col_p2:
+    _graphique_bandes("provenance_usagers_limitrophe", "Provenance : commune limitrophe")
+with col_p3:
+    _graphique_bandes("provenance_usagers_plus_loin", "Provenance : plus loin")
 
 st.divider()
 st.subheader("Mots-clés les plus fréquents")

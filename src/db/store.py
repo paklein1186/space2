@@ -126,6 +126,14 @@ class Store(ABC):
     def get_all_answers_by_contributeur(self, tiers_lieu_id: str) -> dict: ...
 
     @abstractmethod
+    def get_reponses_pour_champs(self, champ_ids: list) -> list:
+        """Réponses à un ensemble de champs, tous lieux confondus — chaque
+        élément : {tiers_lieu_id, contributeur_id, champ_id, valeur}. Utilisé
+        pour lister les répondants d'une campagne prioritaire (email, lieu,
+        rôle) indépendamment du lieu auquel ils appartiennent."""
+        ...
+
+    @abstractmethod
     def save_free_text_note(self, tiers_lieu_id: str, contributeur_id: str, section_id: Optional[str],
                              texte: str) -> None: ...
 
@@ -192,6 +200,13 @@ class Store(ABC):
 
     @abstractmethod
     def delete_campagne_prioritaire(self, campagne_id: str) -> None: ...
+
+    @abstractmethod
+    def map_user_emails(self, user_ids: list) -> dict:
+        """Résout un ensemble d'identifiants utilisateur en emails —
+        {user_id: email}. Utilisé pour afficher l'email des répondants
+        d'une campagne prioritaire (table admin)."""
+        ...
 
     # -- historique, stewardship, modération --------------------------------------------------
 
