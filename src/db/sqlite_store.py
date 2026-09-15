@@ -314,6 +314,21 @@ class SqliteStore(Store):
         ).fetchall()
         return [dict(r) for r in rows]
 
+    def update_free_text_note(self, note_id: str, texte: str) -> None:
+        self.conn.execute("update notes_libres set texte = ? where id = ?", (texte, note_id))
+        self.conn.commit()
+
+    def delete_free_text_note(self, note_id: str) -> None:
+        self.conn.execute("delete from notes_libres where id = ?", (note_id,))
+        self.conn.commit()
+
+    def delete_answer(self, tiers_lieu_id: str, contributeur_id: str, champ_id: str) -> None:
+        self.conn.execute(
+            "delete from reponses where tiers_lieu_id = ? and contributeur_id = ? and champ_id = ?",
+            (tiers_lieu_id, contributeur_id, champ_id),
+        )
+        self.conn.commit()
+
     # -- donnée dérivée (jamais dans reponses) --------------------------------------------------
 
     def save_lieu_derive(self, lieu_derive: LieuDerive) -> None:

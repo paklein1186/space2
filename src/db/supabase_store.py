@@ -202,6 +202,16 @@ class SupabaseStore(Store):
         )
         return result.data
 
+    def update_free_text_note(self, note_id: str, texte: str) -> None:
+        self.client.table("notes_libres").update({"texte": texte}).eq("id", note_id).execute()
+
+    def delete_free_text_note(self, note_id: str) -> None:
+        self.client.table("notes_libres").delete().eq("id", note_id).execute()
+
+    def delete_answer(self, tiers_lieu_id: str, contributeur_id: str, champ_id: str) -> None:
+        self.client.table("reponses").delete().eq("tiers_lieu_id", tiers_lieu_id) \
+            .eq("contributeur_id", contributeur_id).eq("champ_id", champ_id).execute()
+
     def save_lieu_derive(self, lieu_derive: LieuDerive) -> None:
         # lien_externe/photo_url ne sont jamais touchés ici : édités manuellement
         # via update_lieu_derive_liens, indépendants du cycle d'enrichissement.

@@ -836,6 +836,101 @@ def administration_tab(store, user_id: str) -> None:
                     st.success("Campagne créée.")
                     st.rerun()
 
+    with st.expander("Données brutes : imports et saisies utilisateurs", expanded=False):
+        st.caption(
+            "Notes libres (imports CSV/CommunECter, anecdotes conversationnelles) et réponses "
+            "structurées d'un lieu, éditables ou supprimables directement — modifiez une cellule "
+            "puis « Enregistrer », ou supprimez une ligne via l'icône 🗑️ qui apparaît à sa gauche."
+        )
+        tous_les_lieux_admin = sorted(store.list_tiers_lieux(), key=lambda l: l.nom.lower())
+        if not tous_les_lieux_admin:
+            st.caption("Aucun lieu recensé pour l'instant.")
+        else:
+            lieu_choisi_nom = st.selectbox(
+                "Lieu", options=[l.nom for l in tous_les_lieux_admin], key="admin_donnees_lieu",
+            )
+            lieu_admin = next(l for l in tous_les_lieux_admin if l.nom == lieu_choisi_nom)
+
+            st.markdown("**Notes libres** *(imports CSV/CommunECter identifiés par leur source ; "
+                        "sans source = capturé pendant l'entretien)*")
+            notes = admin_store.get_free_text_notes(lieu_admin.id)
+            if notes:
+                df_notes = pd.DataFrame([
+                    {"id": n["id"], "source": n.get("section_id") or "conversationnel", "texte": n["texte"]}
+                    for n in notes
+                ])
+                edite_notes = st.data_editor(
+                    df_notes, key=f"editor_notes_{lieu_admin.id}", use_container_width=True,
+                    hide_index=True, num_rows="dynamic",
+                    column_config={"id": None, "source": st.column_config.TextColumn(disabled=True)},
+                )
+                if st.button("Enregistrer les modifications", key=f"save_notes_{lieu_admin.id}"):
+                    texte_avant = {n["id"]: n["texte"] for n in notes}
+                    ids_apres = set(edite_notes["id"].dropna())
+                    for note_id in set(texte_avant) - ids_apres:
+                        admin_store.delete_free_text_note(note_id)
+                    for _, row in edite_notes.iterrows():
+                        if pd.notna(row["id"]) and row["texte"] != texte_avant.get(row["id"]):
+                            admin_store.update_free_text_note(row["id"], row["texte"])
+                    st.success("Notes mises à jour.")
+                    st.rerun()
+            else:
+                st.caption("Aucune note libre pour ce lieu.")
+
+            st.markdown("**Réponses structurées** *(saisies via l'entretien)*")
+            reponses_par_contrib = admin_store.get_all_answers_by_contributeur(lieu_admin.id)
+            contribs_admin = {c.id: c for c in admin_store.list_contributeurs(lieu_admin.id)}
+            lignes_reponses = []
+            for contributeur_id, reponses in reponses_par_contrib.items():
+                role = contribs_admin[contributeur_id].role if contributeur_id in contribs_admin else "?"
+                for champ_id, valeur in reponses.items():
+                    lignes_reponses.append({
+                        "contributeur_id": contributeur_id, "champ_id": champ_id,
+                        "rôle": ROLE_LABELS.get(role, role), "champ": field_label(champ_id),
+                        "valeur": ", ".join(valeur) if isinstance(valeur, list) else str(valeur if valeur is not None else ""),
+                    })
+            if lignes_reponses:
+                df_reponses_admin = pd.DataFrame(lignes_reponses)
+                edite_reponses = st.data_editor(
+                    df_reponses_admin, key=f"editor_reponses_{lieu_admin.id}", use_container_width=True,
+                    hide_index=True, num_rows="dynamic",
+                    column_config={
+                        "contributeur_id": None, "champ_id": None,
+                        "rôle": st.column_config.TextColumn(disabled=True),
+                        "champ": st.column_config.TextColumn(disabled=True),
+                    },
+                )
+                if st.button("Enregistrer les modifications", key=f"save_reponses_{lieu_admin.id}"):
+                    avant = {(l["contributeur_id"], l["champ_id"]): l["valeur"] for l in lignes_reponses}
+                    apres_cles = set(zip(edite_reponses["contributeur_id"], edite_reponses["champ_id"]))
+                    for (cid, chid) in set(avant) - apres_cles:
+                        admin_store.delete_answer(lieu_admin.id, cid, chid)
+                    for _, row in edite_reponses.iterrows():
+                        cle = (row["contributeur_id"], row["champ_id"])
+                        if cle not in avant or row["valeur"] == avant[cle]:
+                            continue
+                        # Reconstruit le type d'origine (liste/bool/nombre) à partir
+                        # de la valeur affichée en texte, pour ne pas corrompre les
+                        # champs multi_choice/boolean/number en les réenregistrant
+                        # comme de simples chaînes.
+                        original = reponses_par_contrib[row["contributeur_id"]][row["champ_id"]]
+                        if isinstance(original, list):
+                            nouvelle_valeur = [v.strip() for v in row["valeur"].split(",") if v.strip()]
+                        elif isinstance(original, bool):
+                            nouvelle_valeur = row["valeur"].strip().lower() in ("true", "vrai", "oui", "1")
+                        elif isinstance(original, (int, float)):
+                            try:
+                                nouvelle_valeur = float(row["valeur"]) if "." in row["valeur"] else int(row["valeur"])
+                            except ValueError:
+                                nouvelle_valeur = row["valeur"]
+                        else:
+                            nouvelle_valeur = row["valeur"]
+                        admin_store.save_answer(lieu_admin.id, row["contributeur_id"], row["champ_id"], nouvelle_valeur)
+                    st.success("Réponses mises à jour.")
+                    st.rerun()
+            else:
+                st.caption("Aucune réponse structurée pour ce lieu.")
+
     with st.expander("Schéma de l'entretien (lecture seule)", expanded=False):
         for module in QUESTIONNAIRE:
             st.markdown(f"#### {module.title} {'· optionnel' if module.optional else '· obligatoire'}")

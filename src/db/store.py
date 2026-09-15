@@ -141,6 +141,21 @@ class Store(ABC):
     def get_free_text_notes(self, tiers_lieu_id: str) -> list: ...
 
     @abstractmethod
+    def update_free_text_note(self, note_id: str, texte: str) -> None:
+        """Édite le texte d'une note libre existante (import ou saisie
+        conversationnelle) — utilisé par la vue admin "Données brutes"."""
+        ...
+
+    @abstractmethod
+    def delete_free_text_note(self, note_id: str) -> None: ...
+
+    @abstractmethod
+    def delete_answer(self, tiers_lieu_id: str, contributeur_id: str, champ_id: str) -> None:
+        """Supprime une réponse structurée précise — utilisé par la vue admin
+        "Données brutes" pour retirer une saisie erronée ou obsolète."""
+        ...
+
+    @abstractmethod
     def save_lieu_derive(self, lieu_derive: LieuDerive) -> None:
         """Écrit/remplace la donnée dérivée d'un lieu. Ne touche jamais à
         `reponses` — table strictement séparée de la donnée brute."""
