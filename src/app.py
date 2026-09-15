@@ -1080,6 +1080,10 @@ def rag_tab(store):
         st.rerun()
 
 
+_session_refresh_faite = False  # module-level : remis à False à chaque script run (Streamlit ré-exécute
+                                  # tout le module à chaque rerun), pas à chaque appel de _resolve_store
+
+
 def _garder_session_supabase_active(client) -> None:
     """Le jeton d'accès Supabase (JWT) expire par défaut après ~1h. La
     librairie rafraîchit automatiquement la session dans get_session() si
@@ -1089,7 +1093,19 @@ def _garder_session_supabase_active(client) -> None:
     onglet resté ouvert plus d'une heure voyait toute requête Supabase
     suivante échouer avec "JWT expired" (PGRST303), constaté en production
     sur la Bibliothèque. Appelé ici, à chaque résolution de store (donc à
-    chaque rendu de page), pour que ça n'arrive plus."""
+    chaque rendu de page), pour que ça n'arrive plus.
+
+    Le garde-fou module-level est indispensable : _resolve_store() est
+    appelée PLUSIEURS FOIS dans un même passage de script (une fois dans
+    main() pour sonder si la section admin doit apparaître, une fois de
+    plus dans la fonction de la page sélectionnée) — sans lui, save_cookie()
+    (donc le composant cookie) était invoqué deux fois avec la même clé fixe
+    dans le même run, ce que Streamlit interdit (StreamlitDuplicateElementKey,
+    constaté en production sur la Bibliothèque)."""
+    global _session_refresh_faite
+    if _session_refresh_faite:
+        return
+    _session_refresh_faite = True
     try:
         session = client.auth.get_session()
     except Exception:
