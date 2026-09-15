@@ -131,7 +131,7 @@ create table if not exists litiges (
 -- Traçabilité et suivi des coûts de chaque appel LLM.
 create table if not exists llm_calls (
     id uuid primary key default gen_random_uuid(),
-    type_appel text not null check (type_appel in ('entretien', 'enrichissement', 'rag_query', 'import_questionnaire')),
+    type_appel text not null check (type_appel in ('entretien', 'enrichissement', 'rag_query', 'import_questionnaire', 'crawl_extraction')),
     tiers_lieu_id uuid references tiers_lieux(id) on delete set null,
     model text not null,
     tokens_in integer not null,

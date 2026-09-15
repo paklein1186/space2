@@ -102,7 +102,14 @@ def extraire_essentiel(store: Store, tiers_lieu_id: str, nom_lieu: str, texte_br
             nom_lieu=nom_lieu, source_label=source_label, texte=texte_brut,
         )}],
     )
-    log_usage(store, "crawl_extraction", "claude-haiku-4-5", response.usage, tiers_lieu_id)
+    try:
+        log_usage(store, "crawl_extraction", "claude-haiku-4-5", response.usage, tiers_lieu_id)
+    except Exception:
+        # La télémétrie de coût ne doit jamais faire échouer une extraction
+        # par ailleurs réussie (vécu : une contrainte Postgres pas encore à
+        # jour sur ce type d'appel a fait planter toute la fonctionnalité
+        # côté admin ET entretien — voir migration_005).
+        pass
     resume = "".join(b.text for b in response.content if b.type == "text").strip()
     if not resume or "RIEN_D_UTILE" in resume:
         return ""
