@@ -31,6 +31,33 @@ from src.questionnaire.schema import Role
 OWNER_ID_LOCAL = "import-csv-tierslieux"
 PAYS_PAR_CODE = {"BE": "Belgique", "FR": "France"}
 
+# Voir la même table dans import_communecter.py (même source CommunECter, même
+# format d'export) — "region" (schema.py : "Région ou province d'implantation")
+# attend une province, pas une commune/village (qui va dans "adresse").
+_PROVINCES_BE = [
+    (1000, 1299, "Région de Bruxelles-Capitale"),
+    (1300, 1499, "Brabant wallon"),
+    (1500, 1999, "Brabant flamand"),
+    (2000, 2999, "Anvers"),
+    (3000, 3499, "Brabant flamand"),
+    (3500, 3999, "Limbourg"),
+    (4000, 4999, "Liège"),
+    (5000, 5999, "Namur"),
+    (6000, 6599, "Hainaut"),
+    (6600, 6999, "Luxembourg"),
+    (7000, 7999, "Hainaut"),
+    (8000, 8999, "Flandre occidentale"),
+    (9000, 9999, "Flandre orientale"),
+]
+
+
+def _province_belge(postal_code: str) -> str | None:
+    code = (postal_code or "").strip()
+    if not code.isdigit():
+        return None
+    code = int(code)
+    return next((prov for lo, hi, prov in _PROVINCES_BE if lo <= code <= hi), None)
+
 _CONTACT_LABELS = [
     "Site internet", "E-mail", "Téléphone", "Facebook", "Instagram", "LinkedIn",
     "Messagerie instantanée", "Autre moyen de contact",
@@ -79,16 +106,17 @@ def import_row(store, owner_user_id: str, row: dict) -> str:
     nom = row["Nom du tiers-lieu"].strip()
     tiers_lieu = store.get_or_create_tiers_lieu(owner_user_id, nom)
 
-    pays = PAYS_PAR_CODE.get((row.get("address.addressCountry") or "").strip().upper())
-    locality = (row.get("address.addressLocality") or "").strip()
+    pays_code = (row.get("address.addressCountry") or "").strip().upper()
+    pays = PAYS_PAR_CODE.get(pays_code)
+    province = _province_belge(row.get("address.postalCode")) if pays_code == "BE" else None
     lat_brut = (row.get("geo.latitude") or "").strip()
     lon_brut = (row.get("geo.longitude") or "").strip()
 
     maj = {}
     if pays and not tiers_lieu.pays:
         maj["pays"] = pays
-    if locality and not tiers_lieu.region:
-        maj["region"] = locality
+    if province and not tiers_lieu.region:
+        maj["region"] = province
     if lat_brut and not tiers_lieu.latitude:
         maj["latitude"] = float(lat_brut)
     if lon_brut and not tiers_lieu.longitude:

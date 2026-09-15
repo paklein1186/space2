@@ -40,6 +40,34 @@ OWNER_ID_LOCAL = "import-communecter"
 NOTE_SECTION_TAGS = "import_communecter_tags"
 PAYS_PAR_CODE = {"BE": "Belgique", "FR": "France"}
 
+# Plages de codes postaux belges par province — standard, stable depuis des
+# décennies (La Poste/bpost). "region" (schema.py : "Région ou province
+# d'implantation") attend une province, pas une commune — addressLocality de
+# CommunECter est au niveau commune/village et va dans "adresse", pas ici.
+_PROVINCES_BE = [
+    (1000, 1299, "Région de Bruxelles-Capitale"),
+    (1300, 1499, "Brabant wallon"),
+    (1500, 1999, "Brabant flamand"),
+    (2000, 2999, "Anvers"),
+    (3000, 3499, "Brabant flamand"),
+    (3500, 3999, "Limbourg"),
+    (4000, 4999, "Liège"),
+    (5000, 5999, "Namur"),
+    (6000, 6599, "Hainaut"),
+    (6600, 6999, "Luxembourg"),
+    (7000, 7999, "Hainaut"),
+    (8000, 8999, "Flandre occidentale"),
+    (9000, 9999, "Flandre orientale"),
+]
+
+
+def _province_belge(postal_code: str) -> str | None:
+    code = (postal_code or "").strip()
+    if not code.isdigit():
+        return None
+    code = int(code)
+    return next((prov for lo, hi, prov in _PROVINCES_BE if lo <= code <= hi), None)
+
 
 def _service_owner_id(store) -> str:
     """Même principe que les autres imports en masse : sur Supabase, résout
@@ -96,15 +124,16 @@ def merge_entity(store, owner_user_id: str, entity: dict, lieux_existants: dict)
     # import_csv_directory.py.
     addr = entity.get("address") or {}
     geo = entity.get("geo") or {}
-    pays = PAYS_PAR_CODE.get((addr.get("addressCountry") or "").strip().upper())
-    locality = (addr.get("addressLocality") or "").strip()
+    pays_code = (addr.get("addressCountry") or "").strip().upper()
+    pays = PAYS_PAR_CODE.get(pays_code)
+    province = _province_belge(addr.get("postalCode")) if pays_code == "BE" else None
     lat_brut, lon_brut = geo.get("latitude"), geo.get("longitude")
 
     maj_lieu = {}
     if pays and not lieu.pays:
         maj_lieu["pays"] = pays
-    if locality and not lieu.region:
-        maj_lieu["region"] = locality
+    if province and not lieu.region:
+        maj_lieu["region"] = province
     if lat_brut and not lieu.latitude:
         maj_lieu["latitude"] = float(lat_brut)
     if lon_brut and not lieu.longitude:
