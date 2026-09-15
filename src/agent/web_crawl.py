@@ -23,11 +23,14 @@ construite ici tant que cette migration n'a pas été exécutée.
 from __future__ import annotations
 
 import re
+import tempfile
+from pathlib import Path
 
 import requests
 from bs4 import BeautifulSoup
 
 from ..db.store import Store
+from ..ingest.loaders import SUPPORTED_TEXT_SUFFIXES, extract_text
 from .usage import log_usage
 
 NOTE_SECTION_CRAWL = "crawl_site_lieu"
@@ -35,18 +38,18 @@ TIMEOUT_S = 15
 MAX_TEXTE_BRUT = 8000  # caractères — borne le coût du prompt d'extraction
 USER_AGENT = "Mozilla/5.0 (compatible; lieux-hybrides-territoires/1.0; +https://troistiers.space)"
 
-PROMPT_EXTRACTION = """Voici le texte brut extrait de la page d'accueil du site web d'un tiers-lieu
-nommé « {nom_lieu} » (URL : {url}).
+PROMPT_EXTRACTION = """Voici du texte brut concernant un tiers-lieu nommé « {nom_lieu} »,
+transmis via {source_label}.
 
-TEXTE DE LA PAGE :
+TEXTE :
 {texte}
 
-Résume en quelques phrases factuelles ce que cette page apprend sur ce lieu et qui pourrait
+Résume en quelques phrases factuelles ce que ce texte apprend sur ce lieu et qui pourrait
 compléter un questionnaire (activités concrètes, statut juridique ou forme d'organisation
 mentionnés, horaires, contact, actualités, partenaires cités...). Ignore le texte de navigation,
-les mentions de cookies, le footer générique. Si la page n'apporte rien de substantiel au-delà
-d'une vitrine sans contenu informatif, réponds exactement "RIEN_D_UTILE" sans rien ajouter
-d'autre. Réponds en français, en texte simple (pas de markdown), 3-6 phrases maximum."""
+les mentions de cookies, le footer générique si présents. Si le texte n'apporte rien de
+substantiel, réponds exactement "RIEN_D_UTILE" sans rien ajouter d'autre. Réponds en français,
+en texte simple (pas de markdown), 3-6 phrases maximum."""
 
 
 def fetch_page_text(url: str) -> str:
@@ -63,34 +66,65 @@ def fetch_page_text(url: str) -> str:
     return texte[:MAX_TEXTE_BRUT]
 
 
-def extraire_et_enregistrer(store: Store, tiers_lieu_id: str, contributeur_id: str,
-                             nom_lieu: str, url: str, client=None) -> str:
-    """Récupère la page, en extrait ce qui est substantiel via un appel LLM
-    léger (Haiku), et l'enregistre en note libre. Renvoie un statut lisible
-    ("enregistre" / "rien_d_utile" / "erreur: ...") plutôt que de lever pour
-    une page individuelle en échec — un site indisponible ne doit jamais
-    interrompre le scan des autres lieux (voir l'appelant, qui boucle sur
-    tous les lieux)."""
+def extraire_texte_fichier(uploaded_file) -> str:
+    """Texte brut d'un fichier déposé via st.file_uploader (txt/docx/pdf) —
+    réutilise l'extraction déjà écrite pour l'ingestion admin (loaders.py),
+    qui travaille sur un chemin disque, via un fichier temporaire (l'objet
+    Streamlit n'est qu'un buffer en mémoire, sans chemin réel)."""
+    suffix = Path(uploaded_file.name).suffix.lower()
+    if suffix not in SUPPORTED_TEXT_SUFFIXES:
+        raise ValueError(f"Format non supporté : {suffix} (formats acceptés : "
+                          f"{', '.join(sorted(SUPPORTED_TEXT_SUFFIXES))})")
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=True) as tmp:
+        tmp.write(uploaded_file.getvalue())
+        tmp.flush()
+        return extract_text(Path(tmp.name))
+
+
+def extraire_essentiel(store: Store, tiers_lieu_id: str, nom_lieu: str, texte_brut: str,
+                        source_label: str, client=None) -> str:
+    """Étape commune à toutes les sources (site web, fichier déposé, texte
+    collé) : extrait via un appel LLM léger (Haiku) ce qu'un texte brut
+    apporte de substantiel sur un lieu. Renvoie le résumé, ou une chaîne vide
+    si rien d'exploitable — ne sauvegarde rien elle-même, laissé à l'appelant
+    (note libre pour le scan admin, tour de conversation pour l'entretien)."""
     from anthropic import Anthropic
 
-    try:
-        texte_brut = fetch_page_text(url)
-    except Exception as exc:
-        return f"erreur: {type(exc).__name__}: {exc}"
+    texte_brut = (texte_brut or "").strip()[:MAX_TEXTE_BRUT]
     if not texte_brut:
-        return "rien_d_utile"
+        return ""
 
     client = client or Anthropic(timeout=30.0)
     response = client.messages.create(
         model="claude-haiku-4-5",
         max_tokens=500,
         messages=[{"role": "user", "content": PROMPT_EXTRACTION.format(
-            nom_lieu=nom_lieu, url=url, texte=texte_brut,
+            nom_lieu=nom_lieu, source_label=source_label, texte=texte_brut,
         )}],
     )
     log_usage(store, "crawl_extraction", "claude-haiku-4-5", response.usage, tiers_lieu_id)
     resume = "".join(b.text for b in response.content if b.type == "text").strip()
     if not resume or "RIEN_D_UTILE" in resume:
+        return ""
+    return resume
+
+
+def extraire_et_enregistrer(store: Store, tiers_lieu_id: str, contributeur_id: str,
+                             nom_lieu: str, url: str, client=None) -> str:
+    """Récupère la page, en extrait ce qui est substantiel, et l'enregistre
+    directement en note libre. Renvoie un statut lisible ("enregistre" /
+    "rien_d_utile" / "erreur: ...") plutôt que de lever pour une page
+    individuelle en échec — un site indisponible ne doit jamais interrompre
+    le scan des autres lieux (voir l'appelant, qui boucle sur tous les
+    lieux). Utilisé par le scan groupé admin ; l'entretien passe plutôt par
+    `extraire_essentiel` pour injecter le résumé dans la conversation."""
+    try:
+        texte_brut = fetch_page_text(url)
+    except Exception as exc:
+        return f"erreur: {type(exc).__name__}: {exc}"
+
+    resume = extraire_essentiel(store, tiers_lieu_id, nom_lieu, texte_brut, f"le site web ({url})", client=client)
+    if not resume:
         return "rien_d_utile"
 
     store.save_free_text_note(

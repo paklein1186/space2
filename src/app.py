@@ -287,6 +287,31 @@ def _maj_completion(store, state: dict) -> None:
     state["completion"] = completion_stats(answers, role, country_code)
 
 
+def _transmettre_source_entretien(store, state: dict, nom_lieu: str, texte_brut: str,
+                                   source_label: str, label_affiche: str) -> None:
+    """Fait analyser `texte_brut` (site web / fichier déposé / texte collé)
+    par le même pipeline d'extraction léger que le crawl admin (voir
+    web_crawl.extraire_essentiel), puis injecte le résumé dans la
+    conversation d'entretien en cours comme un tour normal — l'agent
+    l'exploite via ses tools habituels (save_answer/save_free_text_note, voir
+    la règle dédiée dans collecte_agent.SYSTEM_PROMPT) plutôt que de passer
+    par un chemin de sauvegarde séparé, hors du fil de l'entretien."""
+    from src.agent.web_crawl import extraire_essentiel
+
+    with st.spinner("Analyse en cours..."):
+        resume = extraire_essentiel(store, state["tiers_lieu_id"], nom_lieu, texte_brut, source_label)
+    if not resume:
+        st.info("Rien d'exploitable n'a été trouvé dans cette source.")
+        return
+    state["history"].append(("user", label_affiche))
+    message = f"[Document transmis par le répondant — {source_label}]\n\n{resume}"
+    with st.spinner("L'agent réfléchit..."):
+        reply = state["agent"].send(message)
+    state["history"].append(("assistant", reply))
+    _maj_completion(store, state)
+    st.rerun()
+
+
 def entretien_tab(store, user_id: str):
     st.title(t("entretien.title"))
     nom_lieu, role = contribution_selector(store, user_id)
@@ -377,6 +402,52 @@ def entretien_tab(store, user_id: str):
             text=f"Entretien complété à {completion['pourcentage']}% "
                  f"({completion['repondus']}/{completion['total']} questions actives)",
         )
+    with st.expander("📎 Transmettre un site, un document, ou un texte", expanded=False):
+        st.caption(
+            "De quoi enrichir l'entretien sans tout retaper : un lien vers votre site, un document "
+            "existant (charte, plaquette, rapport...), ou un texte collé. L'agent en tire ce qui est "
+            "utile puis poursuit l'entretien avec."
+        )
+        url_source = st.text_input("URL d'un site à analyser", key=f"{session_key}::crawl_url")
+        if st.button("Analyser ce site", key=f"{session_key}::crawl_url_btn") and url_source.strip():
+            from src.agent.web_crawl import fetch_page_text
+            url_source = url_source.strip()
+            try:
+                with st.spinner("Récupération de la page..."):
+                    texte_brut = fetch_page_text(url_source)
+            except Exception as exc:
+                st.error(f"Impossible de récupérer cette page : {exc}")
+                texte_brut = None
+            if texte_brut:
+                _transmettre_source_entretien(
+                    store, state, nom_lieu, texte_brut, f"le site web ({url_source})",
+                    f"📎 Site transmis : {url_source}",
+                )
+
+        fichier = st.file_uploader("Déposer un document (txt, docx, pdf)", type=["txt", "docx", "pdf"],
+                                    key=f"{session_key}::crawl_file")
+        if fichier is not None and st.button("Analyser ce document", key=f"{session_key}::crawl_file_btn"):
+            from src.agent.web_crawl import extraire_texte_fichier
+            try:
+                with st.spinner("Lecture du document..."):
+                    texte_brut = extraire_texte_fichier(fichier)
+            except Exception as exc:
+                st.error(f"Impossible de lire ce document : {exc}")
+                texte_brut = None
+            if texte_brut:
+                _transmettre_source_entretien(
+                    store, state, nom_lieu, texte_brut, f"le document déposé « {fichier.name} »",
+                    f"📎 Document transmis : {fichier.name}",
+                )
+
+        texte_colle = st.text_area("Coller un texte (extrait d'un document, description existante...)",
+                                    key=f"{session_key}::crawl_texte")
+        if st.button("Analyser ce texte", key=f"{session_key}::crawl_texte_btn") and texte_colle.strip():
+            _transmettre_source_entretien(
+                store, state, nom_lieu, texte_colle.strip(), "un texte collé par le répondant",
+                "📎 Texte collé transmis",
+            )
+
     for speaker, text in state["history"]:
         with st.chat_message(speaker):
             st.write(text)
