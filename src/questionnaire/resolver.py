@@ -7,6 +7,7 @@ schéma complet ni les règles de branchement.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from typing import Optional
 
@@ -68,20 +69,57 @@ def section_is_complete(section: Section, answers: dict, role: Role, country_cod
     return True
 
 
+def _rang_pseudo_aleatoire(seed: str, section_id: str) -> str:
+    """Rang stable et pseudo-aléatoire pour une section donnée un `seed`
+    donné — même section + même seed renvoie toujours le même rang (ordre
+    stable au sein d'une session), mais le classement diffère d'un seed
+    (donc d'un entretien) à l'autre. Pas besoin de porter un générateur
+    aléatoire avec état : un simple hash suffit et reste calculable à la
+    volée, y compris après reprise d'une session interrompue."""
+    return hashlib.md5(f"{seed}:{section_id}".encode()).hexdigest()
+
+
 def next_incomplete_section(module: Module, answers: dict, role: Role, country_code: Optional[str],
-                             completed_section_ids: set) -> Optional[Section]:
-    for section in module.sections:
-        if section.id in completed_section_ids:
-            continue
-        if not section_is_active(section, answers):
-            continue
-        return section
-    return None
+                             completed_section_ids: set, seed: Optional[str] = None) -> Optional[Section]:
+    """Renvoie la prochaine section à traiter parmi celles actives et non
+    terminées. Sans `seed`, l'ordre déclaré dans le schéma fait foi (utilisé
+    par les tests et tout appelant qui n'a pas de session à identifier).
+
+    Avec un `seed` (typiquement l'id du contributeur), les sections situées
+    au-delà de `module.ancrage_debut` sont proposées dans un ordre
+    pseudo-aléatoire propre à ce seed plutôt que toujours le même — pour
+    qu'un même parcours ne se déroule pas de façon identique à chaque
+    entretien, tout en gardant l'entrée en matière (et les sections qui
+    déclenchent des branches conditionnelles) dans un ordre prévisible. Les
+    conditions d'activation restent seules responsables de ce qui PEUT être
+    proposé ; ce tirage ne choisit qu'entre des sections déjà également
+    valides à cet instant.
+
+    Parmi ces candidates, une section conditionnelle (`section.condition`
+    renseigné) vient toujours d'être débloquée par une réponse précise —
+    elle reste prioritaire sur les sections génériques (sans condition,
+    actives dès le départ) pour enchaîner dessus tant que c'est encore dans
+    le fil de la conversation, plutôt que de sauter directement à une
+    section sans rapport ; le tirage aléatoire ne s'applique qu'au sein de
+    chacun des deux groupes."""
+    candidats = [s for s in module.sections
+                 if s.id not in completed_section_ids and section_is_active(s, answers)]
+    if not candidats:
+        return None
+    if seed is None:
+        return candidats[0]
+    ancrage_ids = {s.id for s in module.sections[:module.ancrage_debut]}
+    ancres = [s for s in candidats if s.id in ancrage_ids]
+    if ancres:
+        return ancres[0]
+    conditionnelles = [s for s in candidats if s.condition is not None]
+    groupe = conditionnelles or candidats
+    return min(groupe, key=lambda s: _rang_pseudo_aleatoire(seed, s.id))
 
 
 def module_is_complete(module: Module, answers: dict, role: Role, country_code: Optional[str],
-                        completed_section_ids: set) -> bool:
-    return next_incomplete_section(module, answers, role, country_code, completed_section_ids) is None
+                        completed_section_ids: set, seed: Optional[str] = None) -> bool:
+    return next_incomplete_section(module, answers, role, country_code, completed_section_ids, seed) is None
 
 
 def completion_stats(answers: dict, role: Optional[Role], country_code: Optional[str]) -> dict:

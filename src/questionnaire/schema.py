@@ -127,6 +127,15 @@ class Module:
     title: str
     sections: list  # list[Section]
     optional: bool = False
+    # Nombre de sections en tête de liste toujours proposées dans l'ordre
+    # déclaré ci-dessous, avant que le tirage pseudo-aléatoire par session
+    # (voir resolver.next_incomplete_section) ne s'applique au reste. Utile
+    # pour les sections qui posent les questions dont dépendent des sections
+    # conditionnelles plus loin dans la liste (ex. "activités", "milieu") :
+    # les faire passer tôt maximise les branches débloquées pour la suite,
+    # sans quoi le tirage aléatoire pourrait les repousser arbitrairement
+    # tard et retarder d'autant la découverte des sections qu'elles activent.
+    ancrage_debut: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -694,6 +703,13 @@ module_socle = Module(
     id="socle",
     title="Portrait du lieu",
     optional=False,
+    # localisation_identite (milieu) et activites (activites_principales)
+    # déclenchent à elles deux la quasi-totalité des sections conditionnelles
+    # du module (alimentaire, culture, milieu rural/urbain...) — les garder
+    # en tête garantit que ces branches sont débloquées tôt, quel que soit
+    # l'ordre tiré ensuite pour le reste. acteurs_origine (genèse du lieu)
+    # les accompagne comme ouverture naturelle de l'entretien.
+    ancrage_debut=3,
     sections=[
         section_localisation_identite,
         section_acteurs_origine,

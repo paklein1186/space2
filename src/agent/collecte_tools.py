@@ -171,7 +171,8 @@ class CollecteToolHandler:
         self._module_id = module_id
         answers = self._current_answers()
         section = next_incomplete_section(
-            get_module(module_id), answers, self.role, self._country_code(), self._completed_section_ids
+            get_module(module_id), answers, self.role, self._country_code(), self._completed_section_ids,
+            seed=self.contributeur_id,
         )
         self._section_id = section.id if section else None
         if persist:
@@ -254,7 +255,8 @@ class CollecteToolHandler:
             # que de renvoyer une section sans aucune question à poser.
             self._completed_section_ids.add(self._section_id)
             next_section = next_incomplete_section(
-                module, answers, self.role, self._country_code(), self._completed_section_ids
+                module, answers, self.role, self._country_code(), self._completed_section_ids,
+                seed=self.contributeur_id,
             )
             if next_section:
                 self._section_id = next_section.id
@@ -311,7 +313,8 @@ class CollecteToolHandler:
         if complete:
             self._completed_section_ids.add(self._section_id)
             next_section = next_incomplete_section(
-                get_module(self._module_id), answers, self.role, self._country_code(), self._completed_section_ids
+                get_module(self._module_id), answers, self.role, self._country_code(), self._completed_section_ids,
+                seed=self.contributeur_id,
             )
             if next_section:
                 self._section_id = next_section.id
