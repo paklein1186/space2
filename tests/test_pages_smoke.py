@@ -25,7 +25,7 @@ from src.db.sqlite_store import SqliteStore
 from src.db.store import LieuDerive
 from src.questionnaire.schema import Role
 
-PAGES = ["src/pages/1_Observatoire.py", "src/pages/2_Portfolio.py"]
+PAGES = ["src/pages/1_Observatoire.py", "src/pages/2_Portfolio.py", "src/pages/3_Fiche.py"]
 
 
 def check(label, condition):
@@ -64,6 +64,8 @@ def main():
 
     for page in PAGES:
         at = AppTest.from_file(page, default_timeout=30)
+        if page == "src/pages/3_Fiche.py":
+            at.query_params["lieu"] = lieu.id
         at.run()
         check(f"{page} : pas d'exception (base peuplée)", not at.exception)
 

@@ -22,15 +22,14 @@ from dotenv import load_dotenv
 from src.agent.collecte_agent import CollecteAgent, opening_message
 from src.agent.collecte_tools import CollecteToolHandler
 from src.annuaire import (
-    SECTIONS_SYNTHESE,
     build_fiche_lieu,
     category_chips_html,
     default_visual,
     field_label,
     lieux_avec_coordonnees,
     photo_html,
-    source_items_for_section,
-    texte_en_points,
+    render_fiche_header,
+    render_fiche_sections,
     vignette_html,
 )
 from src.auth_session import clear_session_cookie, read_session_cookie, save_session_cookie
@@ -44,6 +43,10 @@ from src.voice_input import bouton_dictee, consume_voice_transcript
 ROLES_INTERNES = {"fondateur", "equipe", "steward"}
 
 RAG_DISPONIBLE = bool(os.environ.get("VOYAGE_API_KEY"))
+# Pas d'API stable pour lire l'URL publique depuis le serveur Streamlit —
+# configurable via env var (déploiements alternatifs), avec l'URL de
+# production actuelle en repli.
+URL_BASE_APP = os.environ.get("URL_BASE_APP", "https://space2.streamlit.app")
 
 load_dotenv()
 st.set_page_config(page_title="Lieux hybrides et territoires", layout="wide")
@@ -403,68 +406,25 @@ def _fiche_dialog(store, fiche, est_admin: bool, user_id: str):
             _auto_enrich_one(store, lieu)
         st.session_state["fiche_enrichie"].add(lieu.id)
     derive = store.get_lieu_derive(lieu.id)
-    donnees = derive.donnees if derive else {}
 
-    col_vignette, col_info = st.columns([1, 2.5])
-    with col_vignette:
-        if derive and derive.photo_url:
-            st.markdown(photo_html(derive.photo_url, hauteur="10rem"), unsafe_allow_html=True)
-        else:
-            emoji, couleur = default_visual(lieu.nom, donnees)
-            st.markdown(vignette_html(emoji, couleur, hauteur="10rem"), unsafe_allow_html=True)
-    with col_info:
-        st.markdown(f"### {lieu.nom}")
-        st.caption(
-            f"{lieu.pays or 'pays non renseigné'} — {lieu.region or 'région non renseignée'} · "
-            f"{fiche['nombre_contributeurs']} contributeur(s)"
-        )
-        if donnees.get("categories"):
-            st.markdown(category_chips_html(donnees["categories"]), unsafe_allow_html=True)
-        if derive:
-            st.write(donnees.get("resume", ""))
-            if derive.lien_externe:
-                st.markdown(f"[🔗 Fiche externe]({derive.lien_externe})")
-        else:
-            st.info("Pas encore de synthèse générée pour ce lieu — répondez à quelques questions "
-                     "dans l'onglet Entretien pour qu'elle apparaisse ici.")
+    render_fiche_header(lieu, derive, nombre_contributeurs=fiche["nombre_contributeurs"])
 
-    if st.button("🌱 Revendiquer le suivi de ce lieu (steward)", key=f"nourrir_{lieu.id}",
-                 use_container_width=True):
-        st.session_state["preselect_lieu"] = lieu.nom
-        st.session_state["preselect_role"] = "steward"
-        st.toast(f"« {lieu.nom} » sélectionné — rendez-vous dans l'onglet Entretien.", icon="🌱")
+    col_partager, col_steward = st.columns(2)
+    with col_partager:
+        with st.popover("🔗 Partager", use_container_width=True):
+            lien_partage = f"{URL_BASE_APP}/fiche?lieu={lieu.id}"
+            st.caption("Lien public en lecture seule, sans connexion nécessaire :")
+            st.code(lien_partage, language=None)
+    with col_steward:
+        if st.button("🌱 Revendiquer le suivi de ce lieu (steward)", key=f"nourrir_{lieu.id}",
+                     use_container_width=True):
+            st.session_state["preselect_lieu"] = lieu.nom
+            st.session_state["preselect_role"] = "steward"
+            st.toast(f"« {lieu.nom} » sélectionné — rendez-vous dans l'onglet Entretien.", icon="🌱")
+
+    render_fiche_sections(store, lieu, derive)
 
     if derive:
-        st.divider()
-        # Une section sans aucune source déclarée (sources[cle] vide) n'est
-        # que la formule de remplissage que le prompt d'enrichissement
-        # demande explicitement pour homogénéiser la longueur (ex. "Aucun
-        # partenariat... n'est mentionné") — ne rien afficher plutôt que du
-        # bruit sans valeur informative, cohérent avec le principe
-        # déclaré/déduit : rien de déclaré, rien à montrer comme fait.
-        # Un seul chargement pour tout le lieu, réutilisé pour les jusqu'à 11
-        # sections (voir la note dans source_items_for_section).
-        notes_lieu = store.get_free_text_notes(lieu.id)
-        reponses_lieu = store.get_all_answers_by_contributeur(lieu.id)
-        sections_avec_sources = []
-        for cle, titre in SECTIONS_SYNTHESE[1:]:  # sans "resume", déjà affiché
-            sources = source_items_for_section(cle, derive, notes_lieu, reponses_lieu)
-            if sources:
-                sections_avec_sources.append((cle, titre, sources))
-
-        if sections_avec_sources:
-            cols = st.columns(3)
-            for i, (cle, titre, sources) in enumerate(sections_avec_sources):
-                texte = donnees.get(cle) or "—"
-                with cols[i % 3]:
-                    st.markdown(f"**{titre}**")
-                    st.caption(texte_en_points(texte))
-                    with st.popover("Sources", use_container_width=True):
-                        for s in sources:
-                            st.markdown(f"**{s['label']}** : {s['valeur']}")
-        else:
-            st.caption("Pas encore assez d'informations déclarées pour détailler ce lieu par thème.")
-
         with st.expander("Modifier le lien externe / la photo"):
             with st.form(f"liens_{lieu.id}"):
                 nouveau_lien = st.text_input("Lien externe (ex. fiche tiers-lieux.xyz)",
@@ -1204,9 +1164,38 @@ def rag_tab(store, user_id: str):
                     store.delete_conversation_bibliotheque(conv.id)
                     st.rerun()
 
-    for speaker, text in st.session_state["rag_history"]:
+    for i, (speaker, text) in enumerate(st.session_state["rag_history"]):
         with st.chat_message(speaker):
             st.write(text)
+            if speaker != "assistant":
+                continue
+            # Une info utile peut émerger d'une discussion (recherche web
+            # ponctuelle par l'agent, recoupement entre lieux...) sans jamais
+            # avoir été écrite nulle part — ce bouton la capture en note
+            # libre pour le lieu concerné, au même titre qu'un import ou un
+            # scan de site, pour qu'elle nourrisse le prochain enrichissement.
+            if st.button(t("bibliotheque.ajouter_a_un_lieu"), key=f"capture_btn_{i}"):
+                st.session_state["capture_message_idx"] = i
+                st.rerun()
+            if st.session_state.get("capture_message_idx") == i:
+                lieux_disponibles = {l.nom: l.id for l in store.list_tiers_lieux()}
+                choix_nom = st.selectbox(
+                    t("bibliotheque.quel_lieu"), options=sorted(lieux_disponibles.keys()),
+                    key=f"capture_select_{i}",
+                )
+                col_ok, col_annuler = st.columns(2)
+                with col_ok:
+                    if st.button(t("bibliotheque.enregistrer"), key=f"capture_ok_{i}", type="primary"):
+                        lieu_id = lieux_disponibles[choix_nom]
+                        contributeur = store.get_or_create_contributeur(user_id, lieu_id, Role.AUTRE.value)
+                        store.save_free_text_note(lieu_id, contributeur.id, "bibliotheque_capture", text)
+                        st.session_state.pop("capture_message_idx", None)
+                        st.toast(t("bibliotheque.ajoute_succes"), icon="💾")
+                        st.rerun()
+                with col_annuler:
+                    if st.button(t("bibliotheque.annuler"), key=f"capture_annuler_{i}"):
+                        st.session_state.pop("capture_message_idx", None)
+                        st.rerun()
 
     # En deux temps (message ajouté + rerun IMMÉDIAT, puis appel LLM dans le
     # rerun suivant) plutôt qu'un seul passage qui ajoute le message ET
@@ -1357,6 +1346,7 @@ def main():
             st.Page(page_lieux_hybrides, title=t("nav.lieux_hybrides"), icon="🏘️", url_path="lieux-hybrides"),
             st.Page("pages/1_Observatoire.py", title=t("nav.observatoire"), icon="📊"),
             st.Page("pages/2_Portfolio.py", title=t("nav.portfolio"), icon="✨"),
+            st.Page("pages/3_Fiche.py", title=t("nav.fiche"), icon="🔗"),
         ],
     }
     user_id_sonde = st.session_state.get("user_id")

@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import hashlib
 
+import streamlit as st
+
 from .db.store import Store
 from .questionnaire.schema import all_fields
 
@@ -193,6 +195,67 @@ def build_annuaire(store: Store) -> list:
     """Fiches de synthèse pour tous les lieux recensés (toutes personnes confondues)."""
     lieux = store.list_tiers_lieux()
     return [build_fiche_lieu(store, lieu) for lieu in lieux]
+
+
+def render_fiche_header(lieu, derive, nombre_contributeurs: int | None = None) -> None:
+    """Vignette/photo + nom + pays/région + catégories + résumé — partie
+    commune au dialogue de fiche de l'Annuaire (connecté) et à la page de
+    partage publique (sans connexion), pour ne pas dupliquer ce rendu."""
+    donnees = derive.donnees if derive else {}
+    col_vignette, col_info = st.columns([1, 2.5])
+    with col_vignette:
+        if derive and derive.photo_url:
+            st.markdown(photo_html(derive.photo_url, hauteur="10rem"), unsafe_allow_html=True)
+        else:
+            emoji, couleur = default_visual(lieu.nom, donnees)
+            st.markdown(vignette_html(emoji, couleur, hauteur="10rem"), unsafe_allow_html=True)
+    with col_info:
+        st.markdown(f"### {lieu.nom}")
+        suffixe_contrib = f" · {nombre_contributeurs} contributeur(s)" if nombre_contributeurs is not None else ""
+        st.caption(
+            f"{lieu.pays or 'pays non renseigné'} — {lieu.region or 'région non renseignée'}{suffixe_contrib}"
+        )
+        if donnees.get("categories"):
+            st.markdown(category_chips_html(donnees["categories"]), unsafe_allow_html=True)
+        if derive:
+            st.write(donnees.get("resume", ""))
+            if derive.lien_externe:
+                st.markdown(f"[🔗 Fiche externe]({derive.lien_externe})")
+        else:
+            st.info("Pas encore de synthèse générée pour ce lieu.")
+
+
+def render_fiche_sections(store: Store, lieu, derive) -> None:
+    """Grille « Activités / Publics / Territoire... » avec sources — même
+    contenu, même mise en page dans le dialogue Annuaire et la page de
+    partage publique. Ne montre jamais les réponses brutes/témoignages
+    (contrairement au dialogue Annuaire, réservé aux utilisateurs connectés) :
+    ici, seules les synthèses déjà curées par l'enrichissement IA sont
+    affichées, jamais le détail nominatif des réponses."""
+    if not derive:
+        return
+    st.divider()
+    donnees = derive.donnees
+    notes_lieu = store.get_free_text_notes(lieu.id)
+    reponses_lieu = store.get_all_answers_by_contributeur(lieu.id)
+    sections_avec_sources = []
+    for cle, titre in SECTIONS_SYNTHESE[1:]:  # sans "resume", déjà affiché par render_fiche_header
+        sources = source_items_for_section(cle, derive, notes_lieu, reponses_lieu)
+        if sources:
+            sections_avec_sources.append((cle, titre, sources))
+
+    if sections_avec_sources:
+        cols = st.columns(3)
+        for i, (cle, titre, sources) in enumerate(sections_avec_sources):
+            texte = donnees.get(cle) or "—"
+            with cols[i % 3]:
+                st.markdown(f"**{titre}**")
+                st.caption(texte_en_points(texte))
+                with st.popover("Sources", use_container_width=True):
+                    for s in sources:
+                        st.markdown(f"**{s['label']}** : {s['valeur']}")
+    else:
+        st.caption("Pas encore assez d'informations déclarées pour détailler ce lieu par thème.")
 
 
 def lieux_avec_coordonnees(store: Store) -> list:

@@ -186,11 +186,14 @@ class RagToolHandler:
         datasets.append({
             "name": "lieux_enrichis",
             "type": "derive",
-            "columns": ["tiers_lieu", "pays", "region", "resume", "activites", "publics", "territoire",
-                        "gouvernance", "ressources", "besoins", "modele_economique", "partenaires",
-                        "competences", "projets", "enjeux", "mots_cles"],
+            "columns": ["tiers_lieu", "pays", "region", "latitude", "longitude", "resume", "activites",
+                        "publics", "territoire", "gouvernance", "ressources", "besoins", "modele_economique",
+                        "partenaires", "competences", "projets", "enjeux", "mots_cles"],
             "description": ("Synthèses dérivées (1 ligne par lieu), produites par l'enrichissement LLM à partir "
-                             "des réponses brutes. Utile pour filtrer par mots-clés/enjeux/activités en texte."),
+                             "des réponses brutes. Utile pour filtrer par mots-clés/enjeux/activités en texte. "
+                             "C'est ICI (pas reponses_tiers_lieux) que se trouvent latitude/longitude quand "
+                             "elles sont connues (~37 lieux, via l'import CommunECter) — colonnes tiers_lieux, "
+                             "jamais posées comme question du questionnaire donc absentes de reponses_tiers_lieux."),
         })
         return {"datasets": datasets, "geodata": geodata}
 
