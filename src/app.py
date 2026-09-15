@@ -1016,6 +1016,56 @@ def administration_tab(store, user_id: str) -> None:
             else:
                 st.success(message)
 
+    with st.expander("Recherche web : sites des lieux", expanded=False):
+        st.caption(
+            "Scanne la page d'accueil du site externe de chaque lieu (déjà connu via l'import "
+            "CommunECter pour la plupart) pour en extraire ce que le questionnaire ne couvre pas "
+            "encore — capturé en note libre, exploité au prochain « Régénérer les synthèses » "
+            "ci-dessus. Un site indisponible ou sans contenu utile n'interrompt jamais le scan des "
+            "autres lieux. Toujours manuel : contrairement aux réponses déjà en base, un site web "
+            "réel est imprévisible (lent, mal formé, hors ligne) et mérite d'être supervisé."
+        )
+        if st.button("Scanner les sites des lieux référencés"):
+            from src.agent.web_crawl import extraire_et_enregistrer
+            from src.db.supabase_store import SupabaseStore
+
+            if isinstance(admin_store, SupabaseStore):
+                from src.db.migrate_sqlite_to_supabase import get_or_create_service_user
+                owner_user_id = get_or_create_service_user(admin_store.client, "web-crawl-lieux")
+            else:
+                owner_user_id = "web-crawl-lieux"
+
+            a_scanner = []
+            for lieu in admin_store.list_tiers_lieux():
+                derive = admin_store.get_lieu_derive(lieu.id)
+                if derive and derive.lien_externe:
+                    a_scanner.append((lieu, derive.lien_externe))
+
+            if not a_scanner:
+                st.caption("Aucun lieu n'a de site externe renseigné pour l'instant.")
+            else:
+                progress = st.progress(0.0)
+                statut = st.empty()
+                enregistres, rien_dutile, erreurs = 0, 0, []
+                for i, (lieu, url) in enumerate(a_scanner):
+                    statut.caption(f"{lieu.nom} ({url})...")
+                    contributeur = admin_store.get_or_create_contributeur(owner_user_id, lieu.id, Role.AUTRE.value)
+                    resultat = extraire_et_enregistrer(admin_store, lieu.id, contributeur.id, lieu.nom, url)
+                    if resultat == "enregistre":
+                        enregistres += 1
+                    elif resultat == "rien_d_utile":
+                        rien_dutile += 1
+                    else:
+                        erreurs.append(f"{lieu.nom} : {resultat}")
+                    progress.progress((i + 1) / len(a_scanner))
+                statut.empty()
+                progress.empty()
+                message = f"{enregistres} lieu(x) avec du contenu extrait, {rien_dutile} sans contenu utile."
+                if erreurs:
+                    st.warning(message + f" {len(erreurs)} erreur(s) :\n" + "\n".join(erreurs))
+                else:
+                    st.success(message)
+
     with st.expander("Schéma de l'entretien (lecture seule)", expanded=False):
         for module in QUESTIONNAIRE:
             st.markdown(f"#### {module.title} {'· optionnel' if module.optional else '· obligatoire'}")
