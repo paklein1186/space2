@@ -240,6 +240,12 @@ class RagToolHandler:
             target = params.get("target_column")
             if not by:
                 return {"error": "groupby_count nécessite 'by'"}
+            colonnes_inconnues = [c for c in [*by, target] if c and c not in df.columns]
+            if colonnes_inconnues:
+                return {
+                    "error": f"colonne(s) inconnue(s) pour ce dataset : {colonnes_inconnues}",
+                    "colonnes_disponibles": list(df.columns),
+                }
             if target:
                 result = df.groupby(by)[target].nunique()
             else:

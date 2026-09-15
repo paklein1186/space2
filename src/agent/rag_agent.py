@@ -66,7 +66,19 @@ class RagAgent:
 
             tool_results = []
             for tu in tool_uses:
-                result = self.tool_handler.execute(tu.name, tu.input)
+                # Une exception non rattrapée ici laisserait ce message
+                # assistant (avec ses tool_use) sans tool_result correspondant
+                # — non seulement ça fait planter la page en cours, mais la
+                # conversation stockée dans self.messages reste corrompue :
+                # le PROCHAIN message de l'utilisateur renvoie alors une
+                # erreur 400 de l'API ("tool_use ids were found without
+                # tool_result blocks"), plantage constaté en production juste
+                # après un premier plantage sur un tool. Convertir toute
+                # exception en résultat d'erreur normal évite les deux.
+                try:
+                    result = self.tool_handler.execute(tu.name, tu.input)
+                except Exception as exc:
+                    result = {"error": f"{type(exc).__name__}: {exc}"}
                 tool_results.append({
                     "type": "tool_result",
                     "tool_use_id": tu.id,

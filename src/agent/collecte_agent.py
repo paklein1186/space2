@@ -133,11 +133,19 @@ class CollecteAgent:
 
             tool_results = []
             for tu in tool_uses:
-                result = self.tool_handler.execute(tu.name, tu.input)
+                # Voir la même note dans rag_agent.py : une exception non
+                # rattrapée ici laisse le message assistant courant sans
+                # tool_result correspondant, ce qui corrompt durablement
+                # self.messages (prochain appel API rejeté en 400 par
+                # Anthropic) en plus de faire planter la page en cours.
+                try:
+                    result = self.tool_handler.execute(tu.name, tu.input)
+                except Exception as exc:
+                    result = {"error": f"{type(exc).__name__}: {exc}"}
                 tool_results.append({
                     "type": "tool_result",
                     "tool_use_id": tu.id,
-                    "content": json.dumps(result, ensure_ascii=False),
+                    "content": json.dumps(result, ensure_ascii=False, default=str),
                 })
             self.messages.append({"role": "user", "content": tool_results})
 
