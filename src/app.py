@@ -730,9 +730,19 @@ def _tableau_repondants_campagne(admin_store, champ_ids: list) -> None:
     """Tableau des répondants à une campagne prioritaire (email, lieu, rôle,
     et leurs réponses aux champs de la campagne) — tous lieux confondus,
     puisqu'une campagne prioritaire n'est pas limitée à un seul lieu."""
-    lignes = admin_store.get_reponses_pour_champs(champ_ids)
+    champs_schema = [cid for cid in champ_ids if not cid.startswith("libre::")]
+    champs_libres = [cid for cid in champ_ids if cid.startswith("libre::")]
+    if champs_libres:
+        st.caption(
+            "Questions libres collées dans cette campagne (réponses visibles par lieu dans "
+            "« Données brutes » ci-dessous, pas dans ce tableau) : "
+            + " · ".join(field_label(cid) for cid in champs_libres)
+        )
+
+    lignes = admin_store.get_reponses_pour_champs(champs_schema) if champs_schema else []
     if not lignes:
-        st.caption("Aucune réponse pour l'instant.")
+        if not champs_libres:
+            st.caption("Aucune réponse pour l'instant.")
         return
 
     # Regroupe par (lieu, contributeur) : plusieurs lignes brutes (une par
@@ -761,7 +771,7 @@ def _tableau_repondants_campagne(admin_store, champ_ids: list) -> None:
             "Rôle": ROLE_LABELS.get(contributeur.role, contributeur.role) if contributeur else "—",
             "Email": emails.get(contributeur.user_id, "—") if contributeur else "—",
         }
-        for champ_id in champ_ids:
+        for champ_id in champs_schema:
             valeur = reponses.get(champ_id)
             ligne[field_label(champ_id)] = ", ".join(valeur) if isinstance(valeur, list) else (valeur or "—")
         lignes_tableau.append(ligne)
@@ -817,20 +827,28 @@ def administration_tab(store, user_id: str) -> None:
         with st.form("nouvelle_campagne_form", clear_on_submit=True):
             titre = st.text_input("Titre de la campagne")
             description = st.text_area("Description (optionnel)")
-            champ_ids = st.multiselect("Champs prioritaires", options=list(tous_les_champs.keys()),
+            champ_ids = st.multiselect("Champs du questionnaire existant", options=list(tous_les_champs.keys()),
                                         format_func=lambda cid: tous_les_champs[cid])
+            questions_libres_brut = st.text_area(
+                "Questions personnalisées (hors questionnaire, une par ligne)",
+                help="Collées telles quelles, sans passer par le schéma — utile pour une question "
+                     "ponctuelle propre à cette campagne. L'agent les posera comme les autres, et "
+                     "la réponse sera capturée en note libre pour le lieu concerné.",
+            )
             col1, col2 = st.columns(2)
             with col1:
                 date_debut = st.date_input("Début")
             with col2:
                 date_fin = st.date_input("Fin")
             if st.form_submit_button("Créer la campagne"):
-                if not titre or not champ_ids:
-                    st.error("Titre et au moins un champ sont requis.")
+                questions_libres = [f"libre::{q.strip()}" for q in questions_libres_brut.splitlines() if q.strip()]
+                tous_champ_ids = champ_ids + questions_libres
+                if not titre or not tous_champ_ids:
+                    st.error("Titre et au moins un champ (du questionnaire ou personnalisé) sont requis.")
                 else:
                     from src.db.store import CampagnePrioritaire
                     admin_store.save_campagne_prioritaire(CampagnePrioritaire(
-                        titre=titre, description=description or None, champ_ids=champ_ids,
+                        titre=titre, description=description or None, champ_ids=tous_champ_ids,
                         date_debut=date_debut.isoformat(), date_fin=date_fin.isoformat(), cree_par=user_id,
                     ))
                     st.success("Campagne créée.")

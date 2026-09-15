@@ -115,12 +115,20 @@ class CollecteToolHandler:
         # (pas besoin de suivre l'évolution des campagnes en cours de route).
         self._priority_field_ids: list = self._compute_priority_field_ids()
         self._priority_active: bool = bool(self._priority_field_ids)
+        # Questions "libre::" (collées par un admin, hors schéma) répondues
+        # pendant CETTE session — sans schéma derrière, get_answers() ne les
+        # verra jamais (réponse capturée en note libre, pas en reponses
+        # structurées), donc rien d'autre ne marque qu'elles sont déjà
+        # traitées d'un appel à l'autre.
+        self._libres_repondues: set = set()
 
     def _compute_priority_field_ids(self) -> list:
         ids: list = []
         for campagne in self.store.get_active_campagnes_prioritaires():
             for champ_id in campagne.champ_ids:
-                if champ_id not in ids and get_field(champ_id) is not None:
+                if champ_id in ids:
+                    continue
+                if champ_id.startswith("libre::") or get_field(champ_id) is not None:
                     ids.append(champ_id)
         return ids
 
@@ -149,16 +157,34 @@ class CollecteToolHandler:
         if persist:
             self._persist_progress()
 
+    def _priority_field_done(self, champ_id: str, answers: dict) -> bool:
+        """Une question "libre::" (collée par un admin, hors schéma) n'a pas
+        de champ structuré derrière : sa réponse part en note libre et ne
+        peut donc pas être détectée via `answers` — on la suit nous-mêmes,
+        pour la session en cours seulement (voir _libres_repondues)."""
+        if champ_id.startswith("libre::"):
+            return champ_id in self._libres_repondues
+        return answers.get(champ_id) is not None
+
     def _priority_section(self) -> Optional[dict]:
         """Section synthétique construite à la volée à partir des campagnes
         prioritaires actives — pas une modification du schéma statique."""
         answers = self._current_answers()
-        restants = [cid for cid in self._priority_field_ids if answers.get(cid) is None]
+        restants = [cid for cid in self._priority_field_ids if not self._priority_field_done(cid, answers)]
         if not restants:
             self._priority_active = False
             return None
         fields = []
         for champ_id in restants:
+            if champ_id.startswith("libre::"):
+                question = champ_id[len("libre::"):].strip()
+                if not question:
+                    continue
+                fields.append({
+                    "id": champ_id, "label": question, "type": "textarea",
+                    "options": None, "required": False, "help_text": None, "max_choices": None,
+                })
+                continue
             f = get_field(champ_id)
             # field_is_active (pas juste allowed_for) : une campagne peut
             # référencer un champ dont la condition dépend d'un autre champ de
@@ -240,7 +266,16 @@ class CollecteToolHandler:
         champ_id = tool_input["champ_id"]
         valeur = tool_input["valeur"]
         confidentiel = bool(tool_input.get("confidentiel", False))
-        self.store.save_answer(self.tiers_lieu_id, self.contributeur_id, champ_id, valeur, confidentiel)
+        if champ_id.startswith("libre::"):
+            # Question collée par un admin (campagne prioritaire), hors
+            # schéma : pas de champ structuré pour la stocker, on la capture
+            # comme une note libre plutôt qu'une réponse.
+            question = champ_id[len("libre::"):].strip()
+            texte = f"{question}\n→ {valeur}" if question else str(valeur)
+            self.store.save_free_text_note(self.tiers_lieu_id, self.contributeur_id, PRIORITY_MODULE_ID, texte)
+            self._libres_repondues.add(champ_id)
+        else:
+            self.store.save_answer(self.tiers_lieu_id, self.contributeur_id, champ_id, valeur, confidentiel)
 
         if self._priority_active and champ_id in self._priority_field_ids:
             section = self._priority_section()

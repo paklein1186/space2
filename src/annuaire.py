@@ -122,6 +122,8 @@ SECTIONS_SYNTHESE = [
 
 
 def field_label(champ_id: str) -> str:
+    if champ_id.startswith("libre::"):
+        return champ_id[len("libre::"):].strip() or champ_id
     return _LABELS_BY_FIELD_ID.get(champ_id, champ_id)
 
 
