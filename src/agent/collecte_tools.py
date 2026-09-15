@@ -327,6 +327,16 @@ class CollecteToolHandler:
             self._libres_repondues.add(champ_id)
         else:
             self.store.save_answer(self.tiers_lieu_id, self.contributeur_id, champ_id, valeur, confidentiel)
+            if champ_id in ("pays", "region") and valeur:
+                # Synchronise vers la fiche du lieu elle-même (tiers_lieux.pays/
+                # region), pas seulement la réponse structurée — sans ça, un lieu
+                # créé via l'entretien (pas importé) n'a jamais ces colonnes
+                # renseignées : filtres Pays/Région de l'Annuaire inopérants pour
+                # lui, alors même que la réponse existe bien (vécu : "Chateau du
+                # Feÿ" invisible dès qu'un filtre pays était actif, malgré un
+                # entretien complet). Même mécanisme que l'import CommunEcter/CSV,
+                # simplement déclenché ici par l'entretien plutôt qu'un script.
+                self.store.update_tiers_lieu(self.tiers_lieu_id, **{champ_id: valeur})
 
         if self._priority_active and champ_id in self._priority_field_ids:
             section = self._priority_section()
