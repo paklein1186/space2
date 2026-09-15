@@ -1,0 +1,5482 @@
+{
+"1000": {
+"commune": "Brussel",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1020": {
+"commune": "Brussel",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1030": {
+"commune": "Schaarbeek",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1040": {
+"commune": "Etterbeek",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1050": {
+"commune": "Elsene",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1060": {
+"commune": "Sint-Gillis",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1070": {
+"commune": "Anderlecht",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1080": {
+"commune": "Sint-Jans-Molenbeek",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1081": {
+"commune": "Koekelberg",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1082": {
+"commune": "Sint-Agatha-Berchem",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1083": {
+"commune": "Ganshoren",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1090": {
+"commune": "Jette",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1120": {
+"commune": "Brussel",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1130": {
+"commune": "Brussel",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1140": {
+"commune": "Evere",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1150": {
+"commune": "Sint-Pieters-Woluwe",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1160": {
+"commune": "Oudergem",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1170": {
+"commune": "Watermaal-Bosvoorde",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1180": {
+"commune": "Ukkel",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1190": {
+"commune": "Vorst (Brussel-Hoofdstad)",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1200": {
+"commune": "Sint-Lambrechts-Woluwe",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1210": {
+"commune": "Sint-Joost-ten-Node",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1300": {
+"commune": "Waver",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1301": {
+"commune": "Waver",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1310": {
+"commune": "Terhulpen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1315": {
+"commune": "Incourt",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"1320": {
+"commune": "Bevekom",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1325": {
+"commune": "Chaumont-Gistoux",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1330": {
+"commune": "Rixensart",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1331": {
+"commune": "Rixensart",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1332": {
+"commune": "Rixensart",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1340": {
+"commune": "Ottignies-Louvain-la-Neuve",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1341": {
+"commune": "Ottignies-Louvain-la-Neuve",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1342": {
+"commune": "Ottignies-Louvain-la-Neuve",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1348": {
+"commune": "Ottignies-Louvain-la-Neuve",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1350": {
+"commune": "Orp-Jauche",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"1357": {
+"commune": "Hélécine",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"1360": {
+"commune": "Perwijs (Nijvel)",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1367": {
+"commune": "Ramillies",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"1370": {
+"commune": "Geldenaken",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"1380": {
+"commune": "Lasne",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1390": {
+"commune": "Graven",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1400": {
+"commune": "Nijvel",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1401": {
+"commune": "Nijvel",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1402": {
+"commune": "Nijvel",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1404": {
+"commune": "Nijvel",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1410": {
+"commune": "Waterloo",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1420": {
+"commune": "Eigenbrakel",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1421": {
+"commune": "Eigenbrakel",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1428": {
+"commune": "Eigenbrakel",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1430": {
+"commune": "Rebecq",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1435": {
+"commune": "Mont-Saint-Guibert",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1440": {
+"commune": "Kasteelbrakel",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1450": {
+"commune": "Chastre",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1457": {
+"commune": "Walhain",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"1460": {
+"commune": "Itter",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"1461": {
+"commune": "Itter",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"1470": {
+"commune": "Genepiën",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1471": {
+"commune": "Genepiën",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1472": {
+"commune": "Genepiën",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1473": {
+"commune": "Genepiën",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1474": {
+"commune": "Genepiën",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1476": {
+"commune": "Genepiën",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1480": {
+"commune": "Tubeke",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1490": {
+"commune": "Court-Saint-Etienne",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1495": {
+"commune": "Villers-la-Ville",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1500": {
+"commune": "Halle (Halle-Vilvoorde)",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1501": {
+"commune": "Halle (Halle-Vilvoorde)",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1502": {
+"commune": "Halle (Halle-Vilvoorde)",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1540": {
+"commune": "Herne",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1541": {
+"commune": "Middelkerke",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1547": {
+"commune": "Bever",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"1560": {
+"commune": "Hoeilaart",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1570": {
+"commune": "Galmaarden",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"1600": {
+"commune": "Sint-Pieters-Leeuw",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1601": {
+"commune": "Sint-Pieters-Leeuw",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1602": {
+"commune": "Sint-Pieters-Leeuw",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1620": {
+"commune": "Drogenbos",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1630": {
+"commune": "Linkebeek",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1640": {
+"commune": "Sint-Genesius-Rode",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1650": {
+"commune": "Beersel",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1651": {
+"commune": "Beersel",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1652": {
+"commune": "Beersel",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1653": {
+"commune": "Beersel",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1654": {
+"commune": "Beersel",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1670": {
+"commune": "Pepingen",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"1671": {
+"commune": "Pepingen",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"1673": {
+"commune": "Pepingen",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"1674": {
+"commune": "Pepingen",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"1700": {
+"commune": "Dilbeek",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1701": {
+"commune": "Dilbeek",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1702": {
+"commune": "Dilbeek",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1703": {
+"commune": "Dilbeek",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1730": {
+"commune": "Asse",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1731": {
+"commune": "Asse",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1740": {
+"commune": "Ternat",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1741": {
+"commune": "Ternat",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1742": {
+"commune": "Ternat",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1745": {
+"commune": "Opwijk",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1750": {
+"commune": "Lennik",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1755": {
+"commune": "Gooik",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"1760": {
+"commune": "Roosdaal",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1761": {
+"commune": "Roosdaal",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1770": {
+"commune": "Liedekerke",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1780": {
+"commune": "Wemmel",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1785": {
+"commune": "Merchtem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1790": {
+"commune": "Affligem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1800": {
+"commune": "Vilvoorde",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1820": {
+"commune": "Steenokkerzeel",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1830": {
+"commune": "Zulte",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1831": {
+"commune": "Machelen (Halle-Vilvoorde)",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1840": {
+"commune": "Londerzeel",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1850": {
+"commune": "Grimbergen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1851": {
+"commune": "Grimbergen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1852": {
+"commune": "Grimbergen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1853": {
+"commune": "Grimbergen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1860": {
+"commune": "Meise",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1861": {
+"commune": "Meise",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1880": {
+"commune": "Kapelle-op-den-Bos",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1910": {
+"commune": "Tongeren",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1930": {
+"commune": "Zaventem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1932": {
+"commune": "Zaventem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1933": {
+"commune": "Zaventem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1950": {
+"commune": "Kraainem",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1970": {
+"commune": "Wezembeek-Oppem",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"1980": {
+"commune": "Zemst",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1981": {
+"commune": "Aalst (Aalst)",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"1982": {
+"commune": "Zemst",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2000": {
+"commune": "Antwerpen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"2018": {
+"commune": "Antwerpen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"2020": {
+"commune": "Antwerpen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"2030": {
+"commune": "Antwerpen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"2040": {
+"commune": "Antwerpen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"2050": {
+"commune": "Antwerpen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"2060": {
+"commune": "Antwerpen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"2070": {
+"commune": "Zwijndrecht",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2100": {
+"commune": "Diest",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2110": {
+"commune": "Wijnegem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2140": {
+"commune": "Antwerpen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"2150": {
+"commune": "Borsbeek",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"2160": {
+"commune": "Wommelgem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2170": {
+"commune": "Antwerpen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"2180": {
+"commune": "Antwerpen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"2200": {
+"commune": "Herentals",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2220": {
+"commune": "Heist-op-den-Berg",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2221": {
+"commune": "Heist-op-den-Berg",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2222": {
+"commune": "Heist-op-den-Berg",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2223": {
+"commune": "Heist-op-den-Berg",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2230": {
+"commune": "Herselt",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2235": {
+"commune": "Hulshout",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2240": {
+"commune": "Zandhoven",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2242": {
+"commune": "Zandhoven",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2243": {
+"commune": "Zandhoven",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2250": {
+"commune": "Olen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2260": {
+"commune": "Westerlo",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2270": {
+"commune": "Herenthout",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2275": {
+"commune": "Lille",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2280": {
+"commune": "Grobbendonk",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2288": {
+"commune": "Grobbendonk",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2290": {
+"commune": "Vorselaar",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2300": {
+"commune": "Turnhout",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2310": {
+"commune": "Rijkevorsel",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2320": {
+"commune": "Hoogstraten",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"2321": {
+"commune": "Hoogstraten",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"2322": {
+"commune": "Hoogstraten",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"2323": {
+"commune": "Hoogstraten",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"2328": {
+"commune": "Hoogstraten",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"2330": {
+"commune": "Merksplas",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2340": {
+"commune": "Beerse",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2350": {
+"commune": "Vosselaar",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2360": {
+"commune": "Oud-Turnhout",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2370": {
+"commune": "Arendonk",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2380": {
+"commune": "Ravels",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"2381": {
+"commune": "Ravels",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"2382": {
+"commune": "Ravels",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"2387": {
+"commune": "Baarle-Hertog",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2390": {
+"commune": "Malle",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2400": {
+"commune": "Mol",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2430": {
+"commune": "Laakdal",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2431": {
+"commune": "Laakdal",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2440": {
+"commune": "Geel",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2450": {
+"commune": "Meerhout",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2460": {
+"commune": "Kasterlee",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2470": {
+"commune": "Retie",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2480": {
+"commune": "Dessel",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2490": {
+"commune": "Balen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2491": {
+"commune": "Balen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2500": {
+"commune": "Lier",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2520": {
+"commune": "Ranst",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2530": {
+"commune": "Boechout",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2531": {
+"commune": "Boechout",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2540": {
+"commune": "Hove (Antwerpen)",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"2547": {
+"commune": "Lint",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"2550": {
+"commune": "Kontich",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"2560": {
+"commune": "Nijlen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2570": {
+"commune": "Duffel",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2580": {
+"commune": "Putte",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2590": {
+"commune": "Berlaar",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2600": {
+"commune": "Antwerpen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"2610": {
+"commune": "Antwerpen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"2620": {
+"commune": "Hemiksem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2627": {
+"commune": "Schelle",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2630": {
+"commune": "Aartselaar",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2640": {
+"commune": "Mortsel",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"2650": {
+"commune": "Edegem",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"2660": {
+"commune": "Antwerpen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"2800": {
+"commune": "Mechelen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"2801": {
+"commune": "Mechelen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"2811": {
+"commune": "Mechelen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"2812": {
+"commune": "Gingelom",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"2820": {
+"commune": "Bonheiden",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2830": {
+"commune": "Willebroek",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2840": {
+"commune": "Rumst",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2845": {
+"commune": "Niel",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2850": {
+"commune": "Boom",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2860": {
+"commune": "Sint-Katelijne-Waver",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2861": {
+"commune": "Sint-Katelijne-Waver",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2880": {
+"commune": "Bornem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2900": {
+"commune": "Schoten",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2910": {
+"commune": "Essen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2920": {
+"commune": "Kalmthout",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2930": {
+"commune": "Brasschaat",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2940": {
+"commune": "Stabroek",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2950": {
+"commune": "Glabbeek",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"2960": {
+"commune": "Brecht",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2970": {
+"commune": "Schilde",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2980": {
+"commune": "Halle (Halle-Vilvoorde)",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"2990": {
+"commune": "Wuustwezel",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3000": {
+"commune": "Leuven",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"3001": {
+"commune": "Leuven",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"3010": {
+"commune": "Leuven",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"3012": {
+"commune": "Leuven",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"3018": {
+"commune": "Leuven",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"3020": {
+"commune": "Herent",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3040": {
+"commune": "Huldenberg",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3050": {
+"commune": "Oud-Heverlee",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3051": {
+"commune": "Oud-Heverlee",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3052": {
+"commune": "Oud-Heverlee",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3053": {
+"commune": "Oud-Heverlee",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3054": {
+"commune": "Oud-Heverlee",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3060": {
+"commune": "Bertem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3061": {
+"commune": "Bertem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3070": {
+"commune": "Kortenberg",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3071": {
+"commune": "Kortenberg",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3078": {
+"commune": "Kortenberg",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3080": {
+"commune": "Tervuren",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3090": {
+"commune": "Overijse",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3110": {
+"commune": "Rotselaar",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3111": {
+"commune": "Rotselaar",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3118": {
+"commune": "Rotselaar",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3120": {
+"commune": "Tremelo",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3128": {
+"commune": "Tremelo",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3130": {
+"commune": "Begijnendijk",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3140": {
+"commune": "Keerbergen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3150": {
+"commune": "Haacht",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3190": {
+"commune": "Boortmeerbeek",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3191": {
+"commune": "Boortmeerbeek",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3200": {
+"commune": "Aarschot",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3201": {
+"commune": "Aarschot",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3202": {
+"commune": "Aarschot",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3210": {
+"commune": "Lubbeek",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3211": {
+"commune": "Lubbeek",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3212": {
+"commune": "Lubbeek",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3220": {
+"commune": "Holsbeek",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3221": {
+"commune": "Holsbeek",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3270": {
+"commune": "Scherpenheuvel-Zichem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3271": {
+"commune": "Scherpenheuvel-Zichem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3272": {
+"commune": "Scherpenheuvel-Zichem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3290": {
+"commune": "Diest",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3293": {
+"commune": "Diest",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3294": {
+"commune": "Diest",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3300": {
+"commune": "Tienen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3320": {
+"commune": "Hoegaarden",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3321": {
+"commune": "Hoegaarden",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3350": {
+"commune": "Linter",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3360": {
+"commune": "Bierbeek",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3370": {
+"commune": "Boutersem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3380": {
+"commune": "Glabbeek",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3381": {
+"commune": "Glabbeek",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3384": {
+"commune": "Glabbeek",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3390": {
+"commune": "Tielt-Winge",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3391": {
+"commune": "Tielt-Winge",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3400": {
+"commune": "Landen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3401": {
+"commune": "Landen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3404": {
+"commune": "Landen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3440": {
+"commune": "Zoutleeuw",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3450": {
+"commune": "Geetbets",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3454": {
+"commune": "Geetbets",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3460": {
+"commune": "Bekkevoort",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3461": {
+"commune": "Bekkevoort",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3470": {
+"commune": "Kortenaken",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3471": {
+"commune": "Kortenaken",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3472": {
+"commune": "Kortenaken",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3473": {
+"commune": "Kortenaken",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3500": {
+"commune": "Hasselt",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3501": {
+"commune": "Hasselt",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3510": {
+"commune": "Hasselt",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3511": {
+"commune": "Hasselt",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3512": {
+"commune": "Hasselt",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3520": {
+"commune": "Zonhoven",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3530": {
+"commune": "Houthalen-Helchteren",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3540": {
+"commune": "Herk-de-Stad",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3545": {
+"commune": "Halen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3550": {
+"commune": "Heusden-Zolder",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3560": {
+"commune": "Lummen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3570": {
+"commune": "Alken",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3580": {
+"commune": "Beringen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3581": {
+"commune": "Beringen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3582": {
+"commune": "Beringen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3583": {
+"commune": "Beringen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3590": {
+"commune": "Diepenbeek",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3600": {
+"commune": "Genk",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3620": {
+"commune": "Lanaken",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3621": {
+"commune": "Lanaken",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3630": {
+"commune": "Maasmechelen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3631": {
+"commune": "Maasmechelen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3640": {
+"commune": "Kinrooi",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3650": {
+"commune": "Dilsen-Stokkem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3665": {
+"commune": "As",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3668": {
+"commune": "As",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3680": {
+"commune": "Maaseik",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3690": {
+"commune": "Zutendaal",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3700": {
+"commune": "Tongeren",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3717": {
+"commune": "Herstappe",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3720": {
+"commune": "Kortessem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3721": {
+"commune": "Kortessem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3722": {
+"commune": "Kortessem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3723": {
+"commune": "Kortessem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3724": {
+"commune": "Kortessem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3730": {
+"commune": "Hoeselt",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3732": {
+"commune": "Hoeselt",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3740": {
+"commune": "Bilzen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3742": {
+"commune": "Bilzen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3746": {
+"commune": "Bilzen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3770": {
+"commune": "Riemst",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3790": {
+"commune": "Voeren",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3791": {
+"commune": "Voeren",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3792": {
+"commune": "Voeren",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3793": {
+"commune": "Voeren",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3798": {
+"commune": "Voeren",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3800": {
+"commune": "Sint-Truiden",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3803": {
+"commune": "Sint-Truiden",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3806": {
+"commune": "Sint-Truiden",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3830": {
+"commune": "Wellen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3831": {
+"commune": "Wellen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3832": {
+"commune": "Wellen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3840": {
+"commune": "Borgloon",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3850": {
+"commune": "Nieuwerkerken (Hasselt)",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3870": {
+"commune": "Heers",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3890": {
+"commune": "Gingelom",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3891": {
+"commune": "Gingelom",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3920": {
+"commune": "Lommel",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3930": {
+"commune": "Hamont-Achel",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3940": {
+"commune": "Hechtel-Eksel",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3941": {
+"commune": "Hechtel-Eksel",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3945": {
+"commune": "Ham",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3950": {
+"commune": "Bocholt",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"3960": {
+"commune": "Bree",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3970": {
+"commune": "Leopoldsburg",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3971": {
+"commune": "Leopoldsburg",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3980": {
+"commune": "Tessenderlo",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"3990": {
+"commune": "Peer",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4000": {
+"commune": "Luik",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"4020": {
+"commune": "Luik",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"4030": {
+"commune": "Luik",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"4031": {
+"commune": "Luik",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"4032": {
+"commune": "Luik",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"4040": {
+"commune": "Herstal",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"4041": {
+"commune": "Herstal",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"4042": {
+"commune": "Herstal",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"4050": {
+"commune": "Chaudfontaine",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4051": {
+"commune": "Chaudfontaine",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4052": {
+"commune": "Chaudfontaine",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4053": {
+"commune": "Chaudfontaine",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4100": {
+"commune": "Seraing",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"4101": {
+"commune": "Seraing",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"4102": {
+"commune": "Seraing",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"4120": {
+"commune": "Neupré",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4121": {
+"commune": "Neupré",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4122": {
+"commune": "Neupré",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4130": {
+"commune": "Esneux",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4140": {
+"commune": "Sprimont",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4141": {
+"commune": "Sprimont",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4160": {
+"commune": "Anthisnes",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4161": {
+"commune": "Anthisnes",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4162": {
+"commune": "Anthisnes",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4163": {
+"commune": "Anthisnes",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4170": {
+"commune": "Comblain-au-Pont",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4171": {
+"commune": "Comblain-au-Pont",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4180": {
+"commune": "Hamoir",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4181": {
+"commune": "Hamoir",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4190": {
+"commune": "Ferrières",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4210": {
+"commune": "Burdinne",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4217": {
+"commune": "Héron",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4218": {
+"commune": "Héron",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4219": {
+"commune": "Wasseiges",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4250": {
+"commune": "Geer",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4252": {
+"commune": "Geer",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4253": {
+"commune": "Geer",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4254": {
+"commune": "Geer",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4257": {
+"commune": "Berloz",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4260": {
+"commune": "Braives",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4261": {
+"commune": "Braives",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4263": {
+"commune": "Braives",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4280": {
+"commune": "Hannuit",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4287": {
+"commune": "Lijsem",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4300": {
+"commune": "Borgworm",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4317": {
+"commune": "Faimes",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4340": {
+"commune": "Awans",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4342": {
+"commune": "Awans",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4347": {
+"commune": "Fexhe-le-Haut-Clocher",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4350": {
+"commune": "Remicourt",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4351": {
+"commune": "Remicourt",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4357": {
+"commune": "Donceel",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4360": {
+"commune": "Oerle",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4367": {
+"commune": "Crisnée",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4400": {
+"commune": "Flémalle",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4420": {
+"commune": "Saint-Nicolas (Luik)",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"4430": {
+"commune": "Ans",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"4431": {
+"commune": "Ans",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"4432": {
+"commune": "Ans",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"4450": {
+"commune": "Juprelle",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4451": {
+"commune": "Juprelle",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4452": {
+"commune": "Juprelle",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4453": {
+"commune": "Juprelle",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4458": {
+"commune": "Juprelle",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4460": {
+"commune": "Grâce-Hollogne",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"4470": {
+"commune": "Saint-Georges-sur-Meuse",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4480": {
+"commune": "Engis",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4500": {
+"commune": "Hoei",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4520": {
+"commune": "Wanze",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4530": {
+"commune": "Villers-Le-Bouillet",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4537": {
+"commune": "Verlaine",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4540": {
+"commune": "Amay",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4550": {
+"commune": "Nandrin",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4557": {
+"commune": "Tinlot",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4560": {
+"commune": "Clavier",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4570": {
+"commune": "Marchin",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4577": {
+"commune": "Modave",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4590": {
+"commune": "Ouffet",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4600": {
+"commune": "Wezet",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4601": {
+"commune": "Wezet",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4602": {
+"commune": "Wezet",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4606": {
+"commune": "Dalhem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4607": {
+"commune": "Dalhem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4608": {
+"commune": "Dalhem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4610": {
+"commune": "Beyne-Heusay",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"4620": {
+"commune": "Fléron",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"4621": {
+"commune": "Fléron",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"4623": {
+"commune": "Fléron",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"4624": {
+"commune": "Fléron",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"4630": {
+"commune": "Soumagne",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4631": {
+"commune": "Soumagne",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4632": {
+"commune": "Soumagne",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4633": {
+"commune": "Soumagne",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4650": {
+"commune": "Herve",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4651": {
+"commune": "Herve",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4652": {
+"commune": "Herve",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4653": {
+"commune": "Herve",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4654": {
+"commune": "Herve",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4670": {
+"commune": "Blegny",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4671": {
+"commune": "Blegny",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4672": {
+"commune": "Blegny",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4680": {
+"commune": "Oupeye",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4681": {
+"commune": "Oupeye",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4682": {
+"commune": "Oupeye",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4683": {
+"commune": "Oupeye",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4684": {
+"commune": "Oupeye",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4690": {
+"commune": "Bitsingen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4700": {
+"commune": "Eupen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4701": {
+"commune": "Eupen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4710": {
+"commune": "Lontzen",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4711": {
+"commune": "Lontzen",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4720": {
+"commune": "Kelmis",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4721": {
+"commune": "Kelmis",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4728": {
+"commune": "Kelmis",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4730": {
+"commune": "Raeren",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4731": {
+"commune": "Raeren",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4750": {
+"commune": "Bütgenbach",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4760": {
+"commune": "Büllingen",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4761": {
+"commune": "Büllingen",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4770": {
+"commune": "Amel",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4771": {
+"commune": "Amel",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4780": {
+"commune": "Sankt Vith",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4782": {
+"commune": "Büllingen",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4783": {
+"commune": "Sankt Vith",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4784": {
+"commune": "Sankt Vith",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4790": {
+"commune": "Burg-Reuland",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4791": {
+"commune": "Burg-Reuland",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4800": {
+"commune": "Verviers",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"4801": {
+"commune": "Verviers",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"4802": {
+"commune": "Verviers",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"4820": {
+"commune": "Dison",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"4821": {
+"commune": "Dison",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"4830": {
+"commune": "Limburg",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4831": {
+"commune": "Limburg",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4834": {
+"commune": "Limburg",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4837": {
+"commune": "Baelen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4840": {
+"commune": "Welkenraedt",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4841": {
+"commune": "Welkenraedt",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4845": {
+"commune": "Jalhay",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4850": {
+"commune": "Plombières",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4851": {
+"commune": "Plombières",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4852": {
+"commune": "Plombières",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4860": {
+"commune": "Pepinster",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4861": {
+"commune": "Pepinster",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4870": {
+"commune": "Trooz",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4877": {
+"commune": "Olne",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4880": {
+"commune": "Aubel",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4890": {
+"commune": "Walcourt",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4900": {
+"commune": "Spa",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4910": {
+"commune": "Theux",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4920": {
+"commune": "Aywaille",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4950": {
+"commune": "Weismes",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4960": {
+"commune": "Malmedy",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"4970": {
+"commune": "Stavelot",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4980": {
+"commune": "Trois-Ponts",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4983": {
+"commune": "Trois-Ponts",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4987": {
+"commune": "Stoumont",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"4990": {
+"commune": "Lierneux",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5000": {
+"commune": "Namen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"5001": {
+"commune": "Namen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"5002": {
+"commune": "Namen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"5003": {
+"commune": "Namen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"5004": {
+"commune": "Namen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"5020": {
+"commune": "Namen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"5021": {
+"commune": "Namen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"5022": {
+"commune": "Namen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"5024": {
+"commune": "Namen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"5030": {
+"commune": "Gembloux",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"5031": {
+"commune": "Gembloux",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"5032": {
+"commune": "Gembloux",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"5060": {
+"commune": "Sambreville",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"5070": {
+"commune": "Fosses-la-Ville",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5080": {
+"commune": "La Bruyère",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"5081": {
+"commune": "La Bruyère",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"5100": {
+"commune": "Namen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"5101": {
+"commune": "Namen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"5140": {
+"commune": "Sombreffe",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"5150": {
+"commune": "Floreffe",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5170": {
+"commune": "Profondeville",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5190": {
+"commune": "Jemeppe-sur-Sambre",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"5300": {
+"commune": "Andenne",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"5310": {
+"commune": "Eghezée",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5330": {
+"commune": "Assesse",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5332": {
+"commune": "Assesse",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5333": {
+"commune": "Assesse",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5334": {
+"commune": "Assesse",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5336": {
+"commune": "Assesse",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5340": {
+"commune": "Gesves",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5350": {
+"commune": "Ohey",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5351": {
+"commune": "Ohey",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5352": {
+"commune": "Ohey",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5353": {
+"commune": "Ohey",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5354": {
+"commune": "Ohey",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5360": {
+"commune": "Hamois",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5361": {
+"commune": "Hamois",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5362": {
+"commune": "Hamois",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5363": {
+"commune": "Hamois",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5364": {
+"commune": "Hamois",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5370": {
+"commune": "Havelange",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5372": {
+"commune": "Havelange",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5374": {
+"commune": "Havelange",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5376": {
+"commune": "Havelange",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5377": {
+"commune": "Somme-Leuze",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5380": {
+"commune": "Fernelmont",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5500": {
+"commune": "Dinant",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"5501": {
+"commune": "Dinant",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"5502": {
+"commune": "Dinant",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"5503": {
+"commune": "Dinant",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"5504": {
+"commune": "Dinant",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"5520": {
+"commune": "Onhaye",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5521": {
+"commune": "Onhaye",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5522": {
+"commune": "Onhaye",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5523": {
+"commune": "Onhaye",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5524": {
+"commune": "Onhaye",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5530": {
+"commune": "Yvoir",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5537": {
+"commune": "Anhée",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5540": {
+"commune": "Hastière",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5541": {
+"commune": "Hastière",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5542": {
+"commune": "Hastière",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5543": {
+"commune": "Hastière",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5544": {
+"commune": "Hastière",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5550": {
+"commune": "Vresse-sur-Semois",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5555": {
+"commune": "Tintigny",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5560": {
+"commune": "Houyet",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5561": {
+"commune": "Houyet",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5562": {
+"commune": "Houyet",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5563": {
+"commune": "Houyet",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5564": {
+"commune": "Houyet",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5570": {
+"commune": "Beauraing",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5571": {
+"commune": "Beauraing",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5572": {
+"commune": "Beauraing",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5573": {
+"commune": "Beauraing",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5574": {
+"commune": "Beauraing",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5575": {
+"commune": "Gedinne",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5576": {
+"commune": "Beauraing",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5580": {
+"commune": "Rochefort",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5590": {
+"commune": "Ciney",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5600": {
+"commune": "Philippeville",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5620": {
+"commune": "Florennes",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5621": {
+"commune": "Florennes",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5630": {
+"commune": "Cerfontaine",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5640": {
+"commune": "Mettet",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5641": {
+"commune": "Mettet",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5644": {
+"commune": "Mettet",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5646": {
+"commune": "Mettet",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5650": {
+"commune": "Walcourt",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"5651": {
+"commune": "Walcourt",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"5660": {
+"commune": "Couvin",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5670": {
+"commune": "Viroinval",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"5680": {
+"commune": "Doische",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6000": {
+"commune": "Charleroi",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"6001": {
+"commune": "Charleroi",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"6010": {
+"commune": "Charleroi",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"6020": {
+"commune": "Charleroi",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"6030": {
+"commune": "Charleroi",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"6031": {
+"commune": "Charleroi",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"6032": {
+"commune": "Charleroi",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"6040": {
+"commune": "Charleroi",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"6041": {
+"commune": "Charleroi",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"6042": {
+"commune": "Charleroi",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"6043": {
+"commune": "Charleroi",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"6044": {
+"commune": "Charleroi",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"6060": {
+"commune": "Charleroi",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"6061": {
+"commune": "Charleroi",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"6110": {
+"commune": "Montigny-le-Tilleul",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6111": {
+"commune": "Montigny-le-Tilleul",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6120": {
+"commune": "Ham-sur-Heure-Nalinnes",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6140": {
+"commune": "Fontaine-l’Evêque",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6141": {
+"commune": "Fontaine-l’Evêque",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6142": {
+"commune": "Fontaine-l’Evêque",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6150": {
+"commune": "Anderlues",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6180": {
+"commune": "Courcelles",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6181": {
+"commune": "Courcelles",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6182": {
+"commune": "Courcelles",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6183": {
+"commune": "Courcelles",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6200": {
+"commune": "Châtelet",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"6210": {
+"commune": "Les Bons Villers",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6211": {
+"commune": "Les Bons Villers",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6220": {
+"commune": "Fleurus",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6221": {
+"commune": "Fleurus",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6222": {
+"commune": "Fleurus",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6223": {
+"commune": "Fleurus",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6224": {
+"commune": "Fleurus",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6230": {
+"commune": "Pont-à-Celles",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6238": {
+"commune": "Pont-à-Celles",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6240": {
+"commune": "Farciennes",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"6250": {
+"commune": "Aiseau-Presles",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6280": {
+"commune": "Gerpinnes",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6440": {
+"commune": "Froidchapelle",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6441": {
+"commune": "Froidchapelle",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6460": {
+"commune": "Chimay",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6461": {
+"commune": "Chimay",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6462": {
+"commune": "Chimay",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6463": {
+"commune": "Chimay",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6464": {
+"commune": "Chimay",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6470": {
+"commune": "Sivry-Rance",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6500": {
+"commune": "Beaumont",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6511": {
+"commune": "Beaumont",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6530": {
+"commune": "Thuin",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6531": {
+"commune": "Thuin",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6532": {
+"commune": "Thuin",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6533": {
+"commune": "Thuin",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6534": {
+"commune": "Thuin",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6536": {
+"commune": "Thuin",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6540": {
+"commune": "Lobbes",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6542": {
+"commune": "Lobbes",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6543": {
+"commune": "Lobbes",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6560": {
+"commune": "Erquelinnes",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6567": {
+"commune": "Merbes-le-Château",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6590": {
+"commune": "Momignies",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6591": {
+"commune": "Momignies",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6592": {
+"commune": "Momignies",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6593": {
+"commune": "Momignies",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6594": {
+"commune": "Momignies",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6596": {
+"commune": "Momignies",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6600": {
+"commune": "Bastenaken",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6630": {
+"commune": "Martelange",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6637": {
+"commune": "Fauvillers",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6640": {
+"commune": "Vaux-sur-Sûre",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6642": {
+"commune": "Vaux-sur-Sûre",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6660": {
+"commune": "Houffalize",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6661": {
+"commune": "Houffalize",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6662": {
+"commune": "Houffalize",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6663": {
+"commune": "Houffalize",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6666": {
+"commune": "Houffalize",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6670": {
+"commune": "Gouvy",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6671": {
+"commune": "Gouvy",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6672": {
+"commune": "Gouvy",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6673": {
+"commune": "Gouvy",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6674": {
+"commune": "Gouvy",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6680": {
+"commune": "Sainte-Ode",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6681": {
+"commune": "Sainte-Ode",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6686": {
+"commune": "Bertogne",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6687": {
+"commune": "Bertogne",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6688": {
+"commune": "Bertogne",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6690": {
+"commune": "Vielsalm",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6692": {
+"commune": "Vielsalm",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6698": {
+"commune": "Vielsalm",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6700": {
+"commune": "Aarlen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6704": {
+"commune": "Aarlen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6706": {
+"commune": "Aarlen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6717": {
+"commune": "Attert",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6720": {
+"commune": "Habay",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6721": {
+"commune": "Habay",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6723": {
+"commune": "Habay",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6724": {
+"commune": "Habay",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6730": {
+"commune": "Tintigny",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6740": {
+"commune": "Etalle",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6741": {
+"commune": "Etalle",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6742": {
+"commune": "Etalle",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6743": {
+"commune": "Etalle",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6747": {
+"commune": "Saint-Léger (Virton)",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6750": {
+"commune": "Musson",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6760": {
+"commune": "Virton",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6761": {
+"commune": "Virton",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6762": {
+"commune": "Virton",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6767": {
+"commune": "Rouvroy",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6769": {
+"commune": "Meix-devant-Virton",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6780": {
+"commune": "Messancy",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6781": {
+"commune": "Messancy",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6782": {
+"commune": "Messancy",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6790": {
+"commune": "Aubange",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6791": {
+"commune": "Aubange",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6792": {
+"commune": "Aubange",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6800": {
+"commune": "Libramont-Chevigny",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6810": {
+"commune": "Chiny",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6811": {
+"commune": "Chiny",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6812": {
+"commune": "Chiny",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6813": {
+"commune": "Chiny",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6820": {
+"commune": "Florenville",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6821": {
+"commune": "Florenville",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6823": {
+"commune": "Florenville",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6824": {
+"commune": "Florenville",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6830": {
+"commune": "Bouillon",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6831": {
+"commune": "Bouillon",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6832": {
+"commune": "Bouillon",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6833": {
+"commune": "Bouillon",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6834": {
+"commune": "Bouillon",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6836": {
+"commune": "Bouillon",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6838": {
+"commune": "Bouillon",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6840": {
+"commune": "Neufchâteau (Neufchâteau)",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6850": {
+"commune": "Paliseul",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6851": {
+"commune": "Paliseul",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6852": {
+"commune": "Paliseul",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6853": {
+"commune": "Paliseul",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6856": {
+"commune": "Paliseul",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6860": {
+"commune": "Léglise",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6870": {
+"commune": "Saint-Hubert",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6880": {
+"commune": "Bertrix",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6887": {
+"commune": "Herbeumont",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6890": {
+"commune": "Libin",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6900": {
+"commune": "Marche-en-Famenne",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"6920": {
+"commune": "Wellin",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6921": {
+"commune": "Wellin",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6922": {
+"commune": "Wellin",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6924": {
+"commune": "Wellin",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6927": {
+"commune": "Tellin",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6929": {
+"commune": "Daverdisse",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6940": {
+"commune": "Durbuy",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6941": {
+"commune": "Durbuy",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6950": {
+"commune": "Nassogne",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6951": {
+"commune": "Nassogne",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6952": {
+"commune": "Nassogne",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6953": {
+"commune": "Nassogne",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6960": {
+"commune": "Manhay",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6970": {
+"commune": "Tenneville",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6971": {
+"commune": "Tenneville",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6972": {
+"commune": "Tenneville",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6980": {
+"commune": "La Roche-en-Ardenne",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6982": {
+"commune": "La Roche-en-Ardenne",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6983": {
+"commune": "La Roche-en-Ardenne",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6984": {
+"commune": "La Roche-en-Ardenne",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6986": {
+"commune": "La Roche-en-Ardenne",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6987": {
+"commune": "Rendeux",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6990": {
+"commune": "Hotton",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"6997": {
+"commune": "Erezée",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7000": {
+"commune": "Bergen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"7011": {
+"commune": "Bergen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"7012": {
+"commune": "Bergen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"7020": {
+"commune": "Bergen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"7021": {
+"commune": "Bergen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"7022": {
+"commune": "Bergen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"7024": {
+"commune": "Bergen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"7030": {
+"commune": "Bergen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"7031": {
+"commune": "Bergen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"7032": {
+"commune": "Bergen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"7033": {
+"commune": "Bergen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"7034": {
+"commune": "Bergen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"7040": {
+"commune": "Quévy",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7041": {
+"commune": "Quévy",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7050": {
+"commune": "Jurbeke",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7060": {
+"commune": "Zinnik",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7061": {
+"commune": "Zinnik",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7062": {
+"commune": "Zinnik",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7063": {
+"commune": "Zinnik",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7070": {
+"commune": "Le Roeulx",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7080": {
+"commune": "Frameries",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"7090": {
+"commune": "’s Gravenbrakel",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7160": {
+"commune": "Chapelle-lez-Herlaimont",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7190": {
+"commune": "Ecaussinnes",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7191": {
+"commune": "Ecaussinnes",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7300": {
+"commune": "Boussu",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7301": {
+"commune": "Boussu",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7320": {
+"commune": "Bernissart",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7321": {
+"commune": "Bernissart",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7322": {
+"commune": "Bernissart",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7330": {
+"commune": "Saint-Ghislain",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7331": {
+"commune": "Saint-Ghislain",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7332": {
+"commune": "Saint-Ghislain",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7333": {
+"commune": "Saint-Ghislain",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7334": {
+"commune": "Saint-Ghislain",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7340": {
+"commune": "Colfontaine",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"7350": {
+"commune": "Hensies",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7370": {
+"commune": "Dour",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7380": {
+"commune": "Quiévrain",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7382": {
+"commune": "Quiévrain",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7387": {
+"commune": "Honnelles",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7390": {
+"commune": "Quaregnon",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"7500": {
+"commune": "Doornik",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7501": {
+"commune": "Doornik",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7502": {
+"commune": "Doornik",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7503": {
+"commune": "Doornik",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7504": {
+"commune": "Doornik",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7506": {
+"commune": "Doornik",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7520": {
+"commune": "Doornik",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7521": {
+"commune": "Doornik",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7522": {
+"commune": "Doornik",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7530": {
+"commune": "Doornik",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7531": {
+"commune": "Doornik",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7532": {
+"commune": "Doornik",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7533": {
+"commune": "Doornik",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7534": {
+"commune": "Doornik",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7536": {
+"commune": "Doornik",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7538": {
+"commune": "Doornik",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7540": {
+"commune": "Doornik",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7542": {
+"commune": "Doornik",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7543": {
+"commune": "Doornik",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7548": {
+"commune": "Doornik",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7600": {
+"commune": "Péruwelz",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7601": {
+"commune": "Péruwelz",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7602": {
+"commune": "Péruwelz",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7603": {
+"commune": "Péruwelz",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7604": {
+"commune": "Péruwelz",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7608": {
+"commune": "Péruwelz",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7610": {
+"commune": "Rumes",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7611": {
+"commune": "Rumes",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7618": {
+"commune": "Rumes",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7620": {
+"commune": "Brunehaut",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7621": {
+"commune": "Brunehaut",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7622": {
+"commune": "Brunehaut",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7623": {
+"commune": "Brunehaut",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7624": {
+"commune": "Brunehaut",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7640": {
+"commune": "Antoing",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7641": {
+"commune": "Antoing",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7642": {
+"commune": "Antoing",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7643": {
+"commune": "Antoing",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7730": {
+"commune": "Estaimpuis",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7740": {
+"commune": "Pecq",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7742": {
+"commune": "Pecq",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7743": {
+"commune": "Pecq",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7750": {
+"commune": "Mont-de-l’Enclus",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7760": {
+"commune": "Houyet",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7800": {
+"commune": "Aat",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7801": {
+"commune": "Aat",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7802": {
+"commune": "Aat",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7803": {
+"commune": "Aat",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7804": {
+"commune": "Aat",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7810": {
+"commune": "Aat",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7811": {
+"commune": "Profondeville",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7812": {
+"commune": "Aat",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7822": {
+"commune": "Aat",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7823": {
+"commune": "Aat",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"7870": {
+"commune": "Lens",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7880": {
+"commune": "Vloesberg",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7890": {
+"commune": "Elzele",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7900": {
+"commune": "Leuze-en-Hainaut",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7901": {
+"commune": "Leuze-en-Hainaut",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7903": {
+"commune": "Leuze-en-Hainaut",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7904": {
+"commune": "Leuze-en-Hainaut",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7906": {
+"commune": "Leuze-en-Hainaut",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7910": {
+"commune": "Frasnes-lez-Anvaing",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7911": {
+"commune": "Frasnes-lez-Anvaing",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7912": {
+"commune": "Frasnes-lez-Anvaing",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7940": {
+"commune": "Brugelette",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7941": {
+"commune": "Brugelette",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7942": {
+"commune": "Brugelette",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7943": {
+"commune": "Brugelette",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7950": {
+"commune": "Chièvres",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7951": {
+"commune": "Chièvres",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7970": {
+"commune": "Beloeil",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7971": {
+"commune": "Beloeil",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7972": {
+"commune": "Beloeil",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"7973": {
+"commune": "Beloeil",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"8000": {
+"commune": "Brugge",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"8020": {
+"commune": "Oostkamp",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8200": {
+"commune": "Brugge",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"8210": {
+"commune": "Zedelgem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8211": {
+"commune": "Zedelgem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8300": {
+"commune": "Knokke-Heist",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8301": {
+"commune": "Nieuwpoort",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8310": {
+"commune": "Brugge",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"8340": {
+"commune": "Damme",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"8370": {
+"commune": "Blankenberge",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8377": {
+"commune": "Zuienkerke",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"8380": {
+"commune": "Brugge",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"8400": {
+"commune": "Oostende",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"8420": {
+"commune": "De Haan",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8421": {
+"commune": "De Haan",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8430": {
+"commune": "Middelkerke",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8431": {
+"commune": "Middelkerke",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8432": {
+"commune": "Middelkerke",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8433": {
+"commune": "Middelkerke",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8434": {
+"commune": "Middelkerke",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8450": {
+"commune": "Bredene",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"8460": {
+"commune": "Oudenburg",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8470": {
+"commune": "Gistel",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8480": {
+"commune": "Ichtegem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8490": {
+"commune": "Jabbeke",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8500": {
+"commune": "Kortrijk",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"8501": {
+"commune": "Kortrijk",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"8510": {
+"commune": "Kortrijk",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"8511": {
+"commune": "Kortrijk",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"8520": {
+"commune": "Kuurne",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"8530": {
+"commune": "Harelbeke",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"8531": {
+"commune": "Harelbeke",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"8540": {
+"commune": "Deerlijk",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8550": {
+"commune": "Zwevegem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8551": {
+"commune": "Zwevegem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8552": {
+"commune": "Zwevegem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8553": {
+"commune": "Zwevegem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8554": {
+"commune": "Zwevegem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8560": {
+"commune": "Wevelgem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8570": {
+"commune": "Anzegem",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"8572": {
+"commune": "Anzegem",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"8573": {
+"commune": "Anzegem",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"8580": {
+"commune": "Avelgem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8581": {
+"commune": "Avelgem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8582": {
+"commune": "Avelgem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8583": {
+"commune": "Avelgem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8587": {
+"commune": "Spiere-Helkijn",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"8600": {
+"commune": "Diksmuide",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"8610": {
+"commune": "Kortemark",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8620": {
+"commune": "Nieuwpoort",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8630": {
+"commune": "Veurne",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8640": {
+"commune": "Vleteren",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"8647": {
+"commune": "Lo-Reninge",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"8650": {
+"commune": "Houthulst",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8660": {
+"commune": "De Panne",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8670": {
+"commune": "Koksijde",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8680": {
+"commune": "Koekelare",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"8690": {
+"commune": "Alveringem",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"8691": {
+"commune": "Alveringem",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"8700": {
+"commune": "Tielt (Tielt)",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8710": {
+"commune": "Wielsbeke",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8720": {
+"commune": "Dentergem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8730": {
+"commune": "Beernem",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"8740": {
+"commune": "Pittem",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"8750": {
+"commune": "Wingene",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"8755": {
+"commune": "Ruiselede",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"8760": {
+"commune": "Meulebeke",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8770": {
+"commune": "Ingelmunster",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8780": {
+"commune": "Oostrozebeke",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8790": {
+"commune": "Waregem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8791": {
+"commune": "Beveren (Sint-Niklaas)",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8792": {
+"commune": "Waregem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8793": {
+"commune": "Waregem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8800": {
+"commune": "Beveren (Sint-Niklaas)",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8810": {
+"commune": "Lichtervelde",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8820": {
+"commune": "Torhout",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8830": {
+"commune": "Hooglede",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8840": {
+"commune": "Staden",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"8850": {
+"commune": "Ardooie",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8851": {
+"commune": "Ardooie",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8860": {
+"commune": "Lendelede",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8870": {
+"commune": "Izegem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8880": {
+"commune": "Ledegem",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"8890": {
+"commune": "Moorslede",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"8900": {
+"commune": "Ieper",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8902": {
+"commune": "Ieper",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8904": {
+"commune": "Ieper",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8906": {
+"commune": "Ieper",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8908": {
+"commune": "Ieper",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8920": {
+"commune": "Langemark-Poelkapelle",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"8930": {
+"commune": "Menen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8940": {
+"commune": "Wervik",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8950": {
+"commune": "Heuvelland",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"8951": {
+"commune": "Heuvelland",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"8952": {
+"commune": "Heuvelland",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"8953": {
+"commune": "Heuvelland",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"8954": {
+"commune": "Heuvelland",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"8956": {
+"commune": "Heuvelland",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"8957": {
+"commune": "Mesen",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"8958": {
+"commune": "Heuvelland",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"8970": {
+"commune": "Poperinge",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8972": {
+"commune": "Poperinge",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8978": {
+"commune": "Poperinge",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"8980": {
+"commune": "Zonnebeke",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"9000": {
+"commune": "Gent",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"9030": {
+"commune": "Gent",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"9031": {
+"commune": "Gent",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"9032": {
+"commune": "Gent",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"9040": {
+"commune": "Gent",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"9041": {
+"commune": "Gent",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"9050": {
+"commune": "Gent",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"9051": {
+"commune": "Gent",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"9052": {
+"commune": "Gent",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"9060": {
+"commune": "Zelzate",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9070": {
+"commune": "Destelbergen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9080": {
+"commune": "Lochristi",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9090": {
+"commune": "Melle",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9100": {
+"commune": "Sint-Niklaas (Sint-Niklaas)",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9111": {
+"commune": "Sint-Niklaas (Sint-Niklaas)",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9112": {
+"commune": "Sint-Niklaas (Sint-Niklaas)",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9120": {
+"commune": "Beveren (Sint-Niklaas)",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9130": {
+"commune": "Beveren (Sint-Niklaas)",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9140": {
+"commune": "Temse",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9150": {
+"commune": "Kruibeke",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9160": {
+"commune": "Lokeren",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9170": {
+"commune": "Sint-Gillis-Waas",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9180": {
+"commune": "Moerbeke (Gent)",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"9185": {
+"commune": "Wachtebeke",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9190": {
+"commune": "Stekene",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9200": {
+"commune": "Dendermonde",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9220": {
+"commune": "Hamme (Dendermonde)",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9230": {
+"commune": "Wetteren",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9240": {
+"commune": "Zele",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9250": {
+"commune": "Waasmunster",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9255": {
+"commune": "Buggenhout",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9260": {
+"commune": "Wichelen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9270": {
+"commune": "Laarne",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9280": {
+"commune": "Lebbeke",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9290": {
+"commune": "Berlare",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9300": {
+"commune": "Sint-Truiden",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9308": {
+"commune": "Aalst (Aalst)",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9310": {
+"commune": "Aalst (Aalst)",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9320": {
+"commune": "Aalst (Aalst)",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9340": {
+"commune": "Lede",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9400": {
+"commune": "Ninove",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9401": {
+"commune": "Ninove",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9402": {
+"commune": "Ninove",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9403": {
+"commune": "Ninove",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9404": {
+"commune": "Ninove",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9406": {
+"commune": "Ninove",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9420": {
+"commune": "Erpe-Mere",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9450": {
+"commune": "Haaltert",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9451": {
+"commune": "Haaltert",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9470": {
+"commune": "Denderleeuw",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9472": {
+"commune": "Denderleeuw",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9473": {
+"commune": "Denderleeuw",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9500": {
+"commune": "Geraardsbergen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9506": {
+"commune": "Geraardsbergen",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9520": {
+"commune": "Sint-Lievens-Houtem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9521": {
+"commune": "Sint-Lievens-Houtem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9550": {
+"commune": "Herzele",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9551": {
+"commune": "Herzele",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9552": {
+"commune": "Herzele",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9570": {
+"commune": "Lierde",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"9571": {
+"commune": "Lierde",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"9572": {
+"commune": "Lierde",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"9600": {
+"commune": "Ronse",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9620": {
+"commune": "Zottegem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9630": {
+"commune": "Zwalm",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"9636": {
+"commune": "Zwalm",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"9660": {
+"commune": "Brakel",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9661": {
+"commune": "Brakel",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9667": {
+"commune": "Horebeke",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"9680": {
+"commune": "Maarkedal",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"9681": {
+"commune": "Maarkedal",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"9688": {
+"commune": "Maarkedal",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"9690": {
+"commune": "Antwerpen",
+"degurba": 1,
+"milieu_suggere": "Urbain"
+},
+"9700": {
+"commune": "Oudenaarde",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9790": {
+"commune": "Wortegem-Petegem",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"9810": {
+"commune": "Nazareth",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9820": {
+"commune": "Merelbeke",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9830": {
+"commune": "Sint-Martens-Latem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9831": {
+"commune": "Sint-Martens-Latem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9840": {
+"commune": "De Pinte",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9860": {
+"commune": "Oosterzele",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9870": {
+"commune": "Zulte",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9890": {
+"commune": "Gavere",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9900": {
+"commune": "Eeklo",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9940": {
+"commune": "Evergem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9960": {
+"commune": "Assenede",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"9961": {
+"commune": "Assenede",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"9968": {
+"commune": "Assenede",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"9970": {
+"commune": "Kaprijke",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"9971": {
+"commune": "Kaprijke",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"9980": {
+"commune": "Sint-Laureins",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"9981": {
+"commune": "Sint-Laureins",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"9982": {
+"commune": "Sint-Laureins",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"9988": {
+"commune": "Sint-Laureins",
+"degurba": 3,
+"milieu_suggere": "Rural"
+},
+"9990": {
+"commune": "Maldegem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9991": {
+"commune": "Maldegem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+},
+"9992": {
+"commune": "Maldegem",
+"degurba": 2,
+"milieu_suggere": "Semi-rural"
+}
+}

@@ -62,7 +62,11 @@ TOOL_DEFINITIONS = [
             "introduction, et la liste des questions actives pour ce répondant "
             "précis — déjà filtrées selon son rôle, le pays du lieu, et les "
             "réponses déjà données). Appeler ce tool au début de la conversation "
-            "et après chaque changement de section."
+            "et après chaque changement de section. Le champ 'milieu', quand une "
+            "adresse belge est déjà connue, peut porter une clé 'suggestion' "
+            "(commune + milieu probable d'après des données officielles) — "
+            "toujours une proposition à faire confirmer, jamais à poser comme un "
+            "fait acquis."
         ),
         "input_schema": {"type": "object", "properties": {}},
     },
@@ -346,6 +350,27 @@ class CollecteToolHandler:
                 self._persist_progress()
                 return self.get_current_section({})
             return self._advance_module(self._module_id)
+        champs = []
+        for rf in a_demander:
+            champ = {
+                "id": rf.id,
+                "label": rf.field.label,
+                "type": rf.field.type.value,
+                "options": rf.options,
+                "required": rf.field.required,
+                "help_text": rf.field.help_text,
+                "max_choices": rf.field.max_choices,
+            }
+            if rf.id == "milieu" and answers.get("adresse"):
+                # Suggestion à CONFIRMER par le répondant, jamais un
+                # remplissage silencieux — voir degurba.py sur pourquoi
+                # (tentative précédente par géocodage abandonnée pour avoir
+                # écrit des valeurs fausses sans supervision).
+                from ..degurba import suggerer_milieu
+                suggestion = suggerer_milieu(answers["adresse"])
+                if suggestion:
+                    champ["suggestion"] = suggestion
+            champs.append(champ)
         return {
             "module_id": self._module_id,
             "module_title": module.title,
@@ -353,18 +378,7 @@ class CollecteToolHandler:
             "section_id": section.id,
             "section_title": section.title,
             "intro": section.intro,
-            "fields": [
-                {
-                    "id": rf.id,
-                    "label": rf.field.label,
-                    "type": rf.field.type.value,
-                    "options": rf.options,
-                    "required": rf.field.required,
-                    "help_text": rf.field.help_text,
-                    "max_choices": rf.field.max_choices,
-                }
-                for rf in a_demander
-            ],
+            "fields": champs,
         }
 
     def save_answer(self, tool_input: dict) -> dict:
