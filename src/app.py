@@ -37,7 +37,7 @@ from src.annuaire import (
 from src.auth_session import clear_session_cookie, read_session_cookie, save_session_cookie
 from src.db.factory import get_admin_store, get_store
 from src.db.store import Litige
-from src.i18n import language_toggle, t
+from src.i18n import language_toggle, t, t_categorie
 from src.questionnaire.resolver import campagne_completion_stats, completion_stats, country_code_for
 from src.questionnaire.schema import QUESTIONNAIRE, CATEGORIES_POSSIBLES, Role, all_fields
 from src.theme import apply_theme
@@ -329,7 +329,7 @@ def _transmettre_source_entretien(store, state: dict, nom_lieu: str, texte_brut:
         return
     state["history"].append(("user", label_affiche))
     message = f"[Document transmis par le répondant — {source_label}]\n\n{resume}"
-    with st.spinner("L'agent réfléchit..."):
+    with st.spinner(t("entretien.agent_reflechit")):
         reply = _agent_send_surveille(state["agent"], message)
     if reply is None:
         return
@@ -356,14 +356,14 @@ def _soumettre_reponse_rapide(store, state: dict, champ_id: str, label: str, val
     handler = state["agent"].tool_handler
     handler.execute("save_answer", {"champ_id": champ_id, "valeur": valeur})
     if isinstance(valeur, list):
-        valeur_affichee = ", ".join(str(v) for v in valeur) if valeur else "(aucun)"
+        valeur_affichee = ", ".join(str(v) for v in valeur) if valeur else t("entretien.reponse_rapide_aucun")
     elif isinstance(valeur, bool):
-        valeur_affichee = "Oui" if valeur else "Non"
+        valeur_affichee = t("entretien.reponse_rapide_oui") if valeur else t("entretien.reponse_rapide_non")
     else:
         valeur_affichee = str(valeur)
-    state["history"].append(("user", f"⚡ {label} : {valeur_affichee}"))
+    state["history"].append(("user", t("entretien.reponse_rapide_message", label=label, valeur=valeur_affichee)))
     message = f"[Réponse via sélection rapide — déjà enregistrée] {label} : {valeur_affichee}"
-    with st.spinner("L'agent réfléchit..."):
+    with st.spinner(t("entretien.agent_reflechit")):
         reply = _agent_send_surveille(state["agent"], message)
     if reply is None:
         return
@@ -382,17 +382,17 @@ def _widget_reponse_rapide(store, state: dict, field: dict) -> None:
         st.caption(label)
         col_oui, col_non = st.columns(2)
         with col_oui:
-            if st.button("✅ Oui", key=f"{cle}::oui", use_container_width=True):
+            if st.button(t("entretien.reponse_rapide_oui_btn"), key=f"{cle}::oui", use_container_width=True):
                 _soumettre_reponse_rapide(store, state, champ_id, label, True)
         with col_non:
-            if st.button("❌ Non", key=f"{cle}::non", use_container_width=True):
+            if st.button(t("entretien.reponse_rapide_non_btn"), key=f"{cle}::non", use_container_width=True):
                 _soumettre_reponse_rapide(store, state, champ_id, label, False)
         return
 
     if type_champ == "single_choice":
         options = field.get("options") or []
         choix = st.radio(label, options=options, key=f"{cle}::radio", index=None)
-        if choix is not None and st.button("Répondre", key=f"{cle}::btn"):
+        if choix is not None and st.button(t("entretien.reponse_rapide_repondre_btn"), key=f"{cle}::btn"):
             _soumettre_reponse_rapide(store, state, champ_id, label, choix)
         return
 
@@ -400,13 +400,13 @@ def _widget_reponse_rapide(store, state: dict, field: dict) -> None:
         options = field.get("options") or []
         choix = st.multiselect(label, options=options, key=f"{cle}::multi",
                                 max_selections=field.get("max_choices"))
-        if st.button("Répondre", key=f"{cle}::btn", disabled=not choix):
+        if st.button(t("entretien.reponse_rapide_repondre_btn"), key=f"{cle}::btn", disabled=not choix):
             _soumettre_reponse_rapide(store, state, champ_id, label, choix)
         return
 
     if type_champ == "scale_1_5":
         valeur = st.select_slider(label, options=[1, 2, 3, 4, 5], key=f"{cle}::scale")
-        if st.button("Répondre", key=f"{cle}::btn"):
+        if st.button(t("entretien.reponse_rapide_repondre_btn"), key=f"{cle}::btn"):
             _soumettre_reponse_rapide(store, state, champ_id, label, valeur)
         return
 
@@ -426,7 +426,7 @@ def _panneau_choix_rapide(store, state: dict) -> None:
     champs = [f for f in (section or {}).get("fields", []) if f["type"] in TYPES_CHOIX_RAPIDE]
     if not champs:
         return
-    with st.expander("⚡ Réponse rapide", expanded=False):
+    with st.expander(t("entretien.panneau_reponse_rapide_titre"), expanded=False):
         _widget_reponse_rapide(store, state, champs[0])
 
 
@@ -437,7 +437,7 @@ def entretien_tab(store, user_id: str):
         st.info(t("contribution.choisir_pour_demarrer"))
         return
     if not os.environ.get("ANTHROPIC_API_KEY"):
-        st.error("ANTHROPIC_API_KEY n'est pas configuré (voir .env.example).")
+        st.error(t("entretien.anthropic_manquant"))
         return
 
     # tiers_lieu/contributeur ne sont résolus qu'à la création de la session
@@ -452,7 +452,7 @@ def entretien_tab(store, user_id: str):
     session_key = f"agent::{nom_lieu}::{role}"
     mode_key = f"mode_entretien::{session_key}"
     if session_key not in st.session_state and mode_key not in st.session_state:
-        st.subheader("Par où commencer ?")
+        st.subheader(t("entretien.par_ou_commencer"))
         # Description en légende toujours visible sous le bouton plutôt qu'en
         # tooltip au survol (help=) : le tooltip natif de Streamlit se
         # superposait au titre "Par où commencer ?" juste au-dessus (bug de
@@ -462,23 +462,21 @@ def entretien_tab(store, user_id: str):
         campagnes_actives = store.get_active_campagnes_prioritaires()
         col1, col2, col3 = st.columns(3)
         with col1:
-            if st.button("📖 Nourrir l'histoire du lieu", use_container_width=True):
+            if st.button(t("entretien.mode_histoire_btn"), use_container_width=True):
                 st.session_state[mode_key] = "histoire"
                 st.rerun()
-            st.caption("Genèse, défis, description, fonctionnement — l'entretien complet, comme "
-                       "d'habitude.")
+            st.caption(t("entretien.mode_histoire_caption"))
         with col2:
-            label_campagne = "📋 Remplir une campagne en cours" if campagnes_actives else "📋 Aucune campagne active"
+            label_campagne = t("entretien.mode_campagne_btn") if campagnes_actives else t("entretien.mode_campagne_btn_vide")
             if st.button(label_campagne, use_container_width=True, disabled=not campagnes_actives):
                 st.session_state[mode_key] = "campagne"
                 st.rerun()
-            st.caption("Répondre en priorité à un recensement ciblé actuellement ouvert par l'équipe.")
+            st.caption(t("entretien.mode_campagne_caption"))
         with col3:
-            if st.button("📣 Rendre visibles vos besoins actuels", use_container_width=True):
+            if st.button(t("entretien.mode_besoins_btn"), use_container_width=True):
                 st.session_state[mode_key] = "besoins"
                 st.rerun()
-            st.caption("Exprimer directement de quoi le lieu aurait besoin — utilisé dans l'Annuaire "
-                       "et pour la curation du Portfolio.")
+            st.caption(t("entretien.mode_besoins_caption"))
         return
     mode_entretien = st.session_state.get(mode_key, "histoire")
 
@@ -486,11 +484,7 @@ def entretien_tab(store, user_id: str):
         tiers_lieu = store.get_or_create_tiers_lieu(user_id, nom_lieu)
         contributeur = store.get_or_create_contributeur(user_id, tiers_lieu.id, role)
         if contributeur.bloque:
-            st.error(
-                "Votre contribution à ce lieu a été suspendue par un administrateur ou un steward "
-                "de ce lieu, suite à un signalement. Contactez l'équipe si vous pensez qu'il s'agit "
-                "d'une erreur."
-            )
+            st.error(t("entretien.contributeur_bloque"))
             return
 
         # Le nom du lieu est déjà connu (saisi dans la barre latérale) : on le
@@ -530,32 +524,28 @@ def entretien_tab(store, user_id: str):
     if completion:
         st.progress(
             completion["pourcentage"] / 100,
-            text=f"Formulaire de cette campagne complété à {completion['pourcentage']}% "
-                 f"({completion['repondus']}/{completion['total']} questions)",
+            text=t("entretien.progression_campagne", pourcentage=completion["pourcentage"],
+                   repondus=completion["repondus"], total=completion["total"]),
         )
     # Suffixe invisible (espaces de largeur nulle) qui change à chaque analyse
     # réussie : st.expander n'a pas de paramètre `key` dans cette version de
     # Streamlit, et le frontend mémorise l'état ouvert/fermé par identité
     # implicite (position + libellé) — sans ce changement d'identité,
     # `expanded=False` serait ignoré et l'encart resterait ouvert après coup.
-    label_panneau_source = "📎 Transmettre un site, un document, ou un texte" + (
+    label_panneau_source = t("entretien.transmettre_source_titre") + (
         "​" * state.get("panneau_source_version", 0)
     )
     with st.expander(label_panneau_source, expanded=False):
-        st.caption(
-            "De quoi enrichir l'entretien sans tout retaper : un lien vers votre site, un document "
-            "existant (charte, plaquette, rapport...), ou un texte collé. L'agent en tire ce qui est "
-            "utile puis poursuit l'entretien avec."
-        )
-        url_source = st.text_input("URL d'un site à analyser", key=f"{session_key}::crawl_url")
-        if st.button("Analyser ce site", key=f"{session_key}::crawl_url_btn") and url_source.strip():
+        st.caption(t("entretien.transmettre_source_caption"))
+        url_source = st.text_input(t("entretien.url_a_analyser"), key=f"{session_key}::crawl_url")
+        if st.button(t("entretien.analyser_site_btn"), key=f"{session_key}::crawl_url_btn") and url_source.strip():
             from src.agent.web_crawl import fetch_page_text
             url_source = url_source.strip()
             try:
-                with st.spinner("Récupération de la page..."):
+                with st.spinner(t("entretien.recuperation_page")):
                     texte_brut = fetch_page_text(url_source)
             except Exception as exc:
-                st.error(f"Impossible de récupérer cette page : {exc}")
+                st.error(t("entretien.echec_recuperation_page", erreur=exc))
                 texte_brut = None
             if texte_brut:
                 _transmettre_source_entretien(
@@ -563,15 +553,15 @@ def entretien_tab(store, user_id: str):
                     f"📎 Site transmis : {url_source}",
                 )
 
-        fichier = st.file_uploader("Déposer un document (txt, docx, pdf)", type=["txt", "docx", "pdf"],
+        fichier = st.file_uploader(t("entretien.deposer_document"), type=["txt", "docx", "pdf"],
                                     key=f"{session_key}::crawl_file")
-        if fichier is not None and st.button("Analyser ce document", key=f"{session_key}::crawl_file_btn"):
+        if fichier is not None and st.button(t("entretien.analyser_document_btn"), key=f"{session_key}::crawl_file_btn"):
             from src.agent.web_crawl import extraire_texte_fichier
             try:
-                with st.spinner("Lecture du document..."):
+                with st.spinner(t("entretien.lecture_document")):
                     texte_brut = extraire_texte_fichier(fichier)
             except Exception as exc:
-                st.error(f"Impossible de lire ce document : {exc}")
+                st.error(t("entretien.echec_lecture_document", erreur=exc))
                 texte_brut = None
             if texte_brut:
                 _transmettre_source_entretien(
@@ -579,9 +569,8 @@ def entretien_tab(store, user_id: str):
                     f"📎 Document transmis : {fichier.name}",
                 )
 
-        texte_colle = st.text_area("Coller un texte (extrait d'un document, description existante...)",
-                                    key=f"{session_key}::crawl_texte")
-        if st.button("Analyser ce texte", key=f"{session_key}::crawl_texte_btn") and texte_colle.strip():
+        texte_colle = st.text_area(t("entretien.coller_texte"), key=f"{session_key}::crawl_texte")
+        if st.button(t("entretien.analyser_texte_btn"), key=f"{session_key}::crawl_texte_btn") and texte_colle.strip():
             _transmettre_source_entretien(
                 store, state, nom_lieu, texte_colle.strip(), "un texte collé par le répondant",
                 "📎 Texte collé transmis",
@@ -592,7 +581,7 @@ def entretien_tab(store, user_id: str):
     # après ce rendu pour ne pas ressurgir aux tours suivants.
     dernier_apport = state.pop("dernier_apport", None)
     if dernier_apport:
-        st.success(f"**Intégré à l'entretien** — {dernier_apport['label']}\n\n{dernier_apport['resume']}")
+        st.success(t("entretien.apport_integre", label=dernier_apport["label"], resume=dernier_apport["resume"]))
 
     for speaker, text in state["history"]:
         with st.chat_message(speaker):
@@ -615,7 +604,7 @@ def entretien_tab(store, user_id: str):
 
     if state.get("reponse_en_attente"):
         reponse_en_attente = state["reponse_en_attente"]
-        with st.spinner("L'agent réfléchit..."):
+        with st.spinner(t("entretien.agent_reflechit")):
             reply = _agent_send_surveille(state["agent"], reponse_en_attente)
         if reply is None:
             # reponse_en_attente n'est pas effacée : le message du répondant
@@ -644,7 +633,7 @@ def _auto_enrich_one(store, lieu) -> None:
         pass  # une synthèse en échec ne doit jamais bloquer l'affichage de la fiche
 
 
-@st.dialog("Fiche du lieu", width="large")
+@st.dialog(t("fiche_dialog.title"), width="large")
 def _fiche_dialog(store, fiche, est_admin: bool, user_id: str):
     lieu = fiche["tiers_lieu"]
     # Vérifié une seule fois par ouverture de fiche, pas une seule fois par
@@ -668,38 +657,38 @@ def _fiche_dialog(store, fiche, est_admin: bool, user_id: str):
 
     col_partager, col_steward = st.columns(2)
     with col_partager:
-        with st.popover("🔗 Partager", use_container_width=True):
+        with st.popover(t("fiche_dialog.partager"), use_container_width=True):
             lien_partage = f"{URL_BASE_APP}/fiche?lieu={lieu.id}"
-            st.caption("Lien public en lecture seule, sans connexion nécessaire :")
+            st.caption(t("fiche_dialog.lien_public"))
             st.code(lien_partage, language=None)
     with col_steward:
-        if st.button("🌱 Revendiquer le suivi de ce lieu (steward)", key=f"nourrir_{lieu.id}",
+        if st.button(t("fiche_dialog.revendiquer_steward"), key=f"nourrir_{lieu.id}",
                      use_container_width=True):
             st.session_state["preselect_lieu"] = lieu.nom
             st.session_state["preselect_role"] = "steward"
-            st.toast(f"« {lieu.nom} » sélectionné — rendez-vous dans l'onglet Entretien.", icon="🌱")
+            st.toast(t("fiche_dialog.steward_toast", nom=lieu.nom), icon="🌱")
 
     render_fiche_sections(store, lieu, derive)
 
     if derive:
-        with st.expander("Modifier le lien externe / la photo"):
+        with st.expander(t("fiche_dialog.modifier_lien_photo")):
             with st.form(f"liens_{lieu.id}"):
-                nouveau_lien = st.text_input("Lien externe (ex. fiche tiers-lieux.xyz)",
+                nouveau_lien = st.text_input(t("fiche_dialog.lien_externe_input"),
                                               value=derive.lien_externe or "")
-                nouvelle_photo = st.text_input("URL de la photo",
+                nouvelle_photo = st.text_input(t("fiche_dialog.url_photo"),
                                                 value=derive.photo_url or "")
-                if st.form_submit_button("Enregistrer"):
+                if st.form_submit_button(t("fiche_dialog.enregistrer")):
                     store.update_lieu_derive_liens(lieu.id, nouveau_lien or None, nouvelle_photo or None)
                     st.rerun()
 
-    with st.expander("Voir toutes les réponses brutes et témoignages"):
+    with st.expander(t("fiche_dialog.voir_reponses_brutes")):
         for label, entries in fiche["par_champ"].items():
             valeurs = ", ".join(str(e["valeur"]) for e in entries)
             st.markdown(f"**{label}** : {valeurs}")
         if fiche["temoignages"]:
-            st.markdown("**Témoignages libres**")
-            for t in fiche["temoignages"]:
-                st.markdown(f"> {t['texte']}")
+            st.markdown(f"**{t('fiche_dialog.temoignages_libres')}**")
+            for temoignage in fiche["temoignages"]:
+                st.markdown(f"> {temoignage['texte']}")
 
     if derive and _est_steward_ou_admin(store, lieu.id, user_id, est_admin):
         st.divider()
@@ -726,40 +715,40 @@ def _fiche_dialog(store, fiche, est_admin: bool, user_id: str):
 
 
 def _historique_et_moderation(store, lieu, contributeurs_lieu: list, est_admin: bool, user_id: str) -> None:
-    with st.expander("Historique & modération"):
-        st.markdown("**Contributeurs de ce lieu**")
+    with st.expander(t("moderation.historique_titre")):
+        st.markdown(f"**{t('moderation.contributeurs_titre')}**")
         for c in contributeurs_lieu:
             col1, col2 = st.columns([4, 1])
             with col1:
-                suffixe = " (vous)" if c.user_id == user_id else ""
-                statut = " · 🚫 bloqué" if c.bloque else ""
+                suffixe = t("moderation.vous_suffixe") if c.user_id == user_id else ""
+                statut = t("moderation.bloque_suffixe") if c.bloque else ""
                 st.write(f"{ROLE_LABELS.get(c.role, c.role)} — `{c.user_id}`{suffixe}{statut}")
             with col2:
                 if c.user_id == user_id:
                     pass
                 elif c.bloque:
-                    if st.button("Débloquer", key=f"unblock_{c.id}"):
+                    if st.button(t("moderation.debloquer"), key=f"unblock_{c.id}"):
                         admin_store = _admin_store_or_error()
                         if admin_store:
                             admin_store.set_contributeur_bloque(c.id, False)
                             st.rerun()
                 else:
-                    if st.button("Bloquer", key=f"block_{c.id}"):
+                    if st.button(t("moderation.bloquer"), key=f"block_{c.id}"):
                         admin_store = _admin_store_or_error()
                         if admin_store:
                             admin_store.set_contributeur_bloque(c.id, True, bloque_par=user_id)
                             st.rerun()
 
-        st.markdown("**Signaler un litige**")
+        st.markdown(f"**{t('moderation.signaler_litige_titre')}**")
         options_cible = [None] + [c.id for c in contributeurs_lieu]
         labels_cible = {c.id: f"{ROLE_LABELS.get(c.role, c.role)} — {c.user_id}" for c in contributeurs_lieu}
         with st.form(f"litige_{lieu.id}", clear_on_submit=True):
-            description = st.text_area("Description du désaccord")
-            cible = st.selectbox("Contributeur concerné (optionnel)", options=options_cible,
+            description = st.text_area(t("moderation.description_desaccord"))
+            cible = st.selectbox(t("moderation.contributeur_concerne"), options=options_cible,
                                   format_func=lambda cid: "—" if cid is None else labels_cible.get(cid, cid))
-            if st.form_submit_button("Signaler"):
+            if st.form_submit_button(t("moderation.signaler")):
                 if not description.strip():
-                    st.error("Décrivez le désaccord avant de signaler.")
+                    st.error(t("moderation.decrire_avant_signaler"))
                 else:
                     admin_store = _admin_store_or_error()
                     if admin_store:
@@ -767,32 +756,32 @@ def _historique_et_moderation(store, lieu, contributeurs_lieu: list, est_admin: 
                             tiers_lieu_id=lieu.id, description=description.strip(),
                             signale_par=user_id, contributeur_vise_id=cible,
                         ))
-                        st.success("Litige signalé.")
+                        st.success(t("moderation.litige_signale"))
                         st.rerun()
 
         litiges = store.list_litiges(lieu.id)
         if litiges:
-            st.markdown("**Litiges**")
+            st.markdown(f"**{t('moderation.litiges_titre')}**")
             for lit in litiges:
                 col1, col2 = st.columns([4, 1])
                 with col1:
-                    marque = "🟢 résolu" if lit.statut == "resolu" else "🔴 ouvert"
+                    marque = t("moderation.resolu") if lit.statut == "resolu" else t("moderation.ouvert")
                     st.write(f"{marque} — {lit.description}")
                 with col2:
                     if est_admin and lit.statut == "ouvert":
-                        if st.button("Résoudre", key=f"resoudre_{lit.id}"):
+                        if st.button(t("moderation.resoudre"), key=f"resoudre_{lit.id}"):
                             admin_store = _admin_store_or_error()
                             if admin_store:
                                 admin_store.resoudre_litige(lit.id)
                                 st.rerun()
 
-        st.markdown("**Historique récent**")
+        st.markdown(f"**{t('moderation.historique_recent_titre')}**")
         historique = store.get_historique(lieu.id, limite=30)
         if not historique:
-            st.caption("Aucun historique pour l'instant.")
+            st.caption(t("moderation.aucun_historique"))
         for h in historique:
             role = h.get("contributeur_role") or "?"
-            champ = h.get("champ_id") or "note libre"
+            champ = h.get("champ_id") or t("moderation.note_libre_champ")
             statut_contrib = " 🚫" if h.get("contributeur_bloque") else ""
             st.caption(f"{h.get('cree_le', '')} — {role}{statut_contrib} — {champ} : {h.get('valeur')}")
 
@@ -804,7 +793,7 @@ def annuaire_tab(store, est_admin: bool, user_id: str):
     # peu significatif pour qui parcourt la liste.
     lieux = sorted(store.list_tiers_lieux(), key=lambda l: l.nom.lower())
     if not lieux:
-        st.info("Aucun lieu recensé pour l'instant.")
+        st.info(t("annuaire.aucun_lieu"))
         return
 
     # La grille n'a besoin que de list_tiers_lieux + un batch de lieu_derive
@@ -831,17 +820,18 @@ def annuaire_tab(store, est_admin: bool, user_id: str):
     # nom/région/pays que par le passé.
     recherche = st.selectbox(
         "Rechercher", options=sorted(l.nom for l in lieux), index=None,
-        accept_new_options=True, placeholder="🔍 Nom, ville, région...", label_visibility="collapsed",
+        accept_new_options=True, placeholder=t("annuaire.rechercher_placeholder"), label_visibility="collapsed",
     ) or ""
     col_pays, col_region, col_categories = st.columns(3)
     with col_pays:
         options_pays = sorted({l.pays for l in lieux if l.pays})
-        filtre_pays = st.multiselect("Pays", options=options_pays)
+        filtre_pays = st.multiselect(t("annuaire.filtre_pays"), options=options_pays)
     with col_region:
         options_region = sorted({l.region for l in lieux if l.region})
-        filtre_region = st.multiselect("Région", options=options_region)
+        filtre_region = st.multiselect(t("annuaire.filtre_region"), options=options_region)
     with col_categories:
-        filtre_categories = st.multiselect("Catégorie", options=CATEGORIES_POSSIBLES)
+        filtre_categories = st.multiselect(t("annuaire.filtre_categorie"), options=CATEGORIES_POSSIBLES,
+                                            format_func=t_categorie)
 
     lieux_affiches = lieux
     if recherche.strip():
@@ -861,7 +851,7 @@ def annuaire_tab(store, est_admin: bool, user_id: str):
                 derive_par_lieu.get(l.id)
             )
         ]
-    st.caption(f"{len(lieux_affiches)} lieu(x) affiché(s)")
+    st.caption(t("annuaire.lieux_affiches", n=len(lieux_affiches)))
 
     coords = lieux_avec_coordonnees(lieux_affiches)
     if coords:
@@ -933,7 +923,7 @@ def annuaire_tab(store, est_admin: bool, user_id: str):
             # _fiche_dialog ne revérifiait plus jamais ce lieu une fois
             # marqué "déjà enrichi" pour toute la session.
             st.session_state.pop("fiche_enrichie_lieu_id", None)
-            with st.spinner("Chargement de la fiche..."):
+            with st.spinner(t("annuaire.chargement_fiche")):
                 fiche = build_fiche_lieu(store, lieu_ouvert)
             _fiche_dialog(store, fiche, est_admin, user_id)
 
@@ -977,35 +967,28 @@ def _besoins_mis_en_avant_form(store, lieu, derive) -> None:
     souhaites), lesquels mettre en avant publiquement sur la fiche du lieu
     (Annuaire) et dans le Portfolio — la liste brute déclarée peut être
     longue et pas destinée telle quelle à un affichage public."""
-    st.markdown("**Besoins mis en avant**")
+    st.markdown(f"**{t('besoins.titre')}**")
     answers = store.get_answers(lieu.id)
     besoins_declares = answers.get("types_soutien_souhaites") or []
     if not besoins_declares:
-        st.caption(
-            "Aucun besoin déclaré pour l'instant — répondez à « 📣 Rendre visibles vos besoins "
-            "actuels » dans l'entretien pour pouvoir en mettre en avant ici."
-        )
+        st.caption(t("besoins.aucun_declare"))
         return
-    st.caption(
-        "Cochez ceux à afficher publiquement (Annuaire et Portfolio) — les autres besoins "
-        "déclarés restent enregistrés mais ne sont pas montrés."
-    )
+    st.caption(t("besoins.cocher_afficher"))
     with st.form(f"besoins_avant_{lieu.id}"):
         choix = st.multiselect(
-            "Besoins à mettre en avant", options=besoins_declares,
+            t("besoins.a_mettre_en_avant"), options=besoins_declares,
             default=[b for b in (derive.besoins_mis_en_avant or []) if b in besoins_declares],
         )
-        if st.form_submit_button("Enregistrer"):
+        if st.form_submit_button(t("fiche_dialog.enregistrer")):
             store.update_besoins_mis_en_avant(lieu.id, choix)
-            st.success("Besoins mis en avant mis à jour.")
+            st.success(t("besoins.mis_a_jour"))
             st.rerun()
 
 
 def _admin_portfolio_form(store, lieu, derive) -> None:
-    st.markdown("**Administration — Portfolio**")
+    st.markdown(f"**{t('portfolio_admin.titre')}**")
     if derive is None:
-        st.caption("Une synthèse doit d'abord être générée pour ce lieu avant de pouvoir "
-                    "l'inclure au Portfolio.")
+        st.caption(t("portfolio_admin.synthese_requise"))
         return
 
     # Case à cocher hors formulaire, sauvegardée immédiatement via on_change —
@@ -1031,28 +1014,28 @@ def _admin_portfolio_form(store, lieu, derive) -> None:
         )
 
     st.checkbox(
-        "Inclure ce lieu dans le Portfolio public", value=bool(derive.inclus_portfolio),
+        t("portfolio_admin.inclure"), value=bool(derive.inclus_portfolio),
         key=f"portfolio_inclus_{lieu.id}", on_change=_bascule_inclusion,
-        help="Sauvegardé immédiatement, sans passer par le bouton Enregistrer ci-dessous.",
+        help=t("portfolio_admin.inclure_help"),
     )
 
     with st.form(f"portfolio_campagne_{lieu.id}"):
-        campagne_texte = st.text_area("Texte de campagne (appel, contexte des besoins)",
+        campagne_texte = st.text_area(t("portfolio_admin.texte_campagne"),
                                        value=derive.campagne_texte or "")
         col1, col2 = st.columns(2)
         with col1:
-            campagne_objectif = st.text_input("Objectif (ex. montant recherché)",
+            campagne_objectif = st.text_input(t("portfolio_admin.objectif"),
                                                 value=derive.campagne_objectif or "")
         with col2:
-            campagne_contact = st.text_input("Contact", value=derive.campagne_contact or "")
-        if st.form_submit_button("Enregistrer la campagne"):
+            campagne_contact = st.text_input(t("portfolio_admin.contact"), value=derive.campagne_contact or "")
+        if st.form_submit_button(t("portfolio_admin.enregistrer_campagne")):
             admin_store = _admin_store_or_error()
             if admin_store:
                 admin_store.update_portfolio_entry(
                     lieu.id, bool(derive.inclus_portfolio), campagne_texte or None,
                     campagne_objectif or None, campagne_contact or None,
                 )
-                st.success("Campagne mise à jour.")
+                st.success(t("portfolio_admin.campagne_maj"))
                 st.rerun()
 
 

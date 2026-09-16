@@ -12,6 +12,7 @@ import hashlib
 import streamlit as st
 
 from .db.store import Store
+from .i18n import t, t_categorie
 from .questionnaire.schema import all_fields
 
 # Palette de secours pour la vignette d'un lieu sans photo — couleur stable
@@ -92,12 +93,15 @@ def texte_en_points(texte: str) -> str:
 
 
 def category_chips_html(categories: list) -> str:
+    """`categories` : valeurs canoniques françaises (clé de couleur ET de
+    filtre) — seul le texte affiché dans le chip passe par t_categorie(),
+    jamais la clé de couleur ni la valeur stockée."""
     if not categories:
         return ""
     chips = "".join(
         f'<span style="background:{_CATEGORY_COLORS.get(c, "#888")};color:#fff;font-size:0.72rem;'
         f'padding:2px 8px;border-radius:10px;margin-right:4px;display:inline-block;'
-        f'margin-bottom:4px;">{c}</span>'
+        f'margin-bottom:4px;">{t_categorie(c)}</span>'
         for c in categories
     )
     return f'<div style="margin:4px 0;">{chips}</div>'
@@ -121,21 +125,24 @@ def besoins_chips_html(besoins: list) -> str:
 
 _LABELS_BY_FIELD_ID = {f.id: f.label for _, _, f in all_fields()}
 
-# Ordre et libellés d'affichage des sections homogénéisées de l'Annuaire —
-# doit correspondre à agent.enrichissement.CHAMPS_LONGUEUR_CIBLE + resume.
+# Ordre et clés i18n des sections homogénéisées de l'Annuaire — doit
+# correspondre à agent.enrichissement.CHAMPS_LONGUEUR_CIBLE + resume. Le
+# libellé n'est PAS résolu ici (module chargé une fois à l'import, avant
+# qu'une langue soit choisie) : chaque appelant fait t(cle_i18n) au moment
+# de l'affichage, pour réagir à la bascule de langue en cours de session.
 SECTIONS_SYNTHESE = [
-    ("resume", "Résumé"),
-    ("activites", "Activités"),
-    ("publics", "Publics"),
-    ("territoire", "Territoire"),
-    ("gouvernance", "Gouvernance"),
-    ("ressources", "Ressources"),
-    ("besoins", "Besoins"),
-    ("modele_economique", "Modèle économique"),
-    ("partenaires", "Partenaires"),
-    ("competences", "Compétences"),
-    ("projets", "Projets"),
-    ("enjeux", "Enjeux"),
+    ("resume", "section.resume"),
+    ("activites", "section.activites"),
+    ("publics", "section.publics"),
+    ("territoire", "section.territoire"),
+    ("gouvernance", "section.gouvernance"),
+    ("ressources", "section.ressources"),
+    ("besoins", "section.besoins"),
+    ("modele_economique", "section.modele_economique"),
+    ("partenaires", "section.partenaires"),
+    ("competences", "section.competences"),
+    ("projets", "section.projets"),
+    ("enjeux", "section.enjeux"),
 ]
 
 
@@ -194,7 +201,7 @@ def source_items_for_section(section_key: str, lieu_derive, notes: list, par_con
             except ValueError:
                 continue
             if 0 <= idx < len(notes):
-                items.append({"type": "note", "label": "Note libre", "valeur": notes[idx]["texte"]})
+                items.append({"type": "note", "label": t("fiche.note_libre"), "valeur": notes[idx]["texte"]})
         else:
             for contributeur_id, reponses in par_contributeur.items():
                 if source_id in reponses:
@@ -227,9 +234,12 @@ def render_fiche_header(lieu, derive, nombre_contributeurs: int | None = None) -
             st.markdown(vignette_html(emoji, couleur, hauteur="10rem"), unsafe_allow_html=True)
     with col_info:
         st.markdown(f"### {lieu.nom}")
-        suffixe_contrib = f" · {nombre_contributeurs} contributeur(s)" if nombre_contributeurs is not None else ""
+        suffixe_contrib = (
+            t("fiche.contributeurs_suffixe", n=nombre_contributeurs) if nombre_contributeurs is not None else ""
+        )
         st.caption(
-            f"{lieu.pays or 'pays non renseigné'} — {lieu.region or 'région non renseignée'}{suffixe_contrib}"
+            f"{lieu.pays or t('fiche.pays_non_renseigne')} — "
+            f"{lieu.region or t('fiche.region_non_renseignee')}{suffixe_contrib}"
         )
         if donnees.get("categories"):
             st.markdown(category_chips_html(donnees["categories"]), unsafe_allow_html=True)
@@ -238,9 +248,9 @@ def render_fiche_header(lieu, derive, nombre_contributeurs: int | None = None) -
         if derive:
             st.write(donnees.get("resume", ""))
             if derive.lien_externe:
-                st.markdown(f"[🔗 Fiche externe]({derive.lien_externe})")
+                st.markdown(f"[{t('fiche.lien_externe')}]({derive.lien_externe})")
         else:
-            st.info("Pas encore de synthèse générée pour ce lieu.")
+            st.info(t("fiche.pas_de_synthese"))
 
 
 def render_fiche_sections(store: Store, lieu, derive, montrer_sources: bool = True) -> None:
@@ -262,28 +272,28 @@ def render_fiche_sections(store: Store, lieu, derive, montrer_sources: bool = Tr
     if montrer_sources:
         notes_lieu = store.get_free_text_notes(lieu.id)
         reponses_lieu = store.get_all_answers_by_contributeur(lieu.id)
-        for cle, titre in SECTIONS_SYNTHESE[1:]:  # sans "resume", déjà affiché par render_fiche_header
+        for cle, titre_key in SECTIONS_SYNTHESE[1:]:  # sans "resume", déjà affiché par render_fiche_header
             sources = source_items_for_section(cle, derive, notes_lieu, reponses_lieu)
             if sources:
-                sections_avec_sources.append((cle, titre, sources))
+                sections_avec_sources.append((cle, titre_key, sources))
     else:
         sections_avec_sources = [
-            (cle, titre, None) for cle, titre in SECTIONS_SYNTHESE[1:] if donnees.get(cle)
+            (cle, titre_key, None) for cle, titre_key in SECTIONS_SYNTHESE[1:] if donnees.get(cle)
         ]
 
     if sections_avec_sources:
         cols = st.columns(3)
-        for i, (cle, titre, sources) in enumerate(sections_avec_sources):
+        for i, (cle, titre_key, sources) in enumerate(sections_avec_sources):
             texte = donnees.get(cle) or "—"
             with cols[i % 3]:
-                st.markdown(f"**{titre}**")
+                st.markdown(f"**{t(titre_key)}**")
                 st.caption(texte_en_points(texte))
                 if montrer_sources:
-                    with st.popover("Sources", use_container_width=True):
+                    with st.popover(t("fiche.sources"), use_container_width=True):
                         for s in sources:
                             st.markdown(f"**{s['label']}** : {s['valeur']}")
     else:
-        st.caption("Pas encore assez d'informations déclarées pour détailler ce lieu par thème.")
+        st.caption(t("fiche.pas_assez_infos"))
 
 
 def lieux_avec_coordonnees(lieux: list) -> list:
