@@ -23,7 +23,7 @@ import streamlit as st
 
 from src.agent.rag_tools import lieux_enrichis_dataframe, reponses_long_dataframe
 from src.db.factory import get_admin_store, get_store
-from src.i18n import t
+from src.i18n import t, t_categorie
 from src.questionnaire.schema import BANDE_INTENSITE, CATEGORIES_POSSIBLES
 
 st.title(t("observatoire.title"))
@@ -40,7 +40,7 @@ def _graphique_barres(series: pd.Series) -> None:
     non résolu côté plateforme à ce jour, donc contourné ici plutôt que
     d'attendre un correctif hors de notre contrôle."""
     if series.empty:
-        st.caption("Aucune donnée pour l'instant.")
+        st.caption(t("observatoire.aucune_donnee"))
         return
     maximum = series.max()
     lignes = []
@@ -84,14 +84,14 @@ def _store_pour_agregats():
 
 
 store = _store_pour_agregats()
-with st.spinner("Chargement des données..."):
+with st.spinner(t("observatoire.chargement")):
     df_lieux = lieux_enrichis_dataframe(store)
 
 if df_lieux.empty:
-    st.info("Aucun lieu enrichi pour l'instant — revenez une fois que des synthèses auront été générées.")
+    st.info(t("observatoire.aucun_lieu_enrichi"))
     st.stop()
 
-with st.spinner("Chargement des données..."):
+with st.spinner(t("observatoire.chargement")):
     df_reponses = reponses_long_dataframe(store)
 # Une même question a pu être répondue par plusieurs contributeurs d'un même
 # lieu (parfois avec des valeurs différentes) : un lieu ne doit compter
@@ -109,138 +109,133 @@ def _valeurs(champ_id: str) -> pd.Series:
 
 
 col1, col2, col3, col4, col5 = st.columns(5)
-col1.metric("Lieux recensés", len(df_lieux))
-col2.metric("Pays représentés", int(df_lieux["pays"].nunique(dropna=True)) if "pays" in df_lieux else 0)
-col3.metric("Régions représentées", int(df_lieux["region"].nunique(dropna=True)) if "region" in df_lieux else 0)
+col1.metric(t("observatoire.lieux_recenses"), len(df_lieux))
+col2.metric(t("observatoire.pays_representes"), int(df_lieux["pays"].nunique(dropna=True)) if "pays" in df_lieux else 0)
+col3.metric(t("observatoire.regions_representees"), int(df_lieux["region"].nunique(dropna=True)) if "region" in df_lieux else 0)
 
 surfaces = pd.to_numeric(_valeurs("surface_batie_m2"), errors="coerce").dropna()
 col4.metric(
-    "Surface bâtie connue", f"{int(surfaces.sum()):,} m²".replace(",", " ") if not surfaces.empty else "—",
-    help=f"Somme sur les {len(surfaces)} lieu(x) ayant renseigné leur surface — sous-estimée, "
-         "la plupart des lieux ne l'ont pas encore déclarée." if not surfaces.empty else None,
+    t("observatoire.surface_batie"), f"{int(surfaces.sum()):,} m²".replace(",", " ") if not surfaces.empty else "—",
+    help=t("observatoire.surface_batie_help", n=len(surfaces)) if not surfaces.empty else None,
 )
 etp = pd.to_numeric(_valeurs("etp_geres"), errors="coerce").dropna()
 col5.metric(
-    "ETP gérés connus", f"{etp.sum():g}" if not etp.empty else "—",
-    help=f"Somme sur les {len(etp)} lieu(x) ayant renseigné leurs ETP — sous-estimée, "
-         "la plupart des lieux ne l'ont pas encore déclaré." if not etp.empty else None,
+    t("observatoire.etp_geres"), f"{etp.sum():g}" if not etp.empty else "—",
+    help=t("observatoire.etp_geres_help", n=len(etp)) if not etp.empty else None,
 )
 
 st.divider()
 col_cat, col_pays = st.columns(2)
 with col_cat:
-    st.subheader("Répartition par catégorie")
+    st.subheader(t("observatoire.repartition_categorie"))
     if "categories" in df_lieux.columns:
         cat_counts = pd.Series(
             [c for cats in df_lieux["categories"].dropna() for c in (cats or [])]
         ).value_counts().reindex(CATEGORIES_POSSIBLES).dropna()
+        cat_counts.index = [t_categorie(c) for c in cat_counts.index]
         if not cat_counts.empty:
             _graphique_barres(cat_counts)
         else:
-            st.caption("Aucune catégorie attribuée pour l'instant.")
+            st.caption(t("observatoire.aucune_categorie"))
 with col_pays:
-    st.subheader("Répartition par pays")
+    st.subheader(t("observatoire.repartition_pays"))
     if "pays" in df_lieux.columns and df_lieux["pays"].notna().any():
         _graphique_barres(df_lieux["pays"].value_counts(dropna=True))
     else:
-        st.caption("Pays non renseigné pour l'instant.")
+        st.caption(t("observatoire.pays_non_renseigne"))
 
 col_milieu, col_region = st.columns(2)
 with col_milieu:
-    st.subheader("Répartition par milieu")
+    st.subheader(t("observatoire.repartition_milieu"))
     milieu_df = df_reponses_dedup[df_reponses_dedup["champ_id"] == "milieu"] if not df_reponses_dedup.empty else df_reponses_dedup
     if not milieu_df.empty:
         _graphique_barres(milieu_df["valeur"].value_counts())
     else:
-        st.caption("Milieu non renseigné pour l'instant.")
+        st.caption(t("observatoire.milieu_non_renseigne"))
 with col_region:
-    st.subheader("Répartition par région")
+    st.subheader(t("observatoire.repartition_region"))
     if "region" in df_lieux.columns and df_lieux["region"].notna().any():
         _graphique_barres(df_lieux["region"].value_counts(dropna=True).head(15))
     else:
-        st.caption("Région non renseignée pour l'instant.")
+        st.caption(t("observatoire.region_non_renseignee"))
 
 st.divider()
 col_annee, col_statut = st.columns(2)
 with col_annee:
-    st.subheader("Évolution du réseau dans le temps")
-    st.caption("Nombre de lieux ouverts par année (année extraite de la date déclarée).")
+    st.subheader(t("observatoire.evolution_reseau"))
+    st.caption(t("observatoire.evolution_reseau_caption"))
     dates = _valeurs("date_ouverture").dropna().astype(str)
     annees = dates.apply(lambda d: (re.search(r"(19|20)\d{2}", d) or [None]).group() if re.search(r"(19|20)\d{2}", d) else None) \
         if not dates.empty else pd.Series(dtype=object)
     annees = annees.dropna()
     if not annees.empty:
         _graphique_barres(annees.value_counts().sort_index())
-        st.caption(f"Basé sur les {len(annees)} lieu(x) ayant déclaré une date d'ouverture.")
+        st.caption(t("observatoire.base_sur_date_ouverture", n=len(annees)))
     else:
-        st.caption("Aucune date d'ouverture déclarée pour l'instant.")
+        st.caption(t("observatoire.aucune_date_ouverture"))
 with col_statut:
-    st.subheader("Statut juridique")
+    st.subheader(t("observatoire.statut_juridique"))
     statuts = _valeurs("statut_juridique").dropna()
     if not statuts.empty:
         _graphique_barres(statuts.value_counts())
-        st.caption(f"Basé sur les {len(statuts)} lieu(x) ayant déclaré leur statut juridique.")
+        st.caption(t("observatoire.base_sur_statut", n=len(statuts)))
     else:
-        st.caption("Aucun statut juridique déclaré pour l'instant.")
+        st.caption(t("observatoire.aucun_statut"))
 
 st.divider()
-st.subheader("Fréquentation, mobilité et rayonnement")
-st.caption(
-    "Indicateurs récemment ajoutés au questionnaire (fréquentation, provenance des usagers, "
-    "modes de déplacement) — ils s'affichent automatiquement ici au fur et à mesure que des "
-    "lieux y répondent."
-)
+st.subheader(t("observatoire.frequentation_titre"))
+st.caption(t("observatoire.frequentation_caption"))
 
 
 def _graphique_bandes(champ_id: str, titre: str) -> None:
     valeurs = _valeurs(champ_id).dropna()
     st.markdown(f"**{titre}**")
     if valeurs.empty:
-        st.caption("Pas encore de réponse pour cet indicateur.")
+        st.caption(t("observatoire.pas_encore_reponse"))
         return
     ordonnee = valeurs.value_counts().reindex(BANDE_INTENSITE).dropna()
     _graphique_barres(ordonnee)
-    st.caption(f"n = {len(valeurs)} lieu(x)")
+    st.caption(t("observatoire.n_lieux", n=len(valeurs)))
 
 
 col_freq, col_evol = st.columns(2)
 with col_freq:
     freq = pd.to_numeric(_valeurs("frequentation_semaine_type"), errors="coerce").dropna()
-    st.markdown("**Fréquentation moyenne sur une bonne semaine**")
+    st.markdown(f"**{t('observatoire.frequentation_moyenne_titre')}**")
     if not freq.empty:
-        st.metric("Passages / semaine (moyenne des lieux répondants)", f"{freq.mean():.0f}")
-        st.caption(f"n = {len(freq)} lieu(x)")
+        st.metric(t("observatoire.passages_semaine"), f"{freq.mean():.0f}")
+        st.caption(t("observatoire.n_lieux", n=len(freq)))
     else:
-        st.caption("Pas encore de réponse pour cet indicateur.")
+        st.caption(t("observatoire.pas_encore_reponse"))
 with col_evol:
     evol = _valeurs("evolution_frequentation_3ans").dropna()
-    st.markdown("**Évolution de la fréquentation (3 ans)**")
+    st.markdown(f"**{t('observatoire.evolution_frequentation_titre')}**")
     if not evol.empty:
         _graphique_barres(evol.value_counts())
-        st.caption(f"n = {len(evol)} lieu(x)")
+        st.caption(t("observatoire.n_lieux", n=len(evol)))
     else:
-        st.caption("Pas encore de réponse pour cet indicateur.")
+        st.caption(t("observatoire.pas_encore_reponse"))
 
 col_m1, col_m2, col_m3, col_m4 = st.columns(4)
 with col_m1:
-    _graphique_bandes("usagers_mode_voiture", "Part venant en voiture")
+    _graphique_bandes("usagers_mode_voiture", t("observatoire.mode_voiture"))
 with col_m2:
-    _graphique_bandes("usagers_mode_velo", "Part venant à vélo")
+    _graphique_bandes("usagers_mode_velo", t("observatoire.mode_velo"))
 with col_m3:
-    _graphique_bandes("usagers_mode_pied", "Part venant à pied")
+    _graphique_bandes("usagers_mode_pied", t("observatoire.mode_pied"))
 with col_m4:
-    _graphique_bandes("usagers_mode_transport_commun", "Part en transport en commun")
+    _graphique_bandes("usagers_mode_transport_commun", t("observatoire.mode_transport_commun"))
 
 col_p1, col_p2, col_p3 = st.columns(3)
 with col_p1:
-    _graphique_bandes("provenance_usagers_commune", "Provenance : commune d'implantation")
+    _graphique_bandes("provenance_usagers_commune", t("observatoire.provenance_commune"))
 with col_p2:
-    _graphique_bandes("provenance_usagers_limitrophe", "Provenance : commune limitrophe")
+    _graphique_bandes("provenance_usagers_limitrophe", t("observatoire.provenance_limitrophe"))
 with col_p3:
-    _graphique_bandes("provenance_usagers_plus_loin", "Provenance : plus loin")
+    _graphique_bandes("provenance_usagers_plus_loin", t("observatoire.provenance_plus_loin"))
 
 st.divider()
-st.subheader("Mots-clés les plus fréquents")
+st.subheader(t("observatoire.mots_cles_titre"))
 if "mots_cles" in df_lieux.columns:
     mots = pd.Series(
         [m for mots in df_lieux["mots_cles"].dropna() for m in (mots or [])]
@@ -248,11 +243,11 @@ if "mots_cles" in df_lieux.columns:
     if not mots.empty:
         _graphique_barres(mots)
     else:
-        st.caption("Pas encore de mots-clés générés.")
+        st.caption(t("observatoire.pas_de_mots_cles"))
 
 st.divider()
-st.subheader("Enjeux et besoins par catégorie")
-st.caption("Vue qualitative : synthèses des enjeux exprimés, groupées par catégorie.")
+st.subheader(t("observatoire.enjeux_besoins_titre"))
+st.caption(t("observatoire.enjeux_besoins_caption"))
 if "categories" in df_lieux.columns:
     au_moins_une = False
     for cat in CATEGORIES_POSSIBLES:
@@ -260,22 +255,18 @@ if "categories" in df_lieux.columns:
         if sous_ensemble.empty:
             continue
         au_moins_une = True
-        with st.expander(f"{cat} ({len(sous_ensemble)} lieu(x))"):
+        with st.expander(f"{t_categorie(cat)} ({t('observatoire.lieu_x', n=len(sous_ensemble))})"):
             for _, row in sous_ensemble.iterrows():
                 if row.get("enjeux"):
                     st.markdown(f"**{row.get('tiers_lieu', '—')}** — {row['enjeux']}")
                 if row.get("besoins"):
-                    st.caption(f"Besoins : {row['besoins']}")
+                    st.caption(t("observatoire.besoins_label", texte=row["besoins"]))
     if not au_moins_une:
-        st.caption("Aucune catégorie attribuée pour l'instant.")
+        st.caption(t("observatoire.aucune_categorie"))
 
 st.divider()
-st.subheader("Besoins par sphère")
-st.caption(
-    "Vue synthétique des besoins déclarés à l'entretien (« 📣 Rendre visibles vos besoins "
-    "actuels »), regroupés par grande sphère plutôt que listés un par un — dépliez un besoin "
-    "pour voir quels lieux précisément l'ont exprimé."
-)
+st.subheader(t("observatoire.besoins_sphere_titre"))
+st.caption(t("observatoire.besoins_sphere_caption"))
 # Regroupement en trois sphères (cadre systémique large, pas une catégorie du
 # questionnaire) : Sociosphère (gouvernance, collectif, réseau, cadre légal),
 # Technosphère (argent, outils, infrastructure, savoir-faire technique),
@@ -319,24 +310,30 @@ lignes_besoins = [
     for besoin in (row["valeur"] or [])
     if besoin in SPHERES_BESOINS
 ]
+SPHERE_I18N_KEYS = {
+    "Sociosphère": "observatoire.sociosphere",
+    "Technosphère": "observatoire.technosphere",
+    "Biosphère": "observatoire.biosphere",
+}
+
 if not lignes_besoins:
-    st.caption("Aucun besoin déclaré pour l'instant.")
+    st.caption(t("observatoire.aucun_besoin_declare"))
 else:
     df_spheres = pd.DataFrame(lignes_besoins)
     cols_spheres = st.columns(3)
     for col, sphere in zip(cols_spheres, ORDRE_SPHERES):
         with col:
-            st.markdown(f"**{sphere}**")
+            st.markdown(f"**{t(SPHERE_I18N_KEYS[sphere])}**")
             sous = df_spheres[df_spheres["sphere"] == sphere]
             if sous.empty:
-                st.caption("Aucun besoin déclaré dans cette sphère pour l'instant.")
+                st.caption(t("observatoire.aucun_besoin_sphere"))
                 continue
             par_besoin = sorted(
                 (
                     (besoin, sorted(set(groupe["lieu"])))
                     for besoin, groupe in sous.groupby("besoin")
                 ),
-                key=lambda t: len(t[1]), reverse=True,
+                key=lambda paire: len(paire[1]), reverse=True,
             )
             for besoin, lieux_concernes in par_besoin:
                 with st.expander(f"{besoin} ({len(lieux_concernes)})"):

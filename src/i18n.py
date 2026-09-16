@@ -324,6 +324,164 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
     "portfolio_admin.contact": {"fr": "Contact", "en": "Contact"},
     "portfolio_admin.enregistrer_campagne": {"fr": "Enregistrer la campagne", "en": "Save the campaign"},
     "portfolio_admin.campagne_maj": {"fr": "Campagne mise à jour.", "en": "Campaign updated."},
+
+    "fiche_page.title": {"fr": "Fiche d'un lieu", "en": "A space's record"},
+    "fiche_page.aucun_lieu_specifie": {
+        "fr": "Aucun lieu spécifié — ce lien doit être ouvert via le bouton « 🔗 Partager » "
+              "d'une fiche dans l'Annuaire.",
+        "en": "No space specified — this link should be opened via the “🔗 Share” button "
+              "on a record in the Directory.",
+    },
+    "fiche_page.lieu_introuvable": {
+        "fr": "Ce lieu est introuvable — le lien est peut-être incorrect ou le lieu a été supprimé.",
+        "en": "This space could not be found — the link may be wrong, or the space was deleted.",
+    },
+    "portfolio.campagne_titre": {"fr": "📣 Campagne en cours", "en": "📣 Ongoing campaign"},
+    "portfolio.objectif_label": {"fr": "🎯 **Objectif :** {valeur}", "en": "🎯 **Goal:** {valeur}"},
+    "portfolio.contact_label": {"fr": "✉️ **Contact :** {valeur}", "en": "✉️ **Contact:** {valeur}"},
+    "portfolio.en_savoir_plus": {"fr": "🔗 En savoir plus", "en": "🔗 Learn more"},
+    "portfolio.aucun_lieu": {"fr": "Aucun lieu mis en avant pour l'instant.", "en": "No space highlighted yet."},
+    "portfolio.filtrer_categorie": {"fr": "Filtrer par catégorie", "en": "Filter by category"},
+    "portfolio.toutes_categories": {"fr": "Toutes les catégories", "en": "All categories"},
+    "portfolio.aucun_lieu_categorie": {
+        "fr": "Aucun lieu ne correspond à cette catégorie.", "en": "No space matches this category.",
+    },
+
+    "observatoire.aucune_donnee": {"fr": "Aucune donnée pour l'instant.", "en": "No data yet."},
+    "observatoire.chargement": {"fr": "Chargement des données...", "en": "Loading data..."},
+    "observatoire.aucun_lieu_enrichi": {
+        "fr": "Aucun lieu enrichi pour l'instant — revenez une fois que des synthèses auront été générées.",
+        "en": "No enriched space yet — come back once syntheses have been generated.",
+    },
+    "observatoire.lieux_recenses": {"fr": "Lieux recensés", "en": "Spaces recorded"},
+    "observatoire.pays_representes": {"fr": "Pays représentés", "en": "Countries represented"},
+    "observatoire.regions_representees": {"fr": "Régions représentées", "en": "Regions represented"},
+    "observatoire.surface_batie": {"fr": "Surface bâtie connue", "en": "Known built surface"},
+    "observatoire.surface_batie_help": {
+        "fr": "Somme sur les {n} lieu(x) ayant renseigné leur surface — sous-estimée, "
+              "la plupart des lieux ne l'ont pas encore déclarée.",
+        "en": "Sum over the {n} space(s) that reported their surface — an underestimate, "
+              "most spaces have not declared it yet.",
+    },
+    "observatoire.etp_geres": {"fr": "ETP gérés connus", "en": "Known FTEs managed"},
+    "observatoire.etp_geres_help": {
+        "fr": "Somme sur les {n} lieu(x) ayant renseigné leurs ETP — sous-estimée, "
+              "la plupart des lieux ne l'ont pas encore déclaré.",
+        "en": "Sum over the {n} space(s) that reported their FTEs — an underestimate, "
+              "most spaces have not declared it yet.",
+    },
+    "observatoire.repartition_categorie": {"fr": "Répartition par catégorie", "en": "Breakdown by category"},
+    "observatoire.aucune_categorie": {
+        "fr": "Aucune catégorie attribuée pour l'instant.", "en": "No category assigned yet.",
+    },
+    "observatoire.repartition_pays": {"fr": "Répartition par pays", "en": "Breakdown by country"},
+    "observatoire.pays_non_renseigne": {
+        "fr": "Pays non renseigné pour l'instant.", "en": "Country not reported yet.",
+    },
+    "observatoire.repartition_milieu": {"fr": "Répartition par milieu", "en": "Breakdown by setting"},
+    "observatoire.milieu_non_renseigne": {
+        "fr": "Milieu non renseigné pour l'instant.", "en": "Setting not reported yet.",
+    },
+    "observatoire.repartition_region": {"fr": "Répartition par région", "en": "Breakdown by region"},
+    "observatoire.region_non_renseignee": {
+        "fr": "Région non renseignée pour l'instant.", "en": "Region not reported yet.",
+    },
+    "observatoire.evolution_reseau": {
+        "fr": "Évolution du réseau dans le temps", "en": "The network's growth over time",
+    },
+    "observatoire.evolution_reseau_caption": {
+        "fr": "Nombre de lieux ouverts par année (année extraite de la date déclarée).",
+        "en": "Number of spaces opened per year (year extracted from the declared date).",
+    },
+    "observatoire.base_sur_date_ouverture": {
+        "fr": "Basé sur les {n} lieu(x) ayant déclaré une date d'ouverture.",
+        "en": "Based on the {n} space(s) that reported an opening date.",
+    },
+    "observatoire.aucune_date_ouverture": {
+        "fr": "Aucune date d'ouverture déclarée pour l'instant.", "en": "No opening date reported yet.",
+    },
+    "observatoire.statut_juridique": {"fr": "Statut juridique", "en": "Legal status"},
+    "observatoire.base_sur_statut": {
+        "fr": "Basé sur les {n} lieu(x) ayant déclaré leur statut juridique.",
+        "en": "Based on the {n} space(s) that reported their legal status.",
+    },
+    "observatoire.aucun_statut": {
+        "fr": "Aucun statut juridique déclaré pour l'instant.", "en": "No legal status reported yet.",
+    },
+    "observatoire.frequentation_titre": {
+        "fr": "Fréquentation, mobilité et rayonnement", "en": "Attendance, mobility and reach",
+    },
+    "observatoire.frequentation_caption": {
+        "fr": "Indicateurs récemment ajoutés au questionnaire (fréquentation, provenance des usagers, "
+              "modes de déplacement) — ils s'affichent automatiquement ici au fur et à mesure que des "
+              "lieux y répondent.",
+        "en": "Indicators recently added to the questionnaire (attendance, where users come from, "
+              "modes of transport) — they appear here automatically as spaces answer them.",
+    },
+    "observatoire.pas_encore_reponse": {
+        "fr": "Pas encore de réponse pour cet indicateur.", "en": "No answer for this indicator yet.",
+    },
+    "observatoire.n_lieux": {"fr": "n = {n} lieu(x)", "en": "n = {n} space(s)"},
+    "observatoire.frequentation_moyenne_titre": {
+        "fr": "Fréquentation moyenne sur une bonne semaine", "en": "Average attendance over a typical week",
+    },
+    "observatoire.passages_semaine": {
+        "fr": "Passages / semaine (moyenne des lieux répondants)", "en": "Visits / week (average of responding spaces)",
+    },
+    "observatoire.evolution_frequentation_titre": {
+        "fr": "Évolution de la fréquentation (3 ans)", "en": "Change in attendance (3 years)",
+    },
+    "observatoire.mode_voiture": {"fr": "Part venant en voiture", "en": "Share arriving by car"},
+    "observatoire.mode_velo": {"fr": "Part venant à vélo", "en": "Share arriving by bike"},
+    "observatoire.mode_pied": {"fr": "Part venant à pied", "en": "Share arriving on foot"},
+    "observatoire.mode_transport_commun": {
+        "fr": "Part en transport en commun", "en": "Share arriving by public transport",
+    },
+    "observatoire.provenance_commune": {
+        "fr": "Provenance : commune d'implantation", "en": "Origin: host municipality",
+    },
+    "observatoire.provenance_limitrophe": {
+        "fr": "Provenance : commune limitrophe", "en": "Origin: neighboring municipality",
+    },
+    "observatoire.provenance_plus_loin": {"fr": "Provenance : plus loin", "en": "Origin: further away"},
+    "observatoire.mots_cles_titre": {
+        "fr": "Mots-clés les plus fréquents", "en": "Most frequent keywords",
+    },
+    "observatoire.pas_de_mots_cles": {
+        "fr": "Pas encore de mots-clés générés.", "en": "No keywords generated yet.",
+    },
+    "observatoire.enjeux_besoins_titre": {
+        "fr": "Enjeux et besoins par catégorie", "en": "Challenges and needs by category",
+    },
+    "observatoire.enjeux_besoins_caption": {
+        "fr": "Vue qualitative : synthèses des enjeux exprimés, groupées par catégorie.",
+        "en": "Qualitative view: syntheses of the challenges expressed, grouped by category.",
+    },
+    "observatoire.besoins_label": {"fr": "Besoins : {texte}", "en": "Needs: {texte}"},
+    "observatoire.lieu_x": {"fr": "{n} lieu(x)", "en": "{n} space(s)"},
+    "observatoire.besoins_sphere_titre": {"fr": "Besoins par sphère", "en": "Needs by sphere"},
+    "observatoire.besoins_sphere_caption": {
+        "fr": "Vue synthétique des besoins déclarés à l'entretien (« 📣 Rendre visibles vos besoins "
+              "actuels »), regroupés par grande sphère plutôt que listés un par un — dépliez un besoin "
+              "pour voir quels lieux précisément l'ont exprimé.",
+        "en": "Synthetic view of the needs declared in the interview (“📣 Make your current needs "
+              "visible”), grouped by broad sphere rather than listed one by one — expand a need "
+              "to see exactly which spaces expressed it.",
+    },
+    "observatoire.sociosphere": {"fr": "Sociosphère", "en": "Sociosphere"},
+    "observatoire.technosphere": {"fr": "Technosphère", "en": "Technosphere"},
+    "observatoire.biosphere": {"fr": "Biosphère", "en": "Biosphere"},
+    "observatoire.aucun_besoin_declare": {
+        "fr": "Aucun besoin déclaré pour l'instant.", "en": "No need declared yet.",
+    },
+    "observatoire.aucun_besoin_sphere": {
+        "fr": "Aucun besoin déclaré dans cette sphère pour l'instant.", "en": "No need declared in this sphere yet.",
+    },
+
+    "fiche_page.caption": {
+        "fr": "Fiche publique, en lecture seule — partagée depuis l'Annuaire.",
+        "en": "Public, read-only record — shared from the Directory.",
+    },
     "entretien.contributeur_bloque": {
         "fr": "Votre contribution à ce lieu a été suspendue par un administrateur ou un steward "
               "de ce lieu, suite à un signalement. Contactez l'équipe si vous pensez qu'il s'agit "

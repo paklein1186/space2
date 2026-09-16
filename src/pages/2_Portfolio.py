@@ -28,10 +28,10 @@ from src.annuaire import (
     vignette_html,
 )
 from src.db.factory import get_store
-from src.i18n import t
+from src.i18n import t, t_categorie
 
 
-@st.dialog("Fiche du lieu", width="large")
+@st.dialog(t("fiche_dialog.title"), width="large")
 def _fiche_publique_dialog(lieu, derive) -> None:
     """Version publique (sans connexion) de la fiche de l'Annuaire : mêmes
     informations de synthèse, sans les sections de modération/administration
@@ -57,15 +57,15 @@ def _fiche_publique_dialog(lieu, derive) -> None:
     if derive and derive.campagne_texte:
         st.divider()
         with st.container(border=True):
-            st.markdown("#### 📣 Campagne en cours")
+            st.markdown(f"#### {t('portfolio.campagne_titre')}")
             st.write(derive.campagne_texte)
             col_obj, col_contact = st.columns(2)
             with col_obj:
                 if derive.campagne_objectif:
-                    st.markdown(f"🎯 **Objectif :** {derive.campagne_objectif}")
+                    st.markdown(t("portfolio.objectif_label", valeur=derive.campagne_objectif))
             with col_contact:
                 if derive.campagne_contact:
-                    st.markdown(f"✉️ **Contact :** {derive.campagne_contact}")
+                    st.markdown(t("portfolio.contact_label", valeur=derive.campagne_contact))
 
     if donnees.get("resume"):
         st.divider()
@@ -77,19 +77,21 @@ def _fiche_publique_dialog(lieu, derive) -> None:
         # pour homogénéiser la longueur) — même logique que la fiche privée,
         # sans avoir besoin de résoudre les sources en détail (pas de
         # popover "Sources" ici, superflu pour un visiteur public).
-        sections_a_afficher = [(cle, titre) for cle, titre in SECTIONS_SYNTHESE[1:] if derive.sources.get(cle)]
+        sections_a_afficher = [
+            (cle, titre_key) for cle, titre_key in SECTIONS_SYNTHESE[1:] if derive.sources.get(cle)
+        ]
         if sections_a_afficher:
             st.divider()
             cols = st.columns(3)
-            for i, (cle, titre) in enumerate(sections_a_afficher):
+            for i, (cle, titre_key) in enumerate(sections_a_afficher):
                 texte = donnees.get(cle) or "—"
                 with cols[i % 3]:
-                    st.markdown(f"**{titre}**")
+                    st.markdown(f"**{t(titre_key)}**")
                     st.caption(texte_en_points(texte))
 
     if derive and derive.lien_externe:
         st.divider()
-        st.markdown(f"[🔗 En savoir plus]({derive.lien_externe})")
+        st.markdown(f"[{t('portfolio.en_savoir_plus')}]({derive.lien_externe})")
 
 
 st.title(t("portfolio.title"))
@@ -99,7 +101,7 @@ store = get_store()
 lieux = store.list_lieux_portfolio()
 
 if not lieux:
-    st.info("Aucun lieu mis en avant pour l'instant.")
+    st.info(t("portfolio.aucun_lieu"))
     st.stop()
 
 # Un seul aller-retour pour toutes les synthèses plutôt qu'un get_lieu_derive
@@ -118,7 +120,8 @@ categories_disponibles = sorted({
     c for derive in derive_par_lieu.values() for c in (derive.donnees.get("categories") or [])
 })
 filtre_categories = st.multiselect(
-    "Filtrer par catégorie", options=categories_disponibles, placeholder="Toutes les catégories",
+    t("portfolio.filtrer_categorie"), options=categories_disponibles,
+    placeholder=t("portfolio.toutes_categories"), format_func=t_categorie,
 )
 
 
@@ -132,7 +135,7 @@ if filtre_categories:
     lieux_affiches = [l for l in lieux_affiches if _categories(l) & set(filtre_categories)]
 
 if not lieux_affiches:
-    st.info("Aucun lieu ne correspond à cette catégorie.")
+    st.info(t("portfolio.aucun_lieu_categorie"))
     st.stop()
 
 # Même gabarit de galerie que l'Annuaire (4 colonnes, vignette homogénéisée
@@ -165,11 +168,11 @@ for i in range(0, len(lieux_affiches), cols_par_ligne):
                 # noyée après la description générale du lieu.
                 if derive and derive.campagne_texte:
                     with st.container(border=True):
-                        st.markdown("**📣 Campagne en cours**")
+                        st.markdown(f"**{t('portfolio.campagne_titre')}**")
                         st.write(derive.campagne_texte)
                         if derive.campagne_objectif:
-                            st.markdown(f"🎯 **Objectif :** {derive.campagne_objectif}")
+                            st.markdown(t("portfolio.objectif_label", valeur=derive.campagne_objectif))
                         if derive.campagne_contact:
-                            st.markdown(f"✉️ **Contact :** {derive.campagne_contact}")
+                            st.markdown(t("portfolio.contact_label", valeur=derive.campagne_contact))
                 if donnees.get("resume"):
                     st.caption(donnees["resume"])

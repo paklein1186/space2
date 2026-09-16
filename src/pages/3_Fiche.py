@@ -22,6 +22,7 @@ import streamlit as st
 
 from src.annuaire import render_fiche_header, render_fiche_sections
 from src.db.factory import get_admin_store, get_store
+from src.i18n import t
 
 
 def _store_pour_lecture_publique():
@@ -41,20 +42,19 @@ def _store_pour_lecture_publique():
 
 lieu_id = st.query_params.get("lieu")
 if not lieu_id:
-    st.title("Fiche d'un lieu")
-    st.info("Aucun lieu spécifié — ce lien doit être ouvert via le bouton « 🔗 Partager » "
-            "d'une fiche dans l'Annuaire.")
+    st.title(t("fiche_page.title"))
+    st.info(t("fiche_page.aucun_lieu_specifie"))
     st.stop()
 
 store = _store_pour_lecture_publique()
 lieux = {l.id: l for l in store.list_tiers_lieux()}
 lieu = lieux.get(lieu_id)
 if lieu is None:
-    st.title("Fiche d'un lieu")
-    st.error("Ce lieu est introuvable — le lien est peut-être incorrect ou le lieu a été supprimé.")
+    st.title(t("fiche_page.title"))
+    st.error(t("fiche_page.lieu_introuvable"))
     st.stop()
 
 derive = store.get_lieu_derive(lieu.id)
-st.caption("Fiche publique, en lecture seule — partagée depuis l'Annuaire.")
+st.caption(t("fiche_page.caption"))
 render_fiche_header(lieu, derive)
 render_fiche_sections(store, lieu, derive, montrer_sources=False)
