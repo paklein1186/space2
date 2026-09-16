@@ -1855,8 +1855,8 @@ def main():
     # rerun suivant la connexion, jamais avant.
     pages = {
         "": [
-            st.Page(page_entretien, title=t("nav.entretien"), icon="📝",
-                    url_path="entretien", default=True),
+            st.Page("pages/0_Accueil.py", title=t("nav.accueil"), icon="🏡", default=True),
+            st.Page(page_entretien, title=t("nav.entretien"), icon="📝", url_path="entretien"),
             st.Page(page_bibliotheque, title=t("nav.bibliotheque"), icon="📚", url_path="bibliotheque"),
             st.Page(page_lieux_hybrides, title=t("nav.lieux_hybrides"), icon="🏘️", url_path="lieux-hybrides"),
             st.Page("pages/1_Observatoire.py", title=t("nav.observatoire"), icon="📊"),

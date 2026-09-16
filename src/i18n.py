@@ -32,6 +32,7 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
     "nav.observatoire": {"fr": "Observatoire", "en": "Observatory"},
     "nav.portfolio": {"fr": "Portfolio", "en": "Portfolio"},
     "nav.fiche": {"fr": "Fiche partagée", "en": "Shared record"},
+    "nav.accueil": {"fr": "Accueil", "en": "Home"},
     "nav.administration": {"fr": "Administration", "en": "Administration"},
 
     "auth.title": {"fr": "Lieux hybrides et territoires", "en": "Hybrid spaces and territories"},
@@ -483,6 +484,73 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
     "observatoire.aucun_besoin_sphere": {
         "fr": "Aucun besoin déclaré dans cette sphère pour l'instant.", "en": "No need declared in this sphere yet.",
     },
+
+    "accueil.hero_titre": {
+        "fr": "Le réseau des lieux hybrides et de leurs territoires",
+        "en": "The network of hybrid spaces and their territories",
+    },
+    "accueil.hero_soustitre": {
+        "fr": "Un espace commun pour documenter ce que vous faites, apprendre de ce que font "
+              "les autres, et faire connaître ce dont vous avez besoin.",
+        "en": "A shared space to document what you do, learn from what others are doing, and "
+              "make your needs known.",
+    },
+    "accueil.stat_lieux": {"fr": "Lieux recensés", "en": "Spaces recorded"},
+    "accueil.stat_pays": {"fr": "Pays représentés", "en": "Countries represented"},
+    "accueil.stat_besoins": {"fr": "Besoins exprimés", "en": "Needs expressed"},
+
+    "accueil.benefice_1_titre": {"fr": "📖 Documenter vos pratiques", "en": "📖 Document your practices"},
+    "accueil.benefice_1_texte": {
+        "fr": "Racontez la genèse, le fonctionnement et les défis de votre lieu au fil d'un "
+              "entretien guidé — une trace vivante et structurée, réutilisable pour vos propres "
+              "besoins (bilan, communication, financeurs) autant que pour le réseau.",
+        "en": "Tell the story of your space's origins, day-to-day, and challenges through a "
+              "guided interview — a living, structured record, useful for your own needs "
+              "(reporting, communication, funders) as much as for the network.",
+    },
+    "accueil.benefice_2_titre": {
+        "fr": "🔎 Découvrir d'autres apprentissages", "en": "🔎 Discover what others have learned",
+    },
+    "accueil.benefice_2_texte": {
+        "fr": "Explorez l'Annuaire et l'Observatoire pour voir comment d'autres lieux, ailleurs, "
+              "ont abordé les mêmes questions — modèle économique, gouvernance, mobilité — et "
+              "interrogez la Bibliothèque en langage naturel pour aller chercher une réponse "
+              "précise dans l'ensemble des données recueillies.",
+        "en": "Explore the Directory and the Observatory to see how other spaces elsewhere have "
+              "approached the same questions — economic model, governance, mobility — and ask "
+              "the Library in plain language to find a precise answer across all the data "
+              "gathered.",
+    },
+    "accueil.benefice_3_titre": {
+        "fr": "🤝 Se mettre en réseau", "en": "🤝 Connect with the network",
+    },
+    "accueil.benefice_3_texte": {
+        "fr": "Être recensé, c'est être visible pour d'éventuelles mises en relation, "
+              "collaborations territoriales, ou invitations à des rencontres et voyages "
+              "d'apprentissage (learning expeditions) entre lieux hybrides européens.",
+        "en": "Being listed means being visible for potential introductions, territorial "
+              "collaborations, or invitations to gatherings and learning expeditions between "
+              "European hybrid spaces.",
+    },
+    "accueil.benefice_4_titre": {
+        "fr": "📣 Faire connaître vos besoins", "en": "📣 Make your needs known",
+    },
+    "accueil.benefice_4_texte": {
+        "fr": "Exprimez directement ce dont votre lieu aurait besoin — compétences, "
+              "accompagnement, mise en réseau, aide à la levée de fonds — pour que les bonnes "
+              "ressources puissent plus facilement vous être acheminées, via l'Annuaire ou une "
+              "campagne mise en avant dans le Portfolio.",
+        "en": "State directly what your space could use — skills, support, networking, help "
+              "raising funds — so the right resources can more easily reach you, via the "
+              "Directory or a campaign highlighted in the Portfolio.",
+    },
+
+    "accueil.cta_titre": {"fr": "Par où commencer ?", "en": "Where to start?"},
+    "accueil.cta_entretien": {
+        "fr": "📝 Recenser mon lieu / compléter son histoire", "en": "📝 List my space / complete its story",
+    },
+    "accueil.cta_annuaire": {"fr": "🏘️ Découvrir les lieux du réseau", "en": "🏘️ Explore the network's spaces"},
+    "accueil.cta_observatoire": {"fr": "📊 Voir l'Observatoire", "en": "📊 See the Observatory"},
 
     "fiche_page.caption": {
         "fr": "Fiche publique, en lecture seule — partagée depuis l'Annuaire.",

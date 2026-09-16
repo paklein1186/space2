@@ -32,18 +32,26 @@ def check(label, condition):
 def main():
     at = AppTest.from_file("src/app.py", default_timeout=30)
     at.run()
-    check("Pas d'exception (auto-login admin + rendu complet)", not at.exception)
+    check("Pas d'exception (page d'accueil, sans connexion)", not at.exception)
 
-    page = str(at)
-    check("Session bien auto-loguée en admin", "test-smoke@localhost" in page)
-    check("Email affiché dans la barre latérale", any("test-smoke@localhost" in c.value for c in at.caption))
-    check("Bouton de déconnexion présent", any(b.label == "Se déconnecter" for b in at.button))
-    # Administration vit sur sa propre page (st.Page/st.navigation) plutôt
-    # que dans le contenu de la page par défaut — AppTest.switch_page()
-    # n'accepte que des pages basées sur un fichier, pas les pages basées sur
-    # une fonction comme page_administration ; sa présence dans le menu (et
-    # son contenu une fois ouverte) est vérifiée manuellement dans le
-    # navigateur plutôt qu'ici.
+    # Accueil (pages/0_Accueil.py) est désormais la page par défaut — publique,
+    # sans auth_screen() — donc user_id/session_state["user_id"] n'est PAS
+    # renseigné tant qu'aucune page authentifiée n'a été visitée dans cette
+    # session : les anciennes assertions "auto-login visible dès le chargement"
+    # ne s'appliquent plus au chargement initial. Vérifie à la place que la
+    # page d'accueil elle-même s'affiche correctement (str(at) est un repr de
+    # debug, pas le texte rendu — utiliser les accesseurs typés d'AppTest).
+    check("Titre de la page d'accueil affiché",
+          any("réseau des lieux hybrides" in ti.value for ti in at.title))
+    check("Bénéfices affichés (ex. documenter ses pratiques)",
+          any("Documenter vos pratiques" in m.value for m in at.markdown))
+
+    # Entretien/Bibliothèque/Lieux hybrides/Administration sont des pages
+    # basées sur une fonction (st.Page(fonction, ...), pas un fichier) :
+    # AppTest.switch_page() n'accepte que des pages basées sur un fichier,
+    # donc ni l'auto-login LOCAL_DEV_AUTOLOGIN (déclenché par auth_screen(),
+    # appelé seulement par ces pages) ni le contenu d'Administration ne sont
+    # vérifiables ici — comportement confirmé manuellement dans le navigateur.
 
     print("\nTous les tests sont passés.")
 
