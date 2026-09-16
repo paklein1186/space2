@@ -1612,6 +1612,14 @@ def _ouvrir_conversation_bibliotheque(store, conversation_id: str) -> None:
         ]
 
 
+QUESTIONS_FREQUENTES_BIBLIOTHEQUE = [
+    "bibliotheque.question_frequente_1",
+    "bibliotheque.question_frequente_2",
+    "bibliotheque.question_frequente_3",
+    "bibliotheque.question_frequente_4",
+]
+
+
 def rag_tab(store, user_id: str):
     st.title(t("bibliotheque.title"))
     st.caption(t("bibliotheque.caption"))
@@ -1666,6 +1674,19 @@ def rag_tab(store, user_id: str):
                     store.delete_conversation_bibliotheque(conv.id)
                     st.rerun()
 
+    question_suggeree = None
+    if not st.session_state["rag_history"]:
+        # Questions fréquentes en chips, seulement avant le premier message —
+        # une fois la conversation lancée elles n'ont plus lieu d'être et
+        # laissent la place à l'historique, comme un point de départ plutôt
+        # qu'une barre d'outils permanente.
+        st.caption(t("bibliotheque.questions_frequentes"))
+        cols_suggestions = st.columns(4)
+        for col, cle in zip(cols_suggestions, QUESTIONS_FREQUENTES_BIBLIOTHEQUE):
+            with col:
+                if st.button(t(cle), key=f"suggestion_{cle}", use_container_width=True):
+                    question_suggeree = t(cle)
+
     for i, (speaker, text) in enumerate(st.session_state["rag_history"]):
         with st.chat_message(speaker):
             st.write(text)
@@ -1704,7 +1725,7 @@ def rag_tab(store, user_id: str):
     lang_code = "fr-FR" if st.session_state.get("ui_lang", "fr") == "fr" else "en-US"
     voice_question = consume_voice_transcript()
     bouton_dictee(lang_code, label=t("voice.dicter_question"))
-    question = st.chat_input(t("chat.bibliotheque_placeholder")) or voice_question
+    question = st.chat_input(t("chat.bibliotheque_placeholder")) or voice_question or question_suggeree
     if question:
         st.session_state["rag_history"].append(("user", question))
         st.session_state["rag_question_en_attente"] = question

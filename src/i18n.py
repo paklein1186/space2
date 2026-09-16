@@ -87,6 +87,23 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "en": "No previous conversation yet — ask a question to get started.",
     },
     "bibliotheque.supprimer_conversation": {"fr": "Supprimer", "en": "Delete"},
+    "bibliotheque.questions_frequentes": {"fr": "Questions fréquentes", "en": "Frequently asked"},
+    "bibliotheque.question_frequente_1": {
+        "fr": "Combien de lieux sont recensés, et où sont-ils situés ?",
+        "en": "How many spaces are recorded, and where are they located?",
+    },
+    "bibliotheque.question_frequente_2": {
+        "fr": "Quels sont les besoins les plus fréquents exprimés par les lieux ?",
+        "en": "What are the most common needs expressed by the spaces?",
+    },
+    "bibliotheque.question_frequente_3": {
+        "fr": "Quelles bonnes pratiques de financement reviennent souvent ?",
+        "en": "Which funding best practices come up often?",
+    },
+    "bibliotheque.question_frequente_4": {
+        "fr": "Qu'est-ce qu'un tiers-lieu hybride ?",
+        "en": "What is a hybrid third place?",
+    },
 
     "nav.compte": {"fr": "Compte", "en": "Account"},
     "contribution.title": {"fr": "Votre contribution", "en": "Your contribution"},
