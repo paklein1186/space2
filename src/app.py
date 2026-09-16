@@ -928,20 +928,30 @@ def annuaire_tab(store, est_admin: bool, user_id: str):
         # sélectionné, réutilisé pour ouvrir la même fiche que le clic sur
         # une carte de la grille (annuaire_open_lieu_id), sans dupliquer le
         # popup dans un second mécanisme d'affichage.
+        #
+        # Clé versionnée (incrémentée à chaque sélection consommée) plutôt
+        # qu'une clé fixe : la sélection du widget carte reste posée côté
+        # deck.gl d'un rerun à l'autre (pas un événement ponctuel comme un
+        # clic de bouton) — avec une clé fixe, fermer la fiche puis recliquer
+        # EXACTEMENT le même point ne rouvrait plus rien (même id renvoyé
+        # que la dernière fois, donc traité comme "déjà vu" et ignoré,
+        # observé sur "Bigre test" : premier clic OK, mais plus rien au clic
+        # suivant sur le même marqueur). Changer la clé force le composant à
+        # se remonter sans sélection résiduelle, donc toujours prêt pour un
+        # nouveau clic — seul effet de bord : le pan/zoom manuel de la carte
+        # repart de la vue calée sur les lieux affichés à chaque ouverture de
+        # fiche, jugé largement préférable à une carte qui ne répond plus.
+        carte_version = st.session_state.get("annuaire_carte_version", 0)
         evenement = st.pydeck_chart(
-            deck, on_select="rerun", selection_mode="single-object", key="annuaire_map",
+            deck, on_select="rerun", selection_mode="single-object",
+            key=f"annuaire_map_{carte_version}",
         )
         objets_selectionnes = evenement.selection.get("objects", {}).get("lieux", [])
-        # La sélection du widget carte reste posée d'un rerun à l'autre (pas
-        # d'événement ponctuel comme un clic de bouton) : sans le comparer à
-        # la dernière traitée, chaque rerun (dialogue fermé, filtre changé...)
-        # rouvrirait la même fiche en boucle, provoquant une boucle infinie.
         if objets_selectionnes:
             lieu_selectionne_id = objets_selectionnes[0]["id"]
-            if st.session_state.get("_derniere_selection_carte") != lieu_selectionne_id:
-                st.session_state["_derniere_selection_carte"] = lieu_selectionne_id
-                st.session_state["annuaire_open_lieu_id"] = lieu_selectionne_id
-                st.rerun()
+            st.session_state["annuaire_carte_version"] = carte_version + 1
+            st.session_state["annuaire_open_lieu_id"] = lieu_selectionne_id
+            st.rerun()
 
     if "annuaire_open_lieu_id" in st.session_state:
         lieu_id = st.session_state.pop("annuaire_open_lieu_id")
