@@ -45,7 +45,15 @@ def log_usage(store: Store, type_appel: str, model: str, usage, tiers_lieu_id: O
     cache_creation = getattr(usage, "cache_creation_input_tokens", 0) or 0
     cache_read = getattr(usage, "cache_read_input_tokens", 0) or 0
     cout = estimate_cost(model, tokens_in, tokens_out, cache_creation, cache_read)
-    # tokens_in enregistré inclut les tokens de cache pour que le total reste lisible
-    # (nombre de tokens réellement traités), le coût lui tient compte du tarif réel de chacun.
-    store.log_llm_call(type_appel, model, tokens_in + cache_creation + cache_read, tokens_out,
-                        cout, tiers_lieu_id)
+    try:
+        # tokens_in enregistré inclut les tokens de cache pour que le total reste lisible
+        # (nombre de tokens réellement traités), le coût lui tient compte du tarif réel de chacun.
+        store.log_llm_call(type_appel, model, tokens_in + cache_creation + cache_read, tokens_out,
+                            cout, tiers_lieu_id)
+    except Exception:
+        # Un journal de coût qui échoue (ex. contrainte llm_calls_type_appel_
+        # check pas encore mise à jour pour un nouveau type_appel — vécu deux
+        # fois : "crawl_extraction" puis "traduction_fiche") ne doit JAMAIS
+        # faire échouer l'appel LLM qu'il se contente de comptabiliser après
+        # coup — le résultat de cet appel est déjà en main à ce stade.
+        pass

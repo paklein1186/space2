@@ -76,5 +76,12 @@ def traduire_donnees_fiche(store: Store, derive: LieuDerive) -> dict:
     # une fiche affichée en anglais montre quand même ses catégories/besoins
     # non textuels correctement (gérés séparément par t_categorie).
     donnees_en = {**derive.donnees, **traduit}
-    store.update_lieu_derive_traduction(derive.tiers_lieu_id, donnees_en, derive.source_hash)
+    try:
+        store.update_lieu_derive_traduction(derive.tiers_lieu_id, donnees_en, derive.source_hash)
+    except Exception:
+        # La mise en cache est un pur bonus de performance (évite de
+        # retraduire au prochain affichage) — si elle échoue (ex. colonnes
+        # donnees_en pas encore migrées), la traduction fraîchement obtenue
+        # doit quand même s'afficher MAINTENANT plutôt que planter la fiche.
+        pass
     return donnees_en
