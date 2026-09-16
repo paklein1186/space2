@@ -80,7 +80,13 @@ create table if not exists lieu_derive (
     campagne_objectif text,
     campagne_contact text,
     besoins_mis_en_avant jsonb not null default '[]'::jsonb,  -- sous-ensemble de types_soutien_souhaites choisi par le steward/admin, affiché publiquement
-    genere_le timestamptz not null default now()
+    genere_le timestamptz not null default now(),
+    -- Traduction anglaise de `donnees`, générée à la volée (1 appel LLM par
+    -- lieu, jamais par affichage) et mise en cache ici — invalidée quand
+    -- donnees_en_source_hash diffère de source_hash (contenu français
+    -- régénéré depuis). Jamais recalculée pour rien.
+    donnees_en jsonb,
+    donnees_en_source_hash text
 );
 
 -- Comptes admin (global, pas lié à un lieu) : peuvent nommer d'autres admins,

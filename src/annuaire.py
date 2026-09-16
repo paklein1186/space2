@@ -220,11 +220,26 @@ def build_annuaire(store: Store) -> list:
     return [build_fiche_lieu(store, lieu) for lieu in lieux]
 
 
-def render_fiche_header(lieu, derive, nombre_contributeurs: int | None = None) -> None:
+def donnees_a_afficher(store: Store, derive) -> dict:
+    """`derive.donnees`, traduit à la volée en anglais si la langue active
+    est l'anglais (mis en cache, voir agent.traduction.traduire_donnees_
+    fiche) — sinon le français tel quel. Import différé (traduction.py
+    importe enrichissement.py, qui importe annuaire.py : un import en tête
+    de module créerait un cycle)."""
+    if not derive:
+        return {}
+    if st.session_state.get("ui_lang", "fr") != "en":
+        return derive.donnees
+    from .agent.traduction import traduire_donnees_fiche
+    with st.spinner(t("fiche.traduction_en_cours")):
+        return traduire_donnees_fiche(store, derive)
+
+
+def render_fiche_header(store: Store, lieu, derive, nombre_contributeurs: int | None = None) -> None:
     """Vignette/photo + nom + pays/région + catégories + résumé — partie
     commune au dialogue de fiche de l'Annuaire (connecté) et à la page de
     partage publique (sans connexion), pour ne pas dupliquer ce rendu."""
-    donnees = derive.donnees if derive else {}
+    donnees = donnees_a_afficher(store, derive)
     col_vignette, col_info = st.columns([1, 2.5])
     with col_vignette:
         if derive and derive.photo_url:
@@ -267,7 +282,7 @@ def render_fiche_sections(store: Store, lieu, derive, montrer_sources: bool = Tr
     if not derive:
         return
     st.divider()
-    donnees = derive.donnees
+    donnees = donnees_a_afficher(store, derive)
     sections_avec_sources = []
     if montrer_sources:
         notes_lieu = store.get_free_text_notes(lieu.id)

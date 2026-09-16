@@ -56,5 +56,5 @@ if lieu is None:
 
 derive = store.get_lieu_derive(lieu.id)
 st.caption(t("fiche_page.caption"))
-render_fiche_header(lieu, derive)
+render_fiche_header(store, lieu, derive)
 render_fiche_sections(store, lieu, derive, montrer_sources=False)

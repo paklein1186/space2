@@ -23,6 +23,7 @@ from src.annuaire import (
     besoins_chips_html,
     category_chips_html,
     default_visual,
+    donnees_a_afficher,
     photo_html,
     texte_en_points,
     vignette_html,
@@ -32,13 +33,13 @@ from src.i18n import t, t_categorie
 
 
 @st.dialog(t("fiche_dialog.title"), width="large")
-def _fiche_publique_dialog(lieu, derive) -> None:
+def _fiche_publique_dialog(store, lieu, derive) -> None:
     """Version publique (sans connexion) de la fiche de l'Annuaire : mêmes
     informations de synthèse, sans les sections de modération/administration
     qui n'ont pas de sens pour un visiteur anonyme. La campagne, raison
     d'être de cette page, est mise en avant avant le reste plutôt que
     mélangée aux autres sections."""
-    donnees = derive.donnees if derive else {}
+    donnees = donnees_a_afficher(store, derive)
     col_photo, col_info = st.columns([1, 3])
     with col_photo:
         if derive and derive.photo_url:
@@ -114,7 +115,7 @@ if "portfolio_open_lieu_id" in st.session_state:
     lieu_id = st.session_state.pop("portfolio_open_lieu_id")
     lieu_ouvert = next((l for l in lieux if l.id == lieu_id), None)
     if lieu_ouvert:
-        _fiche_publique_dialog(lieu_ouvert, derive_par_lieu.get(lieu_id))
+        _fiche_publique_dialog(store, lieu_ouvert, derive_par_lieu.get(lieu_id))
 
 categories_disponibles = sorted({
     c for derive in derive_par_lieu.values() for c in (derive.donnees.get("categories") or [])
@@ -147,7 +148,10 @@ for i in range(0, len(lieux_affiches), cols_par_ligne):
     cols = st.columns(cols_par_ligne)
     for col, lieu in zip(cols, lieux_affiches[i:i + cols_par_ligne]):
         derive = derive_par_lieu.get(lieu.id)
-        donnees = derive.donnees if derive else {}
+        # Portfolio = sélection restreinte et curée (pas les 50 lieux de
+        # l'Annuaire) : traduire à la volée chaque carte reste raisonnable,
+        # contrairement à une grille complète.
+        donnees = donnees_a_afficher(store, derive)
         with col:
             with st.container(border=True):
                 if derive and derive.photo_url:

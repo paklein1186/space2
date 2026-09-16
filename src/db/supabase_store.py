@@ -309,6 +309,13 @@ class SupabaseStore(Store):
             "photo_url": photo_url,
         }).eq("tiers_lieu_id", tiers_lieu_id).execute()
 
+    def update_lieu_derive_traduction(self, tiers_lieu_id: str, donnees_en: dict,
+                                       source_hash: str) -> None:
+        self.client.table("lieu_derive").update({
+            "donnees_en": donnees_en,
+            "donnees_en_source_hash": source_hash,
+        }).eq("tiers_lieu_id", tiers_lieu_id).execute()
+
     def log_llm_call(self, type_appel: str, model: str, tokens_in: int, tokens_out: int,
                       cout_estime: float, tiers_lieu_id: Optional[str] = None) -> None:
         self.client.table("llm_calls").insert({

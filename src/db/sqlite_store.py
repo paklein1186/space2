@@ -83,7 +83,9 @@ create table if not exists lieu_derive (
     campagne_objectif text,
     campagne_contact text,
     besoins_mis_en_avant text not null default '[]',
-    genere_le text not null default (datetime('now'))
+    genere_le text not null default (datetime('now')),
+    donnees_en text,
+    donnees_en_source_hash text
 );
 create table if not exists admins (
     user_id text primary key
@@ -431,6 +433,14 @@ class SqliteStore(Store):
         )
         self.conn.commit()
 
+    def update_lieu_derive_traduction(self, tiers_lieu_id: str, donnees_en: dict,
+                                       source_hash: str) -> None:
+        self.conn.execute(
+            "update lieu_derive set donnees_en = ?, donnees_en_source_hash = ? where tiers_lieu_id = ?",
+            (json.dumps(donnees_en, ensure_ascii=False), source_hash, tiers_lieu_id),
+        )
+        self.conn.commit()
+
     # -- suivi des coûts LLM --------------------------------------------------
 
     def log_llm_call(self, type_appel: str, model: str, tokens_in: int, tokens_out: int,
@@ -658,6 +668,8 @@ def _lieu_derive_from_row(data: dict) -> LieuDerive:
         campagne_contact=data["campagne_contact"],
         besoins_mis_en_avant=json.loads(data["besoins_mis_en_avant"]) if data.get("besoins_mis_en_avant") else [],
         genere_le=data["genere_le"],
+        donnees_en=json.loads(data["donnees_en"]) if data.get("donnees_en") else None,
+        donnees_en_source_hash=data.get("donnees_en_source_hash"),
     )
 
 

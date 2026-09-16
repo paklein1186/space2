@@ -677,7 +677,7 @@ def _fiche_dialog(store, fiche, est_admin: bool, user_id: str):
         st.session_state["fiche_enrichie_lieu_id"] = lieu.id
     derive = store.get_lieu_derive(lieu.id)
 
-    render_fiche_header(lieu, derive, nombre_contributeurs=fiche["nombre_contributeurs"])
+    render_fiche_header(store, lieu, derive, nombre_contributeurs=fiche["nombre_contributeurs"])
 
     col_partager, col_steward = st.columns(2)
     with col_partager:

@@ -140,6 +140,7 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
     },
     "fiche.lien_externe": {"fr": "🔗 Fiche externe", "en": "🔗 External record"},
     "fiche.sources": {"fr": "Sources", "en": "Sources"},
+    "fiche.traduction_en_cours": {"fr": "Traduction...", "en": "Translating..."},
     "fiche.note_libre": {"fr": "Note libre", "en": "Free-form note"},
     "fiche.pas_assez_infos": {
         "fr": "Pas encore assez d'informations déclarées pour détailler ce lieu par thème.",

@@ -68,6 +68,11 @@ class LieuDerive:
     # brute déclarée à l'entretien, qui peut être longue et non filtrée.
     besoins_mis_en_avant: list = field(default_factory=list)
     genere_le: Optional[str] = None
+    # Traduction anglaise de `donnees`, mise en cache (voir update_lieu_
+    # derive_traduction) — donnees_en_source_hash permet de savoir si elle
+    # est encore à jour par rapport à `donnees`/`source_hash`.
+    donnees_en: Optional[dict] = None
+    donnees_en_source_hash: Optional[str] = None
 
 
 @dataclass
@@ -223,6 +228,14 @@ class Store(ABC):
                                   photo_url: Optional[str]) -> None:
         """Met à jour uniquement lien_externe/photo_url (édition manuelle depuis
         l'Annuaire), sans toucher au reste de la donnée dérivée."""
+        ...
+
+    @abstractmethod
+    def update_lieu_derive_traduction(self, tiers_lieu_id: str, donnees_en: dict,
+                                       source_hash: str) -> None:
+        """Met en cache la traduction anglaise de `donnees` (voir agent.
+        traduction.traduire_donnees_fiche) avec le hash source au moment de
+        la traduction — sert à détecter si elle est encore à jour."""
         ...
 
     @abstractmethod
