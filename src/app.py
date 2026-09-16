@@ -576,11 +576,19 @@ def entretien_tab(store, user_id: str):
                 except Exception as exc:
                     st.error(t("entretien.echec_lecture_document", erreur=exc))
                     texte_brut = None
-                if texte_brut:
+                if texte_brut and texte_brut.strip():
                     _transmettre_source_entretien(
                         store, state, nom_lieu, texte_brut, f"le document déposé « {fichier.name} »",
                         f"📎 Document transmis : {fichier.name}",
                     )
+                elif texte_brut is not None:
+                    # extraire_texte_fichier n'a pas levé d'exception, mais n'a
+                    # rien extrait (typiquement un PDF scanné, image sans
+                    # couche de texte) — sans ce message, l'upload ne
+                    # produisait alors AUCUN retour visible, comme si de rien
+                    # n'était (signalé confus par un utilisateur : "il n'a pas
+                    # l'air de les lire").
+                    st.info(t("entretien.document_sans_texte"))
 
             texte_colle = st.text_area(t("entretien.coller_texte"), key=f"{session_key}::crawl_texte")
             if st.button(t("entretien.analyser_texte_btn"), key=f"{session_key}::crawl_texte_btn") and texte_colle.strip():

@@ -270,6 +270,12 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
     "entretien.echec_lecture_document": {
         "fr": "Impossible de lire ce document : {erreur}", "en": "Could not read this document: {erreur}",
     },
+    "entretien.document_sans_texte": {
+        "fr": "Aucun texte exploitable trouvé dans ce document — s'il s'agit d'un PDF scanné "
+              "(image sans texte sélectionnable), l'extraction automatique ne peut pas le lire.",
+        "en": "No usable text found in this document — if it's a scanned PDF (an image with no "
+              "selectable text), automatic extraction can't read it.",
+    },
     "entretien.coller_texte": {
         "fr": "Coller un texte (extrait d'un document, description existante...)",
         "en": "Paste some text (excerpt from a document, existing description...)",
