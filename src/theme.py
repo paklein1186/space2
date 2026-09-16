@@ -210,6 +210,21 @@ a[data-testid="stSidebarNavLink"][href$="/fiche"]{{ display: none; }}
   transition: opacity 0.15s ease;
 }}
 [data-testid="stChatMessage"]:hover [data-testid="stButton"] button{{ opacity: 1; }}
+
+/* ---------- Entretien/Bibliothèque : historique ancré en bas, comme un chat ---------- */
+/* st.chat_input est déjà fixé en bas de la fenêtre (stBottomBlockContainer
+   ci-dessus), mais l'historique lui-même s'affichait en flux normal depuis
+   le haut de la page — pour une conversation courte, ça laissait un grand
+   vide entre les derniers messages et le champ de saisie, au lieu de les
+   voir "collés" au-dessus du champ comme sur ChatGPT/Claude. Les conteneurs
+   nommés ci-dessous (st.container(key="...")) sont mis en colonne flex avec
+   justify-content:flex-end : les messages restent dans l'ordre chronologique
+   normal (PAS d'inversion de l'ordre de rendu, juste un ancrage visuel), et
+   une conversation plus longue que min-height déborde naturellement vers le
+   haut avec le défilement normal de la page. */
+.st-key-entretien_messages, .st-key-bibliotheque_messages {{
+  display: flex; flex-direction: column; justify-content: flex-end; min-height: 55vh;
+}}
 </style>
 """
 

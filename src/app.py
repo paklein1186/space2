@@ -426,8 +426,12 @@ def _panneau_choix_rapide(store, state: dict) -> None:
     champs = [f for f in (section or {}).get("fields", []) if f["type"] in TYPES_CHOIX_RAPIDE]
     if not champs:
         return
-    with st.expander(t("entretien.panneau_reponse_rapide_titre"), expanded=False):
-        _widget_reponse_rapide(store, state, champs[0])
+    # Plus d'expander : ce panneau vit désormais dans la colonne d'outils à
+    # droite de la conversation (voir entretien_tab), toujours visible plutôt
+    # que caché derrière un clic supplémentaire — il ne s'affiche de toute
+    # façon déjà que lorsqu'une question à choix est en attente.
+    st.markdown(f"**{t('entretien.panneau_reponse_rapide_titre')}**")
+    _widget_reponse_rapide(store, state, champs[0])
 
 
 def entretien_tab(store, user_id: str):
@@ -527,67 +531,83 @@ def entretien_tab(store, user_id: str):
             text=t("entretien.progression_campagne", pourcentage=completion["pourcentage"],
                    repondus=completion["repondus"], total=completion["total"]),
         )
-    # Suffixe invisible (espaces de largeur nulle) qui change à chaque analyse
-    # réussie : st.expander n'a pas de paramètre `key` dans cette version de
-    # Streamlit, et le frontend mémorise l'état ouvert/fermé par identité
-    # implicite (position + libellé) — sans ce changement d'identité,
-    # `expanded=False` serait ignoré et l'encart resterait ouvert après coup.
-    label_panneau_source = t("entretien.transmettre_source_titre") + (
-        "​" * state.get("panneau_source_version", 0)
-    )
-    with st.expander(label_panneau_source, expanded=False):
-        st.caption(t("entretien.transmettre_source_caption"))
-        url_source = st.text_input(t("entretien.url_a_analyser"), key=f"{session_key}::crawl_url")
-        if st.button(t("entretien.analyser_site_btn"), key=f"{session_key}::crawl_url_btn") and url_source.strip():
-            from src.agent.web_crawl import fetch_page_text
-            url_source = url_source.strip()
-            try:
-                with st.spinner(t("entretien.recuperation_page")):
-                    texte_brut = fetch_page_text(url_source)
-            except Exception as exc:
-                st.error(t("entretien.echec_recuperation_page", erreur=exc))
-                texte_brut = None
-            if texte_brut:
+    # Colonne d'outils à droite plutôt que tout empiler entre l'historique et
+    # le champ de saisie — "Transmettre une source" et "Réponse rapide"
+    # coupaient le fil de lecture de la conversation (signalé confus par un
+    # utilisateur), en plus de repousser le champ de saisie toujours plus bas
+    # selon ce qu'il y avait à afficher à cet instant précis.
+    col_chat, col_outils = st.columns([3, 1], gap="medium")
+
+    with col_outils:
+        # Suffixe invisible (espaces de largeur nulle) qui change à chaque
+        # analyse réussie : st.expander n'a pas de paramètre `key` dans cette
+        # version de Streamlit, et le frontend mémorise l'état ouvert/fermé
+        # par identité implicite (position + libellé) — sans ce changement
+        # d'identité, `expanded=False` serait ignoré et l'encart resterait
+        # ouvert après coup.
+        label_panneau_source = t("entretien.transmettre_source_titre") + (
+            "​" * state.get("panneau_source_version", 0)
+        )
+        with st.expander(label_panneau_source, expanded=False):
+            st.caption(t("entretien.transmettre_source_caption"))
+            url_source = st.text_input(t("entretien.url_a_analyser"), key=f"{session_key}::crawl_url")
+            if st.button(t("entretien.analyser_site_btn"), key=f"{session_key}::crawl_url_btn") and url_source.strip():
+                from src.agent.web_crawl import fetch_page_text
+                url_source = url_source.strip()
+                try:
+                    with st.spinner(t("entretien.recuperation_page")):
+                        texte_brut = fetch_page_text(url_source)
+                except Exception as exc:
+                    st.error(t("entretien.echec_recuperation_page", erreur=exc))
+                    texte_brut = None
+                if texte_brut:
+                    _transmettre_source_entretien(
+                        store, state, nom_lieu, texte_brut, f"le site web ({url_source})",
+                        f"📎 Site transmis : {url_source}",
+                    )
+
+            fichier = st.file_uploader(t("entretien.deposer_document"), type=["txt", "docx", "pdf"],
+                                        key=f"{session_key}::crawl_file")
+            if fichier is not None and st.button(t("entretien.analyser_document_btn"), key=f"{session_key}::crawl_file_btn"):
+                from src.agent.web_crawl import extraire_texte_fichier
+                try:
+                    with st.spinner(t("entretien.lecture_document")):
+                        texte_brut = extraire_texte_fichier(fichier)
+                except Exception as exc:
+                    st.error(t("entretien.echec_lecture_document", erreur=exc))
+                    texte_brut = None
+                if texte_brut:
+                    _transmettre_source_entretien(
+                        store, state, nom_lieu, texte_brut, f"le document déposé « {fichier.name} »",
+                        f"📎 Document transmis : {fichier.name}",
+                    )
+
+            texte_colle = st.text_area(t("entretien.coller_texte"), key=f"{session_key}::crawl_texte")
+            if st.button(t("entretien.analyser_texte_btn"), key=f"{session_key}::crawl_texte_btn") and texte_colle.strip():
                 _transmettre_source_entretien(
-                    store, state, nom_lieu, texte_brut, f"le site web ({url_source})",
-                    f"📎 Site transmis : {url_source}",
+                    store, state, nom_lieu, texte_colle.strip(), "un texte collé par le répondant",
+                    "📎 Texte collé transmis",
                 )
 
-        fichier = st.file_uploader(t("entretien.deposer_document"), type=["txt", "docx", "pdf"],
-                                    key=f"{session_key}::crawl_file")
-        if fichier is not None and st.button(t("entretien.analyser_document_btn"), key=f"{session_key}::crawl_file_btn"):
-            from src.agent.web_crawl import extraire_texte_fichier
-            try:
-                with st.spinner(t("entretien.lecture_document")):
-                    texte_brut = extraire_texte_fichier(fichier)
-            except Exception as exc:
-                st.error(t("entretien.echec_lecture_document", erreur=exc))
-                texte_brut = None
-            if texte_brut:
-                _transmettre_source_entretien(
-                    store, state, nom_lieu, texte_brut, f"le document déposé « {fichier.name} »",
-                    f"📎 Document transmis : {fichier.name}",
-                )
+        # Affiché une seule fois, juste après l'analyse d'une source transmise
+        # (voir _transmettre_source_entretien) — retiré du state immédiatement
+        # après ce rendu pour ne pas ressurgir aux tours suivants.
+        dernier_apport = state.pop("dernier_apport", None)
+        if dernier_apport:
+            st.success(t("entretien.apport_integre", label=dernier_apport["label"], resume=dernier_apport["resume"]))
 
-        texte_colle = st.text_area(t("entretien.coller_texte"), key=f"{session_key}::crawl_texte")
-        if st.button(t("entretien.analyser_texte_btn"), key=f"{session_key}::crawl_texte_btn") and texte_colle.strip():
-            _transmettre_source_entretien(
-                store, state, nom_lieu, texte_colle.strip(), "un texte collé par le répondant",
-                "📎 Texte collé transmis",
-            )
+        _panneau_choix_rapide(store, state)
 
-    # Affiché une seule fois, juste après l'analyse d'une source transmise
-    # (voir _transmettre_source_entretien) — retiré du state immédiatement
-    # après ce rendu pour ne pas ressurgir aux tours suivants.
-    dernier_apport = state.pop("dernier_apport", None)
-    if dernier_apport:
-        st.success(t("entretien.apport_integre", label=dernier_apport["label"], resume=dernier_apport["resume"]))
-
-    for speaker, text in state["history"]:
-        with st.chat_message(speaker):
-            st.write(text)
-
-    _panneau_choix_rapide(store, state)
+    with col_chat:
+        # Conteneur nommé (CSS .st-key-entretien_messages, voir theme.py) :
+        # ancre les messages en bas de l'espace disponible plutôt qu'en haut
+        # de la page pour une conversation courte — comme ChatGPT/Claude,
+        # au lieu d'un grand vide entre les derniers messages et le champ de
+        # saisie fixé en bas par Streamlit.
+        with st.container(key="entretien_messages"):
+            for speaker, text in state["history"]:
+                with st.chat_message(speaker):
+                    st.write(text)
 
     # En deux temps (message ajouté + rerun immédiat, appel LLM au rerun
     # suivant) — voir la même note dans rag_tab : sans ça, la réponse de
@@ -598,22 +618,26 @@ def entretien_tab(store, user_id: str):
     bouton_dictee(lang_code, label=t("voice.dicter_reponse"))
     user_text = st.chat_input(t("chat.entretien_placeholder")) or voice_text
     if user_text:
+        # File d'attente (liste), pas une seule valeur : le champ reste actif
+        # pendant que l'agent traite un message précédent — plusieurs messages
+        # tapés à la suite s'accumulent ici plutôt que d'écraser ou de perdre
+        # les précédents, et sont envoyés à l'agent un par un, dans l'ordre.
         state["history"].append(("user", user_text))
-        state["reponse_en_attente"] = user_text
+        state.setdefault("file_attente_messages", []).append(user_text)
         st.rerun()
 
-    if state.get("reponse_en_attente"):
-        reponse_en_attente = state["reponse_en_attente"]
+    if state.get("file_attente_messages"):
+        prochain_message = state["file_attente_messages"][0]
         with st.spinner(t("entretien.agent_reflechit")):
-            reply = _agent_send_surveille(state["agent"], reponse_en_attente)
+            reply = _agent_send_surveille(state["agent"], prochain_message)
         if reply is None:
-            # reponse_en_attente n'est pas effacée : le message du répondant
-            # reste affiché et le prochain rerun (retape, ou simple nouvelle
-            # interaction) retentera automatiquement le même envoi.
+            # Le message reste en tête de file (pas retiré) : le prochain
+            # rerun retentera automatiquement le même envoi, sans perdre les
+            # messages suivants déjà accumulés derrière lui dans la file.
             return
         state["history"].append(("assistant", reply))
         _maj_completion(store, state)
-        state["reponse_en_attente"] = None
+        state["file_attente_messages"].pop(0)
         st.rerun()
 
 
@@ -1584,6 +1608,10 @@ def _ouvrir_conversation_bibliotheque(store, conversation_id: str) -> None:
         return
     st.session_state["rag_history"] = [(m["role"], m["content"]) for m in conv.messages]
     st.session_state["rag_conversation_id"] = conv.id
+    # Même précaution que "Nouvelle conversation" : une question encore en
+    # file au moment du clic ne doit pas finir répondue dans CETTE conversation
+    # rouverte, sans rapport avec elle.
+    st.session_state.pop("rag_file_attente_questions", None)
     # Reconstruit un contexte simplifié (texte seul, sans les blocs tool_use/
     # tool_result des échanges passés) plutôt que l'état exact de l'API — un
     # nouvel appel de tool se refait naturellement si besoin pour la
@@ -1640,6 +1668,10 @@ def rag_tab(store, user_id: str):
             st.session_state["rag_history"] = []
             st.session_state["rag_agent"].messages = []
             st.session_state.pop("rag_conversation_id", None)
+            # Sans ça, une question encore en file au moment du clic aurait
+            # fini par obtenir sa réponse dans la conversation VIERGE qui
+            # vient de démarrer, plutôt que d'être simplement abandonnée.
+            st.session_state.pop("rag_file_attente_questions", None)
             st.rerun()
         conversations = store.list_conversations_bibliotheque(user_id)
         if not conversations:
@@ -1670,34 +1702,38 @@ def rag_tab(store, user_id: str):
                 if st.button(t(cle), key=f"suggestion_{cle}", use_container_width=True):
                     question_suggeree = t(cle)
 
-    for i, (speaker, text) in enumerate(st.session_state["rag_history"]):
-        with st.chat_message(speaker):
-            st.write(text)
-            if speaker != "assistant":
-                continue
-            # Une info utile peut émerger d'une discussion (recherche web
-            # ponctuelle par l'agent, recoupement entre lieux...) sans jamais
-            # avoir été écrite nulle part. Icône discrète (visible au survol
-            # du message, via la règle CSS ciblant stChatMessage dans
-            # theme.py) plutôt qu'un bouton pleine largeur toujours affiché :
-            # une action secondaire, pas une action principale du chat.
-            if st.button("🧠", key=f"capture_savoir_btn_{i}",
-                         help="Nourrir l'intelligence : verse ce texte dans la base de connaissances "
-                              "générale de la Bibliothèque, cherchable tout de suite."):
-                from src.agent.embeddings import VoyageEmbedder
-                from src.agent.vectorstore import ChromaStore
-                import uuid
+    # Conteneur nommé (CSS .st-key-bibliotheque_messages, voir theme.py) :
+    # ancre les messages en bas de l'espace disponible plutôt qu'en haut de la
+    # page pour une conversation courte, comme entretien_tab.
+    with st.container(key="bibliotheque_messages"):
+        for i, (speaker, text) in enumerate(st.session_state["rag_history"]):
+            with st.chat_message(speaker):
+                st.write(text)
+                if speaker != "assistant":
+                    continue
+                # Une info utile peut émerger d'une discussion (recherche web
+                # ponctuelle par l'agent, recoupement entre lieux...) sans jamais
+                # avoir été écrite nulle part. Icône discrète (visible au survol
+                # du message, via la règle CSS ciblant stChatMessage dans
+                # theme.py) plutôt qu'un bouton pleine largeur toujours affiché :
+                # une action secondaire, pas une action principale du chat.
+                if st.button("🧠", key=f"capture_savoir_btn_{i}",
+                             help="Nourrir l'intelligence : verse ce texte dans la base de connaissances "
+                                  "générale de la Bibliothèque, cherchable tout de suite."):
+                    from src.agent.embeddings import VoyageEmbedder
+                    from src.agent.vectorstore import ChromaStore
+                    import uuid
 
-                with st.spinner("Ajout à la base de connaissances..."):
-                    embedder = VoyageEmbedder()
-                    embedding = embedder.embed_documents([text])[0]
-                    ChromaStore().upsert(
-                        ids=[f"bibliotheque_{uuid.uuid4()}"],
-                        embeddings=[embedding],
-                        documents=[text],
-                        metadatas=[{"doc_type": "connaissance_bibliotheque", "source_file": "Bibliothèque"}],
-                    )
-                st.toast("Ajouté à la base de connaissances.", icon="🧠")
+                    with st.spinner("Ajout à la base de connaissances..."):
+                        embedder = VoyageEmbedder()
+                        embedding = embedder.embed_documents([text])[0]
+                        ChromaStore().upsert(
+                            ids=[f"bibliotheque_{uuid.uuid4()}"],
+                            embeddings=[embedding],
+                            documents=[text],
+                            metadatas=[{"doc_type": "connaissance_bibliotheque", "source_file": "Bibliothèque"}],
+                        )
+                    st.toast("Ajouté à la base de connaissances.", icon="🧠")
 
     # En deux temps (message ajouté + rerun IMMÉDIAT, puis appel LLM dans le
     # rerun suivant) plutôt qu'un seul passage qui ajoute le message ET
@@ -1710,18 +1746,22 @@ def rag_tab(store, user_id: str):
     bouton_dictee(lang_code, label=t("voice.dicter_question"))
     question = st.chat_input(t("chat.bibliotheque_placeholder")) or voice_question or question_suggeree
     if question:
+        # File d'attente (liste), même principe que entretien_tab : le champ
+        # reste actif pendant une recherche en cours, plusieurs questions
+        # posées à la suite s'accumulent ici plutôt que de s'écraser.
         st.session_state["rag_history"].append(("user", question))
-        st.session_state["rag_question_en_attente"] = question
+        st.session_state.setdefault("rag_file_attente_questions", []).append(question)
         st.rerun()
 
-    if st.session_state.get("rag_question_en_attente"):
-        question_en_attente = st.session_state["rag_question_en_attente"]
+    if st.session_state.get("rag_file_attente_questions"):
+        prochaine_question = st.session_state["rag_file_attente_questions"][0]
         with st.spinner("Recherche en cours..."):
-            reply = _agent_send_surveille(st.session_state["rag_agent"], question_en_attente)
+            reply = _agent_send_surveille(st.session_state["rag_agent"], prochaine_question)
         if reply is None:
+            # Reste en tête de file : voir la même note dans entretien_tab.
             return
         st.session_state["rag_history"].append(("assistant", reply))
-        st.session_state["rag_question_en_attente"] = None
+        st.session_state["rag_file_attente_questions"].pop(0)
         _sauvegarder_conversation_bibliotheque(store, user_id)
         st.rerun()
 
@@ -1817,6 +1857,7 @@ def page_bibliotheque() -> None:
         st.session_state.pop("rag_agent", None)
         st.session_state.pop("rag_history", None)
         st.session_state.pop("rag_conversation_id", None)
+        st.session_state.pop("rag_file_attente_questions", None)
     store = _resolve_store(user_id)
     _rendre_isole("Bibliothèque", rag_tab, store, user_id)
 
