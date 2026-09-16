@@ -1,11 +1,17 @@
-"""Traduction légère du "chrome" de l'interface (navigation, écran de
-connexion, en-têtes de page, barre latérale) — pas le contenu du
-questionnaire, ni les échanges avec l'agent, ni les fiches lieu, qui restent
-en français pour l'instant : les traduire correctement demanderait soit de
-dupliquer l'intégralité du schéma (121 champs) dans chaque langue, soit une
-traduction à la volée par LLM à chaque affichage (coût et latence non
-négligeables) — un choix d'ampleur différente, à trancher séparément si
-besoin, pas embarqué silencieusement ici.
+"""Traduction du "chrome" de l'interface — navigation, écran de connexion,
+en-têtes de page, barre latérale, ET (depuis le 2026-09-16) la fiche du
+lieu, la modération, l'entretien et les 3 pages publiques (Observatoire,
+Portfolio, Fiche partagée). Volontairement PAS traduits :
+- le contenu généré par l'IA (résumés de fiche, réponses de l'agent, texte
+  libre saisi par les répondants) : le traduire à la volée par LLM à
+  chaque affichage aurait un coût et une latence non négligeables — un
+  choix d'ampleur différente, à trancher séparément si besoin ;
+- les libellés de champs et d'options du questionnaire (121 champs) :
+  les traduire demanderait de dupliquer l'intégralité du schéma dans
+  chaque langue, idem ;
+- le panneau Administration (utilisateurs, campagnes prioritaires, base
+  de connaissances...) : décision explicite du 2026-09-16, reste
+  français uniquement — un seul francophone l'utilise en pratique.
 
 Même mécanique que le thème clair/sombre (src/theme.py) : un simple bouton
 en barre latérale, mémorisé dans st.session_state ET dans un cookie (les
