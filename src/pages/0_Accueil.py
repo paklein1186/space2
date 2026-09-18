@@ -55,22 +55,6 @@ if nb_lieux:
 
 st.divider()
 
-BENEFICES = [
-    ("accueil.benefice_1_titre", "accueil.benefice_1_texte"),
-    ("accueil.benefice_2_titre", "accueil.benefice_2_texte"),
-    ("accueil.benefice_3_titre", "accueil.benefice_3_texte"),
-    ("accueil.benefice_4_titre", "accueil.benefice_4_texte"),
-]
-cols_benefices = st.columns(2)
-for i, (titre_key, texte_key) in enumerate(BENEFICES):
-    with cols_benefices[i % 2]:
-        with st.container(border=True):
-            st.markdown(f"#### {t(titre_key)}")
-            st.write(t(texte_key))
-
-st.divider()
-st.subheader(t("accueil.cta_titre"))
-
 
 def _lien_interne(href: str, label: str) -> None:
     """Lien vers une autre page DE CE SITE, dans le même onglet — st.markdown
@@ -80,6 +64,32 @@ def _lien_interne(href: str, label: str) -> None:
     navigation interne. Le HTML brut, lui, n'est pas retraité par ce
     mécanisme : target="_self" explicite s'applique donc vraiment."""
     st.markdown(f'<a href="{href}" target="_self">{label}</a>', unsafe_allow_html=True)
+
+
+# Chaque bénéfice pointe vers le module concerné — deux formes de lien selon
+# que la page cible est une fonction (st.Page(fonction, ...) dans app.py,
+# _lien_interne) ou un fichier (st.page_link, seul type que cette fonction
+# accepte). Réutilise les libellés de navigation déjà traduits (nav.*)
+# plutôt que d'en dupliquer de nouveaux.
+BENEFICES = [
+    ("accueil.benefice_1_titre", "accueil.benefice_1_texte", "/entretien", "nav.entretien"),
+    ("accueil.benefice_2_titre", "accueil.benefice_2_texte", "/lieux-hybrides", "nav.lieux_hybrides"),
+    ("accueil.benefice_3_titre", "accueil.benefice_3_texte", "/lieux-hybrides", "nav.lieux_hybrides"),
+    ("accueil.benefice_4_titre", "accueil.benefice_4_texte", "pages/2_Portfolio.py", "nav.portfolio"),
+]
+cols_benefices = st.columns(2)
+for i, (titre_key, texte_key, lien, lien_titre_key) in enumerate(BENEFICES):
+    with cols_benefices[i % 2]:
+        with st.container(border=True):
+            st.markdown(f"#### {t(titre_key)}")
+            st.write(t(texte_key))
+            if lien.startswith("pages/"):
+                st.page_link(lien, label=f"→ {t(lien_titre_key)}")
+            else:
+                _lien_interne(lien, f"→ {t(lien_titre_key)}")
+
+st.divider()
+st.subheader(t("accueil.cta_titre"))
 
 
 col_a, col_b, col_c = st.columns(3)
