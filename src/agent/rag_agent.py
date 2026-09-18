@@ -61,6 +61,77 @@ class RagAgent:
         self.messages.append({"role": "user", "content": user_text})
         return self._run_until_text()
 
+    def send_stream(self, user_text: str):
+        """Variante génératrice de send() — voir la même note dans
+        collecte_agent.py. Le tour qui appelle search_knowledge_base/
+        list_datasets/query_structured_data (le cas courant en début de
+        réponse) ne cède aucun texte tant que ces tools n'ont pas répondu ;
+        le texte final commence ensuite à s'afficher au fil de l'eau."""
+        self.messages.append({"role": "user", "content": user_text})
+        while True:
+            apply_single_cache_breakpoint(self.messages)
+            with self.client.messages.stream(
+                model=self.model,
+                max_tokens=8000,
+                system=cached_system(SYSTEM_PROMPT),
+                tools=TOOL_DEFINITIONS,
+                messages=self.messages,
+            ) as stream:
+                yield from stream.text_stream
+                final_message = stream.get_final_message()
+
+            if self.store is not None:
+                log_usage(self.store, "rag_query", self.model, final_message.usage)
+            self.messages.append({"role": "assistant", "content": to_plain_content(final_message.content)})
+
+            tool_uses = [b for b in final_message.content if b.type == "tool_use"]
+            if not tool_uses:
+                if final_message.stop_reason == "max_tokens":
+                    yield ("\n\n*(Réponse interrompue — trop longue pour être générée en une fois. "
+                           "Redemandez « continue » pour la suite, ou reformulez une question plus ciblée.)*")
+                return
+
+            self.messages.append({"role": "user", "content": self._executer_tool_uses(tool_uses)})
+
+    def _executer_tool_uses(self, tool_uses: list) -> list:
+        """Exécute tous les tool_use d'un même tour — en parallèle plutôt
+        qu'en séquence quand Claude en demande plusieurs à la fois (ex.
+        search_knowledge_base sur deux doc_type, ou list_datasets +
+        query_structured_data ensemble) : ce sont tous des appels réseau
+        indépendants et en lecture seule (Chroma/Voyage/Supabase), sans état
+        partagé — les paralléliser réduit directement la latence perçue, qui
+        s'additionnait sinon appel après appel (constaté en production :
+        20-30s sur une question déclenchant plusieurs tools). Partagée entre
+        send() et send_stream() : même logique, un seul endroit à maintenir."""
+        def _executer(tu):
+            # Une exception non rattrapée ici laisserait ce message assistant
+            # (avec ses tool_use) sans tool_result correspondant — non
+            # seulement ça fait planter la page en cours, mais la
+            # conversation stockée dans self.messages reste corrompue : le
+            # PROCHAIN message de l'utilisateur renvoie alors une erreur 400
+            # de l'API ("tool_use ids were found without tool_result
+            # blocks"). Convertir toute exception en résultat d'erreur normal
+            # évite les deux.
+            try:
+                return self.tool_handler.execute(tu.name, tu.input)
+            except Exception as exc:
+                return {"error": f"{type(exc).__name__}: {exc}"}
+
+        if len(tool_uses) == 1:
+            resultats = [_executer(tool_uses[0])]
+        else:
+            with ThreadPoolExecutor(max_workers=len(tool_uses)) as executor:
+                resultats = list(executor.map(_executer, tool_uses))
+
+        return [
+            {
+                "type": "tool_result",
+                "tool_use_id": tu.id,
+                "content": json.dumps(result, ensure_ascii=False, default=str),
+            }
+            for tu, result in zip(tool_uses, resultats)
+        ]
+
     def _run_until_text(self) -> str:
         while True:
             apply_single_cache_breakpoint(self.messages)
@@ -88,41 +159,4 @@ class RagAgent:
                               "Redemandez « continue » pour la suite, ou reformulez une question plus ciblée.)*")
                 return texte
 
-            # En parallèle plutôt qu'en séquence quand Claude demande plusieurs
-            # tools dans le même tour (ex. search_knowledge_base sur deux
-            # doc_type, ou list_datasets + query_structured_data ensemble) :
-            # ce sont tous des appels réseau indépendants et en lecture seule
-            # (Chroma/Voyage/Supabase), sans état partagé — les paralléliser
-            # réduit directement la latence perçue, qui s'additionnait
-            # sinon appel après appel (constaté en production : 20-30s sur
-            # une question déclenchant plusieurs tools).
-            def _executer(tu):
-                # Voir la note historique : une exception non rattrapée ici
-                # laisserait ce message assistant (avec ses tool_use) sans
-                # tool_result correspondant — non seulement ça fait planter
-                # la page en cours, mais la conversation stockée dans
-                # self.messages reste corrompue : le PROCHAIN message de
-                # l'utilisateur renvoie alors une erreur 400 de l'API
-                # ("tool_use ids were found without tool_result blocks").
-                # Convertir toute exception en résultat d'erreur normal
-                # évite les deux.
-                try:
-                    return self.tool_handler.execute(tu.name, tu.input)
-                except Exception as exc:
-                    return {"error": f"{type(exc).__name__}: {exc}"}
-
-            if len(tool_uses) == 1:
-                resultats = [_executer(tool_uses[0])]
-            else:
-                with ThreadPoolExecutor(max_workers=len(tool_uses)) as executor:
-                    resultats = list(executor.map(_executer, tool_uses))
-
-            tool_results = [
-                {
-                    "type": "tool_result",
-                    "tool_use_id": tu.id,
-                    "content": json.dumps(result, ensure_ascii=False, default=str),
-                }
-                for tu, result in zip(tool_uses, resultats)
-            ]
-            self.messages.append({"role": "user", "content": tool_results})
+            self.messages.append({"role": "user", "content": self._executer_tool_uses(tool_uses)})

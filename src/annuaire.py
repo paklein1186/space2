@@ -225,14 +225,49 @@ def donnees_a_afficher(store: Store, derive) -> dict:
     est l'anglais (mis en cache, voir agent.traduction.traduire_donnees_
     fiche) — sinon le français tel quel. Import différé (traduction.py
     importe enrichissement.py, qui importe annuaire.py : un import en tête
-    de module créerait un cycle)."""
+    de module créerait un cycle).
+
+    Si une traduction en cache existe déjà mais est périmée (le français a
+    changé depuis), elle est affichée IMMÉDIATEMENT (un "tampon" sur la
+    dernière version connue) plutôt que de bloquer l'affichage derrière un
+    nouvel appel LLM — la retraduction se lance quand même dans la foulée,
+    et un st.rerun() bascule sur la version fraîche dès qu'elle est prête.
+    Seule la toute première traduction d'un lieu (aucun cache du tout)
+    bloque encore, faute de quoi que ce soit d'autre à montrer."""
     if not derive:
         return {}
     if st.session_state.get("ui_lang", "fr") != "en":
         return derive.donnees
+
     from .agent.traduction import traduire_donnees_fiche
-    with st.spinner(t("fiche.traduction_en_cours")):
-        return traduire_donnees_fiche(store, derive)
+
+    a_jour = derive.donnees_en and derive.donnees_en_source_hash == derive.source_hash
+    if a_jour:
+        return derive.donnees_en
+
+    if not derive.donnees_en:
+        with st.spinner(t("fiche.traduction_en_cours")):
+            return traduire_donnees_fiche(store, derive)
+
+    # Cache périmé : affiché tel quel, retraduction déclenchée une seule
+    # fois par affichage (render_fiche_header ET render_fiche_sections
+    # appellent tous deux cette fonction pour la même fiche ouverte). Le
+    # hash source fait partie de la clé : si le contenu change ENCORE plus
+    # tard, une nouvelle tentative doit pouvoir se relancer plutôt que de
+    # rester bloquée sur un marqueur posé pour un hash différent, déjà
+    # obsolète lui aussi.
+    cle_deja_lancee = f"retraduction_lancee::{derive.tiers_lieu_id}::{derive.source_hash}"
+    if not st.session_state.get(cle_deja_lancee):
+        st.session_state[cle_deja_lancee] = True
+        fraiche = traduire_donnees_fiche(store, derive)
+        # `is not derive.donnees` : traduire_donnees_fiche() retourne cet
+        # objet précis (même référence) quand elle échoue et retombe sur le
+        # français — un rerun basculerait alors vers du français affiché
+        # comme si c'était la traduction, pire que garder l'ancien anglais.
+        if fraiche is not derive.donnees and fraiche != derive.donnees_en:
+            st.session_state.pop(cle_deja_lancee, None)
+            st.rerun()
+    return derive.donnees_en
 
 
 def render_fiche_header(store: Store, lieu, derive, nombre_contributeurs: int | None = None) -> None:

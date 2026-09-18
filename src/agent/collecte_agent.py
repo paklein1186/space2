@@ -195,6 +195,61 @@ class CollecteAgent:
         self.messages.append({"role": "user", "content": user_text})
         return self._run_until_text()
 
+    def send_stream(self, user_text: str):
+        """Variante génératrice de send() — même boucle agentique (tool-use
+        compris), mais cède le texte au fil de sa génération plutôt que de
+        renvoyer la réponse complète d'un bloc. Pensée pour st.write_stream()
+        côté Streamlit : rien de spécial à gérer côté appelant, il consomme
+        juste le générateur comme du texte qui arrive au fil de l'eau.
+
+        Un tour qui ne fait qu'appeler un ou plusieurs tools (pas de texte,
+        le cas le plus courant en tout début de réponse) ne cède rien tant
+        qu'aucun texte n'arrive — le round-trip réseau + exécution des tools
+        reste une pause silencieuse, comme le spinner précédent, avant que le
+        texte final ne commence à s'afficher progressivement."""
+        self.messages.append({"role": "user", "content": user_text})
+        while True:
+            apply_single_cache_breakpoint(self.messages)
+            with self.client.messages.stream(
+                model=self.model,
+                max_tokens=4000,
+                system=cached_system(SYSTEM_PROMPT),
+                tools=TOOL_DEFINITIONS,
+                messages=self.messages,
+            ) as stream:
+                yield from stream.text_stream
+                final_message = stream.get_final_message()
+
+            if self.store is not None:
+                log_usage(self.store, "entretien", self.model, final_message.usage, self.tiers_lieu_id)
+            self.messages.append({"role": "assistant", "content": to_plain_content(final_message.content)})
+
+            tool_uses = [b for b in final_message.content if b.type == "tool_use"]
+            if not tool_uses:
+                if final_message.stop_reason == "max_tokens":
+                    yield "\n\n*(Message interrompu — trop long à générer d'un coup.)*"
+                return
+
+            self.messages.append({"role": "user", "content": self._executer_tool_uses(tool_uses)})
+
+    def _executer_tool_uses(self, tool_uses: list) -> list:
+        tool_results = []
+        for tu in tool_uses:
+            # Une exception non rattrapée ici laisse le message assistant
+            # courant sans tool_result correspondant, ce qui corrompt
+            # durablement self.messages (prochain appel API rejeté en 400 par
+            # Anthropic) en plus de faire planter la page en cours.
+            try:
+                result = self.tool_handler.execute(tu.name, tu.input)
+            except Exception as exc:
+                result = {"error": f"{type(exc).__name__}: {exc}"}
+            tool_results.append({
+                "type": "tool_result",
+                "tool_use_id": tu.id,
+                "content": json.dumps(result, ensure_ascii=False, default=str),
+            })
+        return tool_results
+
     def _run_until_text(self) -> str:
         while True:
             apply_single_cache_breakpoint(self.messages)
@@ -220,23 +275,7 @@ class CollecteAgent:
                     texte += "\n\n*(Message interrompu — trop long à générer d'un coup.)*"
                 return texte
 
-            tool_results = []
-            for tu in tool_uses:
-                # Voir la même note dans rag_agent.py : une exception non
-                # rattrapée ici laisse le message assistant courant sans
-                # tool_result correspondant, ce qui corrompt durablement
-                # self.messages (prochain appel API rejeté en 400 par
-                # Anthropic) en plus de faire planter la page en cours.
-                try:
-                    result = self.tool_handler.execute(tu.name, tu.input)
-                except Exception as exc:
-                    result = {"error": f"{type(exc).__name__}: {exc}"}
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": tu.id,
-                    "content": json.dumps(result, ensure_ascii=False, default=str),
-                })
-            self.messages.append({"role": "user", "content": tool_results})
+            self.messages.append({"role": "user", "content": self._executer_tool_uses(tool_uses)})
 
 
 _INSTRUCTIONS_MODE = {

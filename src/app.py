@@ -294,6 +294,12 @@ def _maj_completion(store, state: dict) -> None:
     state["completion"] = state["agent"].tool_handler.campagne_completion()
 
 
+_MESSAGE_ERREUR_AGENT = (
+    "L'agent n'a pas pu répondre (problème réseau ou service momentanément "
+    "indisponible). Réessayez dans quelques instants — rien n'est perdu."
+)
+
+
 def _agent_send_surveille(agent, message: str) -> Optional[str]:
     """Enveloppe `agent.send` : un aléa réseau/API (l'appel Claude repose sur
     httpx/HTTP2, sujet à des coupures transitoires — voir la panne du
@@ -304,11 +310,25 @@ def _agent_send_surveille(agent, message: str) -> Optional[str]:
     try:
         return agent.send(message)
     except Exception:
-        st.error(
-            "L'agent n'a pas pu répondre (problème réseau ou service momentanément "
-            "indisponible). Réessayez dans quelques instants — rien n'est perdu."
-        )
+        st.error(_MESSAGE_ERREUR_AGENT)
         return None
+
+
+def _agent_stream_surveille(agent, message: str, etat: dict):
+    """Variante générateur de _agent_send_surveille, pour st.write_stream()
+    (voir agent.send_stream) : le texte s'affiche au fil de sa génération
+    plutôt que d'attendre la réponse complète — perçu bien plus rapide,
+    même si le temps de réponse réel du modèle ne change pas.
+
+    st.write_stream() ne peut pas renvoyer None sur échec (il retourne
+    toujours la concaténation de ce qui a été cédé) : `etat` est un dict
+    mutable partagé avec l'appelant, qui y lit après coup si un aléa réseau
+    a coupé le flux, pour afficher l'erreur au bon endroit (st.error, pas
+    noyée dans la bulle de réponse) sans dupliquer l'essai/erreur ici."""
+    try:
+        yield from agent.send_stream(message)
+    except Exception:
+        etat["echec"] = True
 
 
 def _transmettre_source_entretien(store, state: dict, nom_lieu: str, texte_brut: str,
@@ -617,10 +637,31 @@ def entretien_tab(store, user_id: str):
                 with st.chat_message(speaker):
                     st.write(text)
 
-    # En deux temps (message ajouté + rerun immédiat, appel LLM au rerun
-    # suivant) — voir la même note dans rag_tab : sans ça, la réponse de
-    # l'utilisateur ne s'affichait elle-même qu'une fois la réplique de
-    # l'agent obtenue, plusieurs secondes plus tard.
+            # Rendu ICI (dans la même colonne/conteneur que l'historique,
+            # juste après) plutôt qu'après un st.rerun() séparé : avec le
+            # streaming, le texte commence à s'afficher en quelques instants
+            # (le round-trip d'éventuels tool calls avant reste une pause
+            # silencieuse, comme le spinner précédent) — plus besoin
+            # d'attendre la réponse complète pour donner un premier retour.
+            if state.get("file_attente_messages"):
+                prochain_message = state["file_attente_messages"][0]
+                with st.chat_message("assistant"):
+                    echec = {}
+                    reply = st.write_stream(
+                        _agent_stream_surveille(state["agent"], prochain_message, echec)
+                    )
+                if echec.get("echec"):
+                    st.error(_MESSAGE_ERREUR_AGENT)
+                    # Le message reste en tête de file (pas retiré) : le
+                    # prochain rerun retentera automatiquement le même
+                    # envoi, sans perdre les messages suivants déjà
+                    # accumulés derrière lui dans la file.
+                    return
+                state["history"].append(("assistant", reply))
+                _maj_completion(store, state)
+                state["file_attente_messages"].pop(0)
+                st.rerun()
+
     lang_code = "fr-FR" if st.session_state.get("ui_lang", "fr") == "fr" else "en-US"
     voice_text = consume_voice_transcript()
     bouton_dictee(lang_code, label=t("voice.dicter_reponse"))
@@ -632,20 +673,6 @@ def entretien_tab(store, user_id: str):
         # les précédents, et sont envoyés à l'agent un par un, dans l'ordre.
         state["history"].append(("user", user_text))
         state.setdefault("file_attente_messages", []).append(user_text)
-        st.rerun()
-
-    if state.get("file_attente_messages"):
-        prochain_message = state["file_attente_messages"][0]
-        with st.spinner(t("entretien.agent_reflechit")):
-            reply = _agent_send_surveille(state["agent"], prochain_message)
-        if reply is None:
-            # Le message reste en tête de file (pas retiré) : le prochain
-            # rerun retentera automatiquement le même envoi, sans perdre les
-            # messages suivants déjà accumulés derrière lui dans la file.
-            return
-        state["history"].append(("assistant", reply))
-        _maj_completion(store, state)
-        state["file_attente_messages"].pop(0)
         st.rerun()
 
 
@@ -1753,12 +1780,26 @@ def rag_tab(store, user_id: str):
                         )
                     st.toast("Ajouté à la base de connaissances.", icon="🧠")
 
-    # En deux temps (message ajouté + rerun IMMÉDIAT, puis appel LLM dans le
-    # rerun suivant) plutôt qu'un seul passage qui ajoute le message ET
-    # attend la réponse avant de rafraîchir l'affichage : sans ça, la
-    # question de l'utilisateur ne s'affichait elle-même qu'une fois la
-    # réponse complète obtenue, donnant l'impression que tout le site est
-    # lent alors que c'est seulement l'appel LLM qui prend plusieurs secondes.
+        # Rendu ici (même conteneur que l'historique, juste après) plutôt
+        # qu'après un st.rerun() séparé — voir la même note dans
+        # entretien_tab : le streaming donne un premier retour en quelques
+        # instants, plus besoin d'attendre la réponse complète.
+        if st.session_state.get("rag_file_attente_questions"):
+            prochaine_question = st.session_state["rag_file_attente_questions"][0]
+            with st.chat_message("assistant"):
+                echec = {}
+                reply = st.write_stream(
+                    _agent_stream_surveille(st.session_state["rag_agent"], prochaine_question, echec)
+                )
+            if echec.get("echec"):
+                st.error(_MESSAGE_ERREUR_AGENT)
+                # Reste en tête de file : voir la même note dans entretien_tab.
+                return
+            st.session_state["rag_history"].append(("assistant", reply))
+            st.session_state["rag_file_attente_questions"].pop(0)
+            _sauvegarder_conversation_bibliotheque(store, user_id)
+            st.rerun()
+
     lang_code = "fr-FR" if st.session_state.get("ui_lang", "fr") == "fr" else "en-US"
     voice_question = consume_voice_transcript()
     bouton_dictee(lang_code, label=t("voice.dicter_question"))
@@ -1769,18 +1810,6 @@ def rag_tab(store, user_id: str):
         # posées à la suite s'accumulent ici plutôt que de s'écraser.
         st.session_state["rag_history"].append(("user", question))
         st.session_state.setdefault("rag_file_attente_questions", []).append(question)
-        st.rerun()
-
-    if st.session_state.get("rag_file_attente_questions"):
-        prochaine_question = st.session_state["rag_file_attente_questions"][0]
-        with st.spinner("Recherche en cours..."):
-            reply = _agent_send_surveille(st.session_state["rag_agent"], prochaine_question)
-        if reply is None:
-            # Reste en tête de file : voir la même note dans entretien_tab.
-            return
-        st.session_state["rag_history"].append(("assistant", reply))
-        st.session_state["rag_file_attente_questions"].pop(0)
-        _sauvegarder_conversation_bibliotheque(store, user_id)
         st.rerun()
 
 
