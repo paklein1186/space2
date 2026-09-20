@@ -136,6 +136,15 @@ def main():
         check("secret non configuré → tout refusé (fail closed)",
               http.post("/ask", json=corps, headers=h).status_code == 401)
         check("/health public", http.get("/health").json() == {"status": "ok"})
+        m = http.get("/manifest")
+        check("/manifest public (sans secret)", m.status_code == 200)
+        fiche = m.json()
+        check("manifest : champs de la fiche ctg",
+              all(k in fiche for k in ("name", "description", "purpose", "readme", "variables",
+                                       "topics", "territories", "category", "version")))
+        check("manifest : reflète le modèle configuré", fiche["model"] in fiche["readme"])
+        check("manifest : liste les jeux de données réels",
+              {d["name"] for d in fiche["datasets"]} == {"lieux", "reponses_publiques", "activite_ctg"})
     print("Tous les tests passent.")
 
 

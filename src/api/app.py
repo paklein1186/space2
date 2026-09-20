@@ -1,5 +1,6 @@
 """API de Space2 pour Changethegame (et autres plateformes).
 
+  GET  /manifest                  fiche de l'agent (publique, sans secret)
   POST /ask                       questions-réponses sur les données publiques
   GET  /lieux[?updated_since=]    flux des lieux (synthèse publique) pour ctg
   POST /lieux/{space2_id}/link    ctg associe son entité à un lieu
@@ -29,6 +30,7 @@ load_dotenv()
 
 from ..db.factory import get_admin_store  # noqa: E402
 from .ask_agent import MODELE_DEFAUT, AskAgent  # noqa: E402
+from .manifest import construire_manifest  # noqa: E402
 from .public_data import DonneesPubliques, flux_lieux  # noqa: E402
 
 MAX_MESSAGES = 20
@@ -105,6 +107,11 @@ def get_store():
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
+
+
+@app.get("/manifest")
+def manifest() -> dict:
+    return construire_manifest()
 
 
 @app.post("/ask", response_model=AskResponse, dependencies=[Depends(verifier_secret)])
