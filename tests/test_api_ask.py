@@ -90,7 +90,9 @@ def main():
         check("aucune réponse de contributeur bloqué (champ pourtant public)",
               not (reps["champ_id"] == champ_bloque.id).any())
         check("aucun identifiant de contributeur exposé", "contributeur_id" not in reps.columns)
-        check("le dataset lieux contient la synthèse", donnees["lieux"].iloc[0]["resume"] == "Un résumé.")
+        check("le dataset lieux n'expose jamais la synthèse interne (donnees)",
+              "Un résumé." not in str(donnees["lieux"].to_dict()))
+        check("le dataset lieux liste le lieu", list(donnees["lieux"]["tiers_lieu"]) == ["Lieu Public"])
 
         # --- Agent : passe par un tool puis répond ; budget respecté ---
         source = DonneesPubliques(store, ttl=60)

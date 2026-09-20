@@ -154,6 +154,21 @@ def lieux_enrichis_dataframe(store: Store) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def activite_ctg_dataframe(store: Store) -> pd.DataFrame:
+    """Activité publique remontée de Changethegame pour les lieux liés
+    (membres, discussions, mises à jour, quêtes, besoins) — alimentée par
+    l'API POST /events (src/api/app.py)."""
+    colonnes = ["tiers_lieu", "type", "titre", "texte", "url", "survenu_le"]
+    evenements = store.list_evenements_ctg()
+    if not evenements:
+        return pd.DataFrame(columns=colonnes)
+    noms = {lieu.id: lieu.nom for lieu in store.list_tiers_lieux()}
+    return pd.DataFrame([
+        {"tiers_lieu": noms[e["tiers_lieu_id"]], **{k: e[k] for k in colonnes[1:]}}
+        for e in evenements if e["tiers_lieu_id"] in noms
+    ], columns=colonnes)
+
+
 def bonnes_pratiques_dataframe(store: Store) -> pd.DataFrame:
     """Retours d'expérience concrets et comparables entre lieux (montages
     financiers, partenariats, dispositifs de gouvernance...), capturés par
@@ -216,6 +231,14 @@ class RagToolHandler:
                              "jamais posées comme question du questionnaire donc absentes de reponses_tiers_lieux."),
         })
         datasets.append({
+            "name": "activite_ctg",
+            "type": "derive",
+            "columns": ["tiers_lieu", "type", "titre", "texte", "url", "survenu_le"],
+            "description": ("Activité publique remontée de Changethegame pour les lieux qui y sont liés : "
+                             "membres, discussions, mises à jour, quêtes, besoins. Vide tant qu'aucun lieu "
+                             "n'est lié. À consulter pour \"que se passe-t-il autour de tel lieu ?\"."),
+        })
+        datasets.append({
             "name": "bonnes_pratiques",
             "type": "notes",
             "columns": ["tiers_lieu", "pays", "region", "texte"],
@@ -235,6 +258,8 @@ class RagToolHandler:
             return lieux_enrichis_dataframe(self.store)
         if dataset_name == "bonnes_pratiques":
             return bonnes_pratiques_dataframe(self.store)
+        if dataset_name == "activite_ctg":
+            return activite_ctg_dataframe(self.store)
         catalog = _load_catalog()
         entry = catalog.get("datasets", {}).get(dataset_name)
         if not entry:

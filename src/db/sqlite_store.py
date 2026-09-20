@@ -30,7 +30,8 @@ create table if not exists tiers_lieux (
     region text,
     latitude real,
     longitude real,
-    statut_progression text default 'en_cours'
+    statut_progression text default 'en_cours',
+    ctg_entity_id text
 );
 create table if not exists contributeurs (
     id text primary key,
@@ -85,7 +86,10 @@ create table if not exists lieu_derive (
     besoins_mis_en_avant text not null default '[]',
     genere_le text not null default (datetime('now')),
     donnees_en text,
-    donnees_en_source_hash text
+    donnees_en_source_hash text,
+    donnees_publiques text,
+    donnees_publiques_source_hash text,
+    donnees_publiques_maj text
 );
 create table if not exists admins (
     user_id text primary key
@@ -127,6 +131,24 @@ create table if not exists litiges (
     cree_le text not null default (datetime('now')),
     resolu_le text
 );
+create table if not exists evenements_ctg (
+    id text primary key,
+    tiers_lieu_id text not null,
+    ctg_event_id text not null unique,
+    type text not null,
+    titre text,
+    texte text,
+    url text,
+    survenu_le text,
+    cree_le text not null default (datetime('now'))
+);
+create table if not exists acces_externes (
+    email text primary key,
+    source text not null default 'ctg',
+    guilde_id text,
+    statut text not null default 'actif',
+    maj_le text not null default (datetime('now'))
+);
 create table if not exists llm_calls (
     id text primary key,
     type_appel text not null,
@@ -143,9 +165,18 @@ create table if not exists llm_calls (
 class SqliteStore(Store):
     def __init__(self, db_path: str = "data/local_dev.sqlite3"):
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-        self.conn = sqlite3.connect(db_path)
+        self.conn = sqlite3.connect(db_path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(DDL)
+        # Bases locales créées avant l'ajout de ces colonnes : CREATE TABLE IF
+        # NOT EXISTS ne les modifie pas.
+        for table, column in (("tiers_lieux", "ctg_entity_id"),
+                              ("lieu_derive", "donnees_publiques"),
+                              ("lieu_derive", "donnees_publiques_source_hash"),
+                              ("lieu_derive", "donnees_publiques_maj")):
+            existantes = {r["name"] for r in self.conn.execute(f"pragma table_info({table})")}
+            if column not in existantes:
+                self.conn.execute(f"alter table {table} add column {column} text")
         self.conn.commit()
 
     # -- tiers_lieux --------------------------------------------------
@@ -339,6 +370,51 @@ class SqliteStore(Store):
                 json.loads(r["valeur"]) if r["valeur"] is not None else None
             )
         return out
+
+    def update_lieu_derive_publique(self, tiers_lieu_id: str, donnees_publiques: dict,
+                                     source_hash: str) -> None:
+        self.conn.execute(
+            "update lieu_derive set donnees_publiques = ?, donnees_publiques_source_hash = ?, "
+            "donnees_publiques_maj = datetime('now') where tiers_lieu_id = ?",
+            (json.dumps(donnees_publiques, ensure_ascii=False), source_hash, tiers_lieu_id),
+        )
+        self.conn.commit()
+
+    def add_evenement_ctg(self, tiers_lieu_id: str, ctg_event_id: str, type_: str,
+                           titre: Optional[str], texte: Optional[str], url: Optional[str],
+                           survenu_le: Optional[str]) -> None:
+        self.conn.execute(
+            "insert into evenements_ctg (id, tiers_lieu_id, ctg_event_id, type, titre, texte, url, "
+            "survenu_le) values (?, ?, ?, ?, ?, ?, ?, ?) "
+            "on conflict(ctg_event_id) do update set tiers_lieu_id = excluded.tiers_lieu_id, "
+            "type = excluded.type, titre = excluded.titre, texte = excluded.texte, "
+            "url = excluded.url, survenu_le = excluded.survenu_le",
+            (str(uuid.uuid4()), tiers_lieu_id, ctg_event_id, type_, titre, texte, url, survenu_le),
+        )
+        self.conn.commit()
+
+    def list_evenements_ctg(self) -> list:
+        rows = self.conn.execute(
+            "select tiers_lieu_id, type, titre, texte, url, survenu_le from evenements_ctg "
+            "order by coalesce(survenu_le, cree_le) desc"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def upsert_acces_externe(self, email: str, source: str, guilde_id: Optional[str],
+                              statut: str) -> None:
+        self.conn.execute(
+            "insert into acces_externes (email, source, guilde_id, statut) values (?, ?, ?, ?) "
+            "on conflict(email) do update set source = excluded.source, guilde_id = excluded.guilde_id, "
+            "statut = excluded.statut, maj_le = datetime('now')",
+            (email.strip().lower(), source, guilde_id, statut),
+        )
+        self.conn.commit()
+
+    def has_acces_externe(self, email: str) -> bool:
+        row = self.conn.execute(
+            "select 1 from acces_externes where email = ? and statut = 'actif'", (email.strip().lower(),)
+        ).fetchone()
+        return row is not None
 
     def get_reponses_pour_champs(self, champ_ids: list) -> list:
         if not champ_ids:
@@ -688,6 +764,9 @@ def _lieu_derive_from_row(data: dict) -> LieuDerive:
         genere_le=data["genere_le"],
         donnees_en=json.loads(data["donnees_en"]) if data.get("donnees_en") else None,
         donnees_en_source_hash=data.get("donnees_en_source_hash"),
+        donnees_publiques=json.loads(data["donnees_publiques"]) if data.get("donnees_publiques") else None,
+        donnees_publiques_source_hash=data.get("donnees_publiques_source_hash"),
+        donnees_publiques_maj=data.get("donnees_publiques_maj"),
     )
 
 

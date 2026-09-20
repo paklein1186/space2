@@ -22,6 +22,9 @@ class TiersLieu:
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     statut_progression: str = "en_cours"
+    # Identifiant de l'entité correspondante dans Changethegame (lien posé par
+    # ctg via l'API, voir src/api/app.py) ; None = pas (encore) synchronisé.
+    ctg_entity_id: Optional[str] = None
 
 
 @dataclass
@@ -73,6 +76,12 @@ class LieuDerive:
     # est encore à jour par rapport à `donnees`/`source_hash`.
     donnees_en: Optional[dict] = None
     donnees_en_source_hash: Optional[str] = None
+    # Synthèse PUBLIQUE : générée à partir des seules réponses publiques (ni
+    # confidentiel, ni champs internes, ni notes libres) — voir
+    # agent/enrichissement_public.py. C'est la seule qui sort vers l'API/ctg.
+    donnees_publiques: Optional[dict] = None
+    donnees_publiques_source_hash: Optional[str] = None
+    donnees_publiques_maj: Optional[str] = None
 
 
 @dataclass
@@ -175,6 +184,38 @@ class Store(ABC):
         de contributeur (agrégat anonyme). Le filtrage des champs réservés à
         certains rôles (finances, RH...) relève de l'appelant, qui connaît le
         schéma du questionnaire — utilisée par l'API publique (src/api)."""
+        ...
+
+    @abstractmethod
+    def update_lieu_derive_publique(self, tiers_lieu_id: str, donnees_publiques: dict,
+                                     source_hash: str) -> None:
+        """Écrit la synthèse publique (et sa date) sans toucher au reste de
+        lieu_derive. Le lieu doit déjà avoir une ligne lieu_derive."""
+        ...
+
+    @abstractmethod
+    def add_evenement_ctg(self, tiers_lieu_id: str, ctg_event_id: str, type_: str,
+                           titre: Optional[str], texte: Optional[str], url: Optional[str],
+                           survenu_le: Optional[str]) -> None:
+        """Enregistre (idempotent sur ctg_event_id) un événement public
+        remonté de Changethegame pour un lieu lié."""
+        ...
+
+    @abstractmethod
+    def list_evenements_ctg(self) -> list:
+        """Tous les événements ctg : {tiers_lieu_id, type, titre, texte, url, survenu_le}."""
+        ...
+
+    @abstractmethod
+    def upsert_acces_externe(self, email: str, source: str, guilde_id: Optional[str],
+                              statut: str) -> None:
+        """Enregistre/met à jour un accès externe (membre de guilde ou
+        loueur de l'agent côté ctg). `statut` : 'actif' | 'revoque'."""
+        ...
+
+    @abstractmethod
+    def has_acces_externe(self, email: str) -> bool:
+        """Vrai si l'email a un accès externe actif."""
         ...
 
     @abstractmethod

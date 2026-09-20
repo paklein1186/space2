@@ -1022,3 +1022,14 @@ def get_field(champ_id: str) -> Optional[Field]:
     par les campagnes prioritaires (collecte_tools.py) qui référencent des
     champs par id sans connaître leur module/section d'origine."""
     return _FIELDS_BY_ID.get(champ_id)
+
+
+def champ_public(champ_id: str) -> bool:
+    """Un champ n'est exposable publiquement (API, synthèse publique) que s'il
+    existe dans le questionnaire, n'est pas confidentiel par défaut et est
+    ouvert à tous les rôles — un champ inconnu (ancien schéma) est exclu par
+    prudence."""
+    champ = get_field(champ_id)
+    if champ is None or champ.confidential_default:
+        return False
+    return champ.roles is None or set(TOUS_ROLES) <= set(champ.roles)

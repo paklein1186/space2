@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Optional
 
 from supabase import Client, create_client
@@ -254,6 +255,43 @@ class SupabaseStore(Store):
                 continue
             out.setdefault(r["tiers_lieu_id"], {})[r["champ_id"]] = r["valeur"]
         return out
+
+    def update_lieu_derive_publique(self, tiers_lieu_id: str, donnees_publiques: dict,
+                                     source_hash: str) -> None:
+        self.client.table("lieu_derive").update({
+            "donnees_publiques": donnees_publiques,
+            "donnees_publiques_source_hash": source_hash,
+            "donnees_publiques_maj": datetime.now(timezone.utc).isoformat(),
+        }).eq("tiers_lieu_id", tiers_lieu_id).execute()
+
+    def add_evenement_ctg(self, tiers_lieu_id: str, ctg_event_id: str, type_: str,
+                           titre: Optional[str], texte: Optional[str], url: Optional[str],
+                           survenu_le: Optional[str]) -> None:
+        self.client.table("evenements_ctg").upsert({
+            "tiers_lieu_id": tiers_lieu_id, "ctg_event_id": ctg_event_id, "type": type_,
+            "titre": titre, "texte": texte, "url": url, "survenu_le": survenu_le,
+        }, on_conflict="ctg_event_id").execute()
+
+    def list_evenements_ctg(self) -> list:
+        return (
+            self.client.table("evenements_ctg")
+            .select("tiers_lieu_id,type,titre,texte,url,survenu_le")
+            .order("survenu_le", desc=True).execute().data
+        )
+
+    def upsert_acces_externe(self, email: str, source: str, guilde_id: Optional[str],
+                              statut: str) -> None:
+        self.client.table("acces_externes").upsert({
+            "email": email.strip().lower(), "source": source, "guilde_id": guilde_id,
+            "statut": statut, "maj_le": datetime.now(timezone.utc).isoformat(),
+        }, on_conflict="email").execute()
+
+    def has_acces_externe(self, email: str) -> bool:
+        result = (
+            self.client.table("acces_externes").select("email")
+            .eq("email", email.strip().lower()).eq("statut", "actif").execute()
+        )
+        return bool(result.data)
 
     def get_reponses_pour_champs(self, champ_ids: list) -> list:
         if not champ_ids:

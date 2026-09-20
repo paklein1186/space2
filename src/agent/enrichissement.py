@@ -192,4 +192,11 @@ def enrich_lieu(store: Store, tiers_lieu_id: str, force: bool = False, nom_lieu:
     )
     store.save_lieu_derive(lieu_derive)
     _embed_profil(tiers_lieu_id, nom_lieu, profil_texte, embedder, vectorstore)
+    try:
+        # Synthèse publique (sortie vers l'API/ctg) : ne doit jamais faire
+        # échouer l'enrichissement interne, déjà écrit à ce stade.
+        from .enrichissement_public import enrichir_public
+        enrichir_public(store, tiers_lieu_id)
+    except Exception:
+        pass
     return lieu_derive, True
