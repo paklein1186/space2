@@ -1,0 +1,22 @@
+# Blueprint Render pour l'API Space2 (ctg). Render > New > Blueprint > ce dépôt.
+# Les valeurs "sync: false" sont à saisir dans le tableau de bord Render
+# (jamais dans le dépôt).
+services:
+  - type: web
+    name: space2-api
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements-api.txt
+    startCommand: uvicorn src.api.app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: CTG_WEBHOOK_SECRET
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
