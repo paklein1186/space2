@@ -18,6 +18,7 @@ import pandas as pd
 from ..db.store import Store
 from ..questionnaire.schema import field_label
 from .embeddings import VoyageEmbedder
+from .objets_ctg import organisations_ctg_dataframe
 from .structured_query import apply_condition as _apply_condition
 from .structured_query import rendre_hashable as _rendre_hashable
 from .structured_query import run_structured_query
@@ -240,6 +241,15 @@ class RagToolHandler:
                              "n'est lié. À consulter pour \"que se passe-t-il autour de tel lieu ?\"."),
         })
         datasets.append({
+            "name": "organisations_ctg",
+            "type": "derive",
+            "columns": ["ctg_id", "kind", "nom", "description", "url", "website_url", "topics", "territories",
+                        "commune", "latitude", "longitude", "parent_ctg_id", "parent_nom", "status", "updated_at"],
+            "description": ("Objets de Changethegame autres que des lieux : organisations, entités, quêtes et "
+                             "posts (kind), avec thèmes, territoires, commune et coordonnées quand ils existent. "
+                             "À consulter pour \"quelles organisations / quêtes travaillent sur X ?\"."),
+        })
+        datasets.append({
             "name": "bonnes_pratiques",
             "type": "notes",
             "columns": ["tiers_lieu", "pays", "region", "texte"],
@@ -261,6 +271,8 @@ class RagToolHandler:
             return bonnes_pratiques_dataframe(self.store)
         if dataset_name == "activite_ctg":
             return activite_ctg_dataframe(self.store)
+        if dataset_name == "organisations_ctg":
+            return organisations_ctg_dataframe(self.store)
         catalog = _load_catalog()
         entry = catalog.get("datasets", {}).get(dataset_name)
         if not entry:

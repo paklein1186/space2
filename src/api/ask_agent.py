@@ -82,7 +82,7 @@ TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "dataset_name": {"type": "string", "enum": ["lieux", "reponses_publiques", "activite_ctg"]},
+                "dataset_name": {"type": "string", "enum": ["lieux", "reponses_publiques", "organisations_ctg", "activite_ctg"]},
                 "operation": {"type": "string", "enum": ["head", "describe", "filter", "groupby_count"]},
                 "params": {
                     "type": "object",
@@ -119,8 +119,9 @@ SYSTEM_PROMPT_COMPLET = SYSTEM_PROMPT_SITE + """
 Contexte de cet appel (depuis Changethegame) :
 - Tu disposes des MÊMES données que l'assistant du site : réponses détaillées du questionnaire \
 (`reponses_tiers_lieux`), synthèses (`lieux_enrichis`), retours d'expérience (`bonnes_pratiques`) et activité \
-venue de Changethegame (`activite_ctg`). `search_knowledge_base` ne couvre ici que doc_type="profil_lieu" (pas \
-les interviews ni les rapports déposés).
+venue de Changethegame (`activite_ctg`). `organisations_ctg` liste les organisations, entités, quêtes et posts \
+de Changethegame qui ne sont pas des lieux (colonne `kind`). `search_knowledge_base` couvre ici doc_type=\
+"profil_lieu" (profils de lieux) et "objet_ctg" (objets de Changethegame), pas les interviews ni les rapports déposés.
 - Les réponses que leurs auteurs ont explicitement marquées confidentielles ne te sont pas accessibles : si on \
 t'interroge sur un sujet sans donnée, dis que l'information n'est pas disponible, sans supposer ni deviner.
 - Géographie : `lieux_enrichis` a des colonnes latitude/longitude. Pour « les lieux proches de X » : estime \
@@ -140,7 +141,7 @@ def _tools_complet() -> list:
     tools = copy.deepcopy(TOOLS_SITE)
     for tool in tools:
         if tool["name"] == "search_knowledge_base":
-            tool["input_schema"]["properties"]["doc_type"]["enum"] = ["profil_lieu"]
+            tool["input_schema"]["properties"]["doc_type"]["enum"] = ["profil_lieu", "objet_ctg"]
             tool["input_schema"]["properties"]["top_k"]["description"] = "défaut 6, maximum 10"
         if tool["name"] == "query_structured_data":
             props = tool["input_schema"]["properties"]
@@ -181,13 +182,13 @@ class OutilsComplets(RagToolHandler):
 
     def search_knowledge_base(self, tool_input: dict) -> dict:
         doc_type = tool_input.get("doc_type")
-        if doc_type and doc_type != "profil_lieu":
-            return {"error": "seul doc_type='profil_lieu' est disponible dans ce déploiement"}
+        if doc_type and doc_type not in ("profil_lieu", "objet_ctg"):
+            return {"error": "seuls doc_type='profil_lieu' et 'objet_ctg' sont disponibles dans ce déploiement"}
         top_k = max(1, min(int(tool_input.get("top_k", 6)), 10))
         # Thread + délai : le client Voyage peut réessayer longtemps en cas de
         # rate limit, ce qui mangerait tout le budget de l'appel.
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        futur = executor.submit(self.profils.search, tool_input["query"], top_k)
+        futur = executor.submit(self.profils.search, tool_input["query"], top_k, doc_type)
         executor.shutdown(wait=False)
         try:
             return {"results": futur.result(timeout=DELAI_RECHERCHE_SEMANTIQUE)}

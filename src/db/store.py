@@ -219,6 +219,19 @@ class Store(ABC):
         ...
 
     @abstractmethod
+    def upsert_objets_ctg(self, objets: list) -> None:
+        """Upsert par ctg_id d'objets Changethegame (dicts : ctg_id, kind,
+        is_place, name, description, url, website_url, topics, territories,
+        commune, latitude, longitude, parent_ctg_id, status, updated_at,
+        tiers_lieu_id)."""
+        ...
+
+    @abstractmethod
+    def list_objets_ctg(self) -> list:
+        """Tous les objets ctg stockés (mêmes clés que upsert_objets_ctg)."""
+        ...
+
+    @abstractmethod
     def upsert_acces_externe(self, email: str, source: str, guilde_id: Optional[str],
                               statut: str) -> None:
         """Enregistre/met à jour un accès externe (membre de guilde ou

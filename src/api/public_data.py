@@ -14,6 +14,7 @@ from typing import Optional
 
 import pandas as pd
 
+from ..agent.objets_ctg import organisations_ctg_dataframe
 from ..db.store import Store
 from ..questionnaire.schema import champ_public, get_field  # noqa: F401 (champ_public ré-exporté)
 
@@ -26,6 +27,12 @@ DATASETS = {
             "synthèse publique (resume, categories, activites, publics, territoire, besoins, "
             "partenaires, competences, projets, enjeux, mots_cles, besoins_mis_en_avant). Les "
             "colonnes de synthèse sont vides pour un lieu dont les réponses publiques manquent."
+        ),
+    },
+    "organisations_ctg": {
+        "description": (
+            "Objets de Changethegame autres que des lieux : organisations, entités, quêtes et posts "
+            "(colonne kind), avec thèmes, territoires, commune et coordonnées quand ils existent."
         ),
     },
     "activite_ctg": {
@@ -107,6 +114,7 @@ def construire_datasets(store: Store) -> dict:
         "lieux": pd.DataFrame(lignes_lieux),
         "reponses_publiques": pd.DataFrame(
             lignes_reponses, columns=["tiers_lieu", "pays", "region", "champ", "champ_id", "valeur"]),
+        "organisations_ctg": organisations_ctg_dataframe(store),
         "activite_ctg": pd.DataFrame(
             lignes_evenements, columns=["tiers_lieu", "type", "titre", "texte", "url", "survenu_le"]),
     }

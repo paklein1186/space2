@@ -5,6 +5,7 @@
   GET  /lieux[?updated_since=]    flux des lieux (synthèse publique) pour ctg
   POST /lieux/{space2_id}/link    ctg associe son entité à un lieu
   POST /events                    événements publics ctg (RAG de Space2)
+  PUT  /ctg/objects               objets ctg : lieux -> galerie/portfolio, reste -> connaissance
   PUT  /access                    membres de guilde / loueurs ayant accès
 
 Lancement : `uvicorn src.api.app:app --host 0.0.0.0 --port $PORT`
@@ -31,6 +32,7 @@ load_dotenv()
 
 from ..db.factory import get_admin_store  # noqa: E402
 from .ask_agent import MODELE_DEFAUT, acces_complet_actif, creer_agent  # noqa: E402
+from .ctg_objects import traiter_objets  # noqa: E402
 from .manifest import construire_manifest  # noqa: E402
 from .public_data import flux_lieux  # noqa: E402
 
@@ -239,3 +241,95 @@ def acces(lot: LotAcces) -> dict:
     for m in lot.members:
         store.upsert_acces_externe(m.email, "ctg", m.guilde_id, m.statut)
     return {"updated": len(lot.members)}
+
+
+# -- Objets ctg (guildes, quêtes, entreprises, posts) ------------------------------
+
+_CTG_ID = re.compile(r"^(guild|quest|company|post):[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+_URL = re.compile(r"^https?://", re.IGNORECASE)
+
+
+def _liste_courte(v: Optional[list], nom: str) -> list:
+    if v is None:
+        return []
+    if len(v) > 50 or any(len(x) > 100 for x in v):
+        raise ValueError(f"{nom} : 50 éléments de 100 caractères maximum")
+    return [x.strip() for x in v if x.strip()]
+
+
+class ObjetCtg(BaseModel):
+    ctg_id: str = Field(max_length=100)
+    kind: Literal["lieu", "organisation", "quete", "entite", "post"]
+    is_place: bool = False
+    name: str = Field(min_length=1, max_length=300)
+    description: Optional[str] = Field(default=None, max_length=8000)
+    url: Optional[str] = Field(default=None, max_length=500)
+    website_url: Optional[str] = Field(default=None, max_length=500)
+    topics: Optional[list[str]] = None
+    territories: Optional[list[str]] = None
+    commune: Optional[str] = Field(default=None, max_length=200)
+    latitude: Optional[float] = Field(default=None, ge=-90, le=90)
+    longitude: Optional[float] = Field(default=None, ge=-180, le=180)
+    parent_ctg_id: Optional[str] = Field(default=None, max_length=100)
+    status: Optional[str] = Field(default=None, max_length=50)
+    updated_at: Optional[str] = Field(default=None, max_length=40)
+
+    @field_validator("ctg_id", "parent_ctg_id")
+    @classmethod
+    def ctg_id_valide(cls, v):
+        if v is None or v == "":
+            return None
+        v = v.strip().lower()
+        if not _CTG_ID.match(v):
+            raise ValueError("identifiant attendu : guild:/quest:/company:/post: + uuid")
+        return v
+
+    @field_validator("name")
+    @classmethod
+    def nom_nettoye(cls, v):
+        v = v.strip()
+        if not v:
+            raise ValueError("name ne peut pas être vide")
+        return v
+
+    @field_validator("url", "website_url")
+    @classmethod
+    def url_http(cls, v):
+        if not v:
+            return None
+        if not _URL.match(v):
+            raise ValueError("url doit commencer par http(s)://")
+        return v
+
+    @field_validator("topics")
+    @classmethod
+    def topics_valides(cls, v):
+        return _liste_courte(v, "topics")
+
+    @field_validator("territories")
+    @classmethod
+    def territories_valides(cls, v):
+        return _liste_courte(v, "territories")
+
+    @field_validator("updated_at")
+    @classmethod
+    def date_iso(cls, v):
+        if v:
+            datetime.fromisoformat(v.replace("Z", "+00:00"))
+        return v or None
+
+
+class LotObjetsCtg(BaseModel):
+    objects: list[ObjetCtg] = Field(max_length=500)
+
+
+@app.put("/ctg/objects", dependencies=[Depends(verifier_secret)])
+def objets_ctg(lot: LotObjetsCtg) -> dict:
+    objets = []
+    for o in lot.objects:
+        d = o.model_dump()
+        d["topics"], d["territories"] = d["topics"] or [], d["territories"] or []
+        if (d["latitude"] is None) != (d["longitude"] is None):
+            d["latitude"] = d["longitude"] = None   # un point n'a de sens qu'avec les deux
+        objets.append(d)
+    return traiter_objets(get_store(), objets)

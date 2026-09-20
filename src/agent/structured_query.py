@@ -47,8 +47,8 @@ def apply_condition(df: pd.DataFrame, cond: dict) -> pd.DataFrame:
     raise ValueError(f"Opérateur de filtre inconnu: {op}")
 
 
-NEAR_COLONNES_PAR_DEFAUT = ["tiers_lieu", "pays", "region", "commune", "latitude", "longitude", "distance_km",
-                            "categories", "mots_cles", "resume"]
+NEAR_COLONNES_PAR_DEFAUT = ["tiers_lieu", "nom", "kind", "pays", "region", "commune", "latitude", "longitude", "distance_km",
+                            "categories", "mots_cles", "topics", "resume", "description"]
 NEAR_RAYON_MAX_KM = 500
 NEAR_LIMITE_MAX = 50
 

@@ -10,6 +10,7 @@ Usage : python3 -m tests.test_api_full
 import os
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -152,8 +153,18 @@ def main():
         store.save_lieu_derive(LieuDerive(
             tiers_lieu_id=normal.id, donnees={**complet}, profil_semantique_texte="profil modifié numérique",
             prompt_version="v", model="m", source_hash="h2"))
-        outils.execute("search_knowledge_base", {"query": "numérique"})
-        check("recherche : seul le profil modifié est recalculé", profils._embedder.appels_documents[-1] == 1)
+        # TTL expiré : la recherche sert l'ancien index et rafraîchit en arrière-plan.
+        ancien = outils.execute("search_knowledge_base", {"query": "numérique"})["results"]
+        check("recherche après expiration du TTL : servie avec l'index existant, sans attendre",
+              len(ancien) >= 1 and "profil modifié" not in str(ancien))
+        for _ in range(50):
+            if profils._embedder.appels_documents[-1] == 1 and not profils._en_cours:
+                break
+            time.sleep(0.05)
+        check("rafraîchissement en arrière-plan : seul le profil modifié est recalculé",
+              profils._embedder.appels_documents[-1] == 1)
+        check("l'index à jour contient le nouveau profil",
+              "profil modifié" in str(outils.execute("search_knowledge_base", {"query": "numérique"})["results"]))
 
         # --- outils via l'interface de l'agent ---
         near = outils.execute("query_structured_data", {
@@ -190,6 +201,7 @@ def main():
             "reponses_tiers_lieux": set(rep.columns),
             "bonnes_pratiques": set(outils._load_dataframe("bonnes_pratiques").columns),
             "activite_ctg": set(outils._load_dataframe("activite_ctg").columns),
+            "organisations_ctg": set(outils._load_dataframe("organisations_ctg").columns),
         }
         m = manifest.construire_manifest(acces_complet=True)
         declares = {d["name"]: {c["name"] for c in d["columns"]} for d in m["datasets"]}

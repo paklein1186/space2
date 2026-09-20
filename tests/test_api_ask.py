@@ -145,7 +145,7 @@ def main():
                                        "topics", "territories", "category", "version")))
         check("manifest : reflète le modèle configuré", fiche["model"] in fiche["readme"])
         check("manifest : liste les jeux de données réels",
-              {d["name"] for d in fiche["datasets"]} == {"lieux", "reponses_publiques", "activite_ctg"})
+              {d["name"] for d in fiche["datasets"]} == {"lieux", "reponses_publiques", "organisations_ctg", "activite_ctg"})
     print("Tous les tests passent.")
 
 

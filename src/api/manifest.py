@@ -12,7 +12,7 @@ from .ask_agent import MODELE_DEFAUT
 
 # À incrémenter quand le comportement de l'agent change (jeux de données,
 # limites, règles) — pas seulement quand le texte de la fiche change.
-VERSION = "1.2"
+VERSION = "1.3"
 
 _LIEU = {
     "tiers_lieu": "Nom du lieu",
@@ -45,6 +45,26 @@ _EVENEMENTS = {
     "survenu_le": "Date de l'événement (ISO 8601)",
 }
 
+_ORGANISATIONS = {
+    "ctg_id": "Identifiant Changethegame (guild:/quest:/company:/post: + uuid)",
+    "kind": "organisation, quete, entite, post (ou lieu non créé comme lieu)",
+    "nom": "Nom de l'objet",
+    "description": "Description",
+    "url": "Lien vers l'objet dans Changethegame",
+    "website_url": "Site web externe",
+    "topics": "Thèmes (liste)",
+    "territories": "Territoires (liste)",
+    "commune": "Commune (si connue)",
+    "latitude": "Latitude (si connue)",
+    "longitude": "Longitude (si connue)",
+    "parent_ctg_id": "Identifiant de l'objet parent",
+    "parent_nom": "Nom de l'objet parent (si connu)",
+    "status": "Statut côté Changethegame",
+    "updated_at": "Dernière mise à jour côté Changethegame (ISO 8601)",
+}
+_DESC_ORGANISATIONS = ("Objets de Changethegame qui ne sont pas des lieux : organisations, entités, quêtes et "
+                       "posts (colonne `kind`). Absents de la galerie et du Portfolio.")
+
 # nom -> (description du jeu, {colonne: description})
 DATASETS_COMPLET = {
     "lieux_enrichis": (
@@ -68,6 +88,7 @@ DATASETS_COMPLET = {
         "Retours d'expérience concrets (montages financiers, partenariats, gouvernance…) recueillis en entretien.",
         {"tiers_lieu": "Nom du lieu", "pays": "Pays", "region": "Région", "texte": "Retour d'expérience"},
     ),
+    "organisations_ctg": (_DESC_ORGANISATIONS, _ORGANISATIONS),
     "activite_ctg": (
         "Activité publique remontée de Changethegame pour les lieux qui y sont liés.", _EVENEMENTS),
 }
@@ -86,6 +107,7 @@ DATASETS_PUBLICS = {
          "champ": "Intitulé de la question", "champ_id": "Identifiant technique de la question",
          "valeur": "Réponse (texte, nombre ou liste)"},
     ),
+    "organisations_ctg": (_DESC_ORGANISATIONS, _ORGANISATIONS),
     "activite_ctg": DATASETS_COMPLET["activite_ctg"],
 }
 
@@ -102,6 +124,7 @@ l'exception de ce que les répondants ont explicitement marqué confidentiel.
 - Retrouver les réponses détaillées au questionnaire (modèle économique, gouvernance, ressources, besoins…).
 - Retrouver des lieux par recherche sémantique sur leur profil, et des retours d'expérience concrets.
 - Rapporter l'activité publique remontée de Changethegame pour les lieux liés.
+- Retrouver les organisations, entités, quêtes et posts de Changethegame (par thème, territoire ou sens).
 
 ## Ses limites
 - Les réponses explicitement marquées confidentielles et celles des contributeurs bloqués sont exclues ; pour \
@@ -124,6 +147,7 @@ Assistant d'analyse sur les tiers-lieux recensés par Space2 (surtout en Belgiqu
 - Compter et croiser (par pays, région, catégorie…).
 - Retrouver les besoins exprimés et les appels de fonds des lieux.
 - Rapporter l'activité publique remontée de Changethegame pour les lieux liés.
+- Retrouver les organisations, entités, quêtes et posts de Changethegame.
 
 ## Ses limites
 - Il n'utilise que des données PUBLIQUES : rien de confidentiel ni d'interne (finances, RH, gouvernance interne).
@@ -164,5 +188,5 @@ def construire_manifest(acces_complet: bool = True) -> dict:
             for nom, (description, colonnes) in datasets.items()
         ],
         "endpoints": {"ask": "POST /ask", "lieux": "GET /lieux", "link": "POST /lieux/{space2_id}/link",
-                      "events": "POST /events", "access": "PUT /access"},
+                      "events": "POST /events", "objects": "PUT /ctg/objects", "access": "PUT /access"},
     }

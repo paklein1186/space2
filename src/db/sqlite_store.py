@@ -144,6 +144,25 @@ create table if not exists evenements_ctg (
     survenu_le text,
     cree_le text not null default (datetime('now'))
 );
+create table if not exists objets_ctg (
+    ctg_id text primary key,
+    kind text not null,
+    is_place integer not null default 0,
+    name text not null,
+    description text,
+    url text,
+    website_url text,
+    topics text not null default '[]',
+    territories text not null default '[]',
+    commune text,
+    latitude real,
+    longitude real,
+    parent_ctg_id text,
+    status text,
+    updated_at text,
+    tiers_lieu_id text,
+    recu_le text not null default (datetime('now'))
+);
 create table if not exists acces_externes (
     email text primary key,
     source text not null default 'ctg',
@@ -415,6 +434,30 @@ class SqliteStore(Store):
             "order by coalesce(survenu_le, cree_le) desc"
         ).fetchall()
         return [dict(r) for r in rows]
+
+    _COLONNES_OBJET_CTG = ("kind", "is_place", "name", "description", "url", "website_url", "topics",
+                           "territories", "commune", "latitude", "longitude", "parent_ctg_id", "status",
+                           "updated_at", "tiers_lieu_id")
+
+    def upsert_objets_ctg(self, objets: list) -> None:
+        cols = self._COLONNES_OBJET_CTG
+        for o in objets:
+            valeurs = [json.dumps(o.get(c) or [], ensure_ascii=False) if c in ("topics", "territories")
+                       else (int(bool(o.get(c))) if c == "is_place" else o.get(c)) for c in cols]
+            self.conn.execute(
+                f"insert into objets_ctg (ctg_id, {', '.join(cols)}) values (?, {', '.join('?' * len(cols))}) "
+                f"on conflict(ctg_id) do update set {', '.join(f'{c} = excluded.{c}' for c in cols)}",
+                [o["ctg_id"], *valeurs])
+        self.conn.commit()
+
+    def list_objets_ctg(self) -> list:
+        out = []
+        for r in self.conn.execute("select * from objets_ctg order by name").fetchall():
+            d = dict(r)
+            d["topics"], d["territories"] = json.loads(d["topics"]), json.loads(d["territories"])
+            d["is_place"] = bool(d["is_place"])
+            out.append(d)
+        return out
 
     def upsert_acces_externe(self, email: str, source: str, guilde_id: Optional[str],
                               statut: str) -> None:

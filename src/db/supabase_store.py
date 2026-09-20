@@ -306,6 +306,13 @@ class SupabaseStore(Store):
             .order("survenu_le", desc=True).execute().data
         )
 
+    def upsert_objets_ctg(self, objets: list) -> None:
+        if objets:
+            self.client.table("objets_ctg").upsert(objets, on_conflict="ctg_id").execute()
+
+    def list_objets_ctg(self) -> list:
+        return _lire_tout(lambda: self.client.table("objets_ctg").select("*").order("ctg_id"))
+
     def upsert_acces_externe(self, email: str, source: str, guilde_id: Optional[str],
                               statut: str) -> None:
         self.client.table("acces_externes").upsert({
