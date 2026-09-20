@@ -35,12 +35,30 @@ def faux_get(payload):
 
 def main():
     # --- extraction ---
-    be = {"address": {"municipality": "Gembloux", "village": "Grand-Leez", "postcode": "5030;5031", "country": "Belgique"}}
+    be = {"address": {"municipality": "Gembloux", "village": "Grand-Leez", "postcode": "5030;5031", "country": "Belgique",
+                  "country_code": "be"}}
     check("Belgique : municipality > village, premier code postal",
           geocoding.extraire_commune_cp(be) == {"commune": "Gembloux", "code_postal": "5030"})
-    fr = {"address": {"town": "Guerchy", "postcode": "89113"}}
+    fr = {"address": {"town": "Guerchy", "postcode": "89113", "country_code": "fr"}}
     check("France : town + code postal", geocoding.extraire_commune_cp(fr) == {"commune": "Guerchy", "code_postal": "89113"})
+    villecien = {"address": {"village": "Villecien", "municipality": "Sens", "county": "Yonne",
+                             "postcode": "89300", "country_code": "fr"}}
+    check("France : Villecien (village) et non Sens (municipality = arrondissement)",
+          geocoding.extraire_commune_cp(villecien) == {"commune": "Villecien", "code_postal": "89300"})
+    check("France : municipality seule en dernier recours",
+          geocoding.extraire_commune_cp({"address": {"municipality": "Sens", "country_code": "fr"}})["commune"] == "Sens")
     check("adresse absente → None", geocoding.extraire_commune_cp({}) == {"commune": None, "code_postal": None})
+
+    gesves = {"address": {"village": "Faulx-Les Tombes", "country_code": "be"}}
+    check("Belgique : section seule + adresse = simple nom → le nom saisi (Gesves)",
+          geocoding.extraire_commune_cp(gesves, "Gesves")["commune"] == "Gesves")
+    check("Belgique : adresse détaillée (chiffres/virgule) → on garde Nominatim",
+          geocoding.extraire_commune_cp(gesves, "Rue X 12, 5340, Gesves")["commune"] == "Faulx-Les Tombes")
+    check("Belgique : municipality trouvée → prioritaire sur l'adresse saisie",
+          geocoding.extraire_commune_cp(be, "Grand-Leez")["commune"] == "Gembloux")
+    check("France : l'adresse saisie n'écrase jamais Nominatim",
+          geocoding.extraire_commune_cp(villecien_fr := {"address": {"village": "Villecien", "municipality": "Sens",
+                                        "country_code": "fr"}}, "Sens")["commune"] == "Villecien")
 
     # --- géocodage détaillé ---
     reel = geocoding.requests.get

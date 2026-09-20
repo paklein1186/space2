@@ -23,19 +23,46 @@ USER_AGENT = "Mozilla/5.0 (compatible; lieux-hybrides-territoires/1.0; +https://
 
 NOMINATIM_REVERSE_URL = "https://nominatim.openstreetmap.org/reverse"
 
-# Ordre de préférence pour le nom de commune : en Belgique `municipality` est
-# la commune administrative (Gembloux) alors que village/town donnent la
-# localité (Grand-Leez) ; en France c'est city/town/village.
-_CLES_COMMUNE = ("municipality", "city", "town", "village", "hamlet")
+# Ordre de préférence pour le nom de commune, selon le pays (les conventions
+# OpenStreetMap diffèrent) :
+# - Belgique : `municipality` est la commune administrative (Gembloux) alors
+#   que village/town donnent la localité/section (Grand-Leez) ;
+# - ailleurs (France...) : la commune est city/town/village, alors que
+#   `municipality` désigne l'arrondissement (vécu : Villecien, commune de
+#   l'Yonne, ressortait « Sens », le chef-lieu de son arrondissement).
+_CLES_COMMUNE_BELGIQUE = ("municipality", "city", "town", "village", "hamlet")
+_CLES_COMMUNE_DEFAUT = ("city", "town", "village", "hamlet", "municipality")
 
 
-def extraire_commune_cp(resultat: dict) -> dict:
+_CLES_LOCALITE = ("village", "hamlet")
+
+
+def _nom_simple(adresse: Optional[str]) -> Optional[str]:
+    """L'adresse saisie si c'est un simple nom (« Gesves ») : ni chiffre, ni
+    virgule, ni parenthèse — sinon None."""
+    texte = (adresse or "").strip()
+    if texte and not re.search(r"[\d,()]", texte) and len(texte) <= 40:
+        return texte
+    return None
+
+
+def extraire_commune_cp(resultat: dict, adresse: Optional[str] = None) -> dict:
     """{commune, code_postal} d'un résultat Nominatim (addressdetails=1) ;
     None pour ce qui manque. Un code postal composé ("5030;5031") garde le
-    premier."""
-    adresse = (resultat or {}).get("address") or {}
-    commune = next((adresse[c] for c in _CLES_COMMUNE if adresse.get(c)), None)
-    code_postal = (adresse.get("postcode") or "").split(";")[0].strip() or None
+    premier.
+
+    En Belgique, OpenStreetMap n'a parfois pas la commune (`municipality`)
+    mais seulement la section (Gesves ressortait « Faulx-Les Tombes ») : dans
+    ce cas, si l'adresse saisie par le lieu est un simple nom, c'est ce nom
+    qui fait foi."""
+    donnees = (resultat or {}).get("address") or {}
+    belgique = donnees.get("country_code") == "be"
+    cles = _CLES_COMMUNE_BELGIQUE if belgique else _CLES_COMMUNE_DEFAUT
+    cle = next((c for c in cles if donnees.get(c)), None)
+    commune = donnees.get(cle) if cle else None
+    if belgique and (cle is None or cle in _CLES_LOCALITE):
+        commune = _nom_simple(adresse) or commune
+    code_postal = (donnees.get("postcode") or "").split(";")[0].strip() or None
     return {"commune": commune, "code_postal": code_postal}
 
 
@@ -73,7 +100,7 @@ def geocoder_adresse_detail(adresse: str, pays: Optional[str] = None) -> Optiona
         return None
     try:
         return {"latitude": float(resultats[0]["lat"]), "longitude": float(resultats[0]["lon"]),
-                **extraire_commune_cp(resultats[0])}
+                **extraire_commune_cp(resultats[0], adresse)}
     except (KeyError, ValueError, TypeError):
         return None
 
@@ -84,7 +111,8 @@ def geocoder_adresse(adresse: str, pays: Optional[str] = None) -> Optional[tuple
     return (detail["latitude"], detail["longitude"]) if detail else None
 
 
-def commune_cp_depuis_coordonnees(latitude: float, longitude: float) -> Optional[dict]:
+def commune_cp_depuis_coordonnees(latitude: float, longitude: float,
+                                  adresse: Optional[str] = None) -> Optional[dict]:
     """{commune, code_postal} du point donné (reverse Nominatim), ou None.
     Sert au rattrapage des lieux qui ont déjà des coordonnées : la commune
     reste ainsi cohérente avec le point réellement servi."""
@@ -96,6 +124,6 @@ def commune_cp_depuis_coordonnees(latitude: float, longitude: float) -> Optional
             timeout=TIMEOUT_S,
         )
         response.raise_for_status()
-        return extraire_commune_cp(response.json())
+        return extraire_commune_cp(response.json(), adresse)
     except Exception:
         return None
