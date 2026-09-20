@@ -25,6 +25,9 @@ class TiersLieu:
     # Identifiant de l'entité correspondante dans Changethegame (lien posé par
     # ctg via l'API, voir src/api/app.py) ; None = pas (encore) synchronisé.
     ctg_entity_id: Optional[str] = None
+    # Issus du géocodage (Nominatim) de la réponse « adresse » — exposés à ctg.
+    commune: Optional[str] = None
+    code_postal: Optional[str] = None
 
 
 @dataclass

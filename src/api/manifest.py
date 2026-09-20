@@ -12,12 +12,14 @@ from .ask_agent import MODELE_DEFAUT
 
 # À incrémenter quand le comportement de l'agent change (jeux de données,
 # limites, règles) — pas seulement quand le texte de la fiche change.
-VERSION = "1.1"
+VERSION = "1.2"
 
 _LIEU = {
     "tiers_lieu": "Nom du lieu",
     "pays": "Pays",
     "region": "Région",
+    "commune": "Commune (issue du géocodage de l'adresse ; vide si inconnue)",
+    "code_postal": "Code postal (issu du géocodage de l'adresse ; vide si inconnu)",
     "latitude": "Latitude (degrés décimaux ; vide si inconnue)",
     "longitude": "Longitude (degrés décimaux ; vide si inconnue)",
 }
@@ -73,7 +75,8 @@ DATASETS_COMPLET = {
 DATASETS_PUBLICS = {
     "lieux": (
         "Un lieu par ligne : localisation et synthèse publique (générée uniquement à partir des réponses publiques).",
-        {**_LIEU, "ctg_entity_id": "Identifiant de l'entité liée dans Changethegame", **_SYNTHESE,
+        {**_LIEU, "adresse": "Adresse ou commune telle que saisie par le lieu (texte libre)",
+         "ctg_entity_id": "Identifiant de l'entité liée dans Changethegame", **_SYNTHESE,
          "besoins_mis_en_avant": "Besoins mis en avant par le lieu (liste)",
          "lien_externe": "Lien externe du lieu", "photo_url": "Photo du lieu"},
     ),

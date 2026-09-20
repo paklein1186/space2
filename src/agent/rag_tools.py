@@ -147,6 +147,7 @@ def lieux_enrichis_dataframe(store: Store) -> pd.DataFrame:
         # exposée à ce dataset.
         row = {
             "tiers_lieu": lieu.nom, "pays": lieu.pays, "region": lieu.region,
+            "commune": lieu.commune, "code_postal": lieu.code_postal,
             "latitude": lieu.latitude, "longitude": lieu.longitude,
         }
         row.update(derive.donnees)
@@ -221,7 +222,7 @@ class RagToolHandler:
         datasets.append({
             "name": "lieux_enrichis",
             "type": "derive",
-            "columns": ["tiers_lieu", "pays", "region", "latitude", "longitude", "resume", "activites",
+            "columns": ["tiers_lieu", "pays", "region", "commune", "code_postal", "latitude", "longitude", "resume", "activites",
                         "publics", "territoire", "gouvernance", "ressources", "besoins", "modele_economique",
                         "partenaires", "competences", "projets", "enjeux", "mots_cles"],
             "description": ("Synthèses dérivées (1 ligne par lieu), produites par l'enrichissement LLM à partir "

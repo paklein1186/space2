@@ -75,6 +75,7 @@ def lieux_enrichis_sans_confidentiel(store: Store) -> pd.DataFrame:
         if not derive:
             continue
         ligne = {"tiers_lieu": lieu.nom, "pays": lieu.pays, "region": lieu.region,
+                 "commune": lieu.commune, "code_postal": lieu.code_postal,
                  "latitude": lieu.latitude, "longitude": lieu.longitude}
         ligne.update(synthese_partageable(derive, lieu.id in confidentiels))
         lignes.append(ligne)

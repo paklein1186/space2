@@ -49,7 +49,7 @@ CHAMPS_PROFIL = ["resume", "categories", "mots_cles", "activites", "publics", "t
                  "partenaires", "competences", "projets", "enjeux", "besoins"]
 
 
-def profil_public(lieu, derive) -> dict:
+def profil_public(lieu, derive, adresse=None) -> dict:
     """Vue publique d'un lieu, partagée entre le dataset `lieux` de l'agent et
     le flux GET /lieux. N'utilise que `donnees_publiques` — jamais `donnees`
     (synthèse interne, qui peut refléter des réponses confidentielles)."""
@@ -57,6 +57,10 @@ def profil_public(lieu, derive) -> dict:
     profil = {
         "space2_id": lieu.id, "ctg_entity_id": lieu.ctg_entity_id, "tiers_lieu": lieu.nom,
         "pays": lieu.pays, "region": lieu.region,
+        # Adresse = réponse publique (non confidentielle) telle que saisie —
+        # surtout un nom de commune ; commune/code_postal viennent du
+        # géocodage (voir geocoding.py, migration_010).
+        "adresse": adresse, "commune": lieu.commune, "code_postal": lieu.code_postal,
         "latitude": lieu.latitude, "longitude": lieu.longitude,
     }
     for cle in CHAMPS_PROFIL:
@@ -85,7 +89,7 @@ def construire_datasets(store: Store) -> dict:
 
     lignes_lieux, lignes_reponses = [], []
     for lieu in lieux:
-        profil = profil_public(lieu, derives.get(lieu.id))
+        profil = profil_public(lieu, derives.get(lieu.id), (reponses.get(lieu.id) or {}).get("adresse"))
         profil.pop("space2_id"), profil.pop("campagne"), profil.pop("updated_at")
         lignes_lieux.append(profil)
         base = {"tiers_lieu": lieu.nom, "pays": lieu.pays, "region": lieu.region}
@@ -113,8 +117,11 @@ def flux_lieux(store: Store, updated_since: Optional[str] = None) -> list:
     lieu sans date de mise à jour (pas encore de synthèse publique) est
     toujours inclus, pour que ctg le crée dès sa première apparition."""
     lieux = store.list_tiers_lieux()
-    derives = store.get_lieu_derive_batch([lieu.id for lieu in lieux])
-    profils = [profil_public(lieu, derives.get(lieu.id)) for lieu in lieux]
+    ids = [lieu.id for lieu in lieux]
+    derives = store.get_lieu_derive_batch(ids)
+    adresses = store.get_public_answers_batch(ids)
+    profils = [profil_public(lieu, derives.get(lieu.id), (adresses.get(lieu.id) or {}).get("adresse"))
+               for lieu in lieux]
     if updated_since:
         profils = [p for p in profils if not p["updated_at"] or str(p["updated_at"]) > updated_since]
     return profils

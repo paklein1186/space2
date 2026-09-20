@@ -31,7 +31,9 @@ create table if not exists tiers_lieux (
     latitude real,
     longitude real,
     statut_progression text default 'en_cours',
-    ctg_entity_id text
+    ctg_entity_id text,
+    commune text,
+    code_postal text
 );
 create table if not exists contributeurs (
     id text primary key,
@@ -171,6 +173,8 @@ class SqliteStore(Store):
         # Bases locales créées avant l'ajout de ces colonnes : CREATE TABLE IF
         # NOT EXISTS ne les modifie pas.
         for table, column in (("tiers_lieux", "ctg_entity_id"),
+                              ("tiers_lieux", "commune"),
+                              ("tiers_lieux", "code_postal"),
                               ("lieu_derive", "donnees_publiques"),
                               ("lieu_derive", "donnees_publiques_source_hash"),
                               ("lieu_derive", "donnees_publiques_maj")):

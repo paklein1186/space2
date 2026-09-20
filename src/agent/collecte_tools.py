@@ -464,13 +464,21 @@ class CollecteToolHandler:
                 # bloque jamais l'enregistrement de la réponse en cas d'échec
                 # réseau ou d'adresse introuvable (geocoder_adresse renvoie
                 # None plutôt que de lever).
-                from ..geocoding import geocoder_adresse
+                from ..geocoding import geocoder_adresse_detail
                 pays_connu = self._current_answers().get("pays")
-                coords = geocoder_adresse(valeur, pays_connu)
-                if coords:
+                detail = geocoder_adresse_detail(valeur, pays_connu)
+                if detail:
                     self.store.update_tiers_lieu(
-                        self.tiers_lieu_id, latitude=coords[0], longitude=coords[1],
+                        self.tiers_lieu_id, latitude=detail["latitude"], longitude=detail["longitude"],
                     )
+                    # Commune / code postal (exposés à Changethegame) : mise à
+                    # jour séparée et non bloquante — les colonnes n'existent
+                    # qu'après migration_010.
+                    try:
+                        self.store.update_tiers_lieu(
+                            self.tiers_lieu_id, commune=detail["commune"], code_postal=detail["code_postal"])
+                    except Exception:
+                        pass
 
         if self._priority_active and champ_id in self._priority_field_ids:
             section = self._priority_section()

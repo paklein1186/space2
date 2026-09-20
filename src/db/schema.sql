@@ -13,6 +13,8 @@ create table if not exists tiers_lieux (
     longitude double precision,
     statut_progression text default 'en_cours',
     ctg_entity_id text,             -- entité Changethegame liée (migration_009)
+    commune text,                   -- issus du géocodage de l'adresse (migration_010)
+    code_postal text,
     cree_le timestamptz not null default now()
 );
 
