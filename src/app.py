@@ -1766,13 +1766,13 @@ def rag_tab(store, user_id: str):
                              help="Nourrir l'intelligence : verse ce texte dans la base de connaissances "
                                   "générale de la Bibliothèque, cherchable tout de suite."):
                     from src.agent.embeddings import VoyageEmbedder
-                    from src.agent.vectorstore import ChromaStore
+                    from src.agent.vectorstore import get_vectorstore
                     import uuid
 
                     with st.spinner("Ajout à la base de connaissances..."):
                         embedder = VoyageEmbedder()
                         embedding = embedder.embed_documents([text])[0]
-                        ChromaStore().upsert(
+                        get_vectorstore().upsert(
                             ids=[f"bibliotheque_{uuid.uuid4()}"],
                             embeddings=[embedding],
                             documents=[text],

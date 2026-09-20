@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from dotenv import load_dotenv
 
 from src.agent.embeddings import VoyageEmbedder
-from src.agent.vectorstore import ChromaStore
+from src.agent.vectorstore import get_vectorstore
 from src.ingest.chunking import chunk_text
 from src.ingest.geodata import (
     SUPPORTED_GEODATA_SUFFIXES,
@@ -117,7 +117,7 @@ def main():
     CATALOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     embedder = VoyageEmbedder()
-    store = ChromaStore()
+    store = get_vectorstore()
     catalog = {"datasets": {}, "geodata": {}}
 
     n_interviews = process_text_documents("interview", "interviews", embedder, store)

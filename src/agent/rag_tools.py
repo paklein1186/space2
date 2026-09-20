@@ -22,7 +22,7 @@ from .objets_ctg import organisations_ctg_dataframe
 from .structured_query import apply_condition as _apply_condition
 from .structured_query import rendre_hashable as _rendre_hashable
 from .structured_query import run_structured_query
-from .vectorstore import ChromaStore
+from .vectorstore import ChromaStore, get_vectorstore
 
 CATALOG_PATH = Path("data/catalog.json")
 
@@ -200,7 +200,7 @@ class RagToolHandler:
                  vectorstore: Optional[ChromaStore] = None):
         self.store = store
         self.embedder = embedder or VoyageEmbedder()
-        self.vectorstore = vectorstore or ChromaStore()
+        self.vectorstore = vectorstore or get_vectorstore()
 
     def search_knowledge_base(self, tool_input: dict) -> dict:
         query = tool_input["query"]

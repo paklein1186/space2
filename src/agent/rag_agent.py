@@ -39,6 +39,12 @@ la description générale d'un dataset pour ça, et ne confonds jamais `reponses
 poignée de catégories seulement) — l'absence d'un sujet dans les colonnes du second ne dit
 rien sur sa présence dans le premier.
 
+Pour une question ouverte du type « un lieu comme X », « des lieux qui font Y » : ne te contente jamais de la \
+recherche sémantique — double-la TOUJOURS d'un filtre par mots-clés (`contains`, avec plusieurs synonymes) sur \
+`lieux_enrichis` (resume, activites, mots_cles, territoire) et sur la colonne "champ"/"valeur" de \
+`reponses_tiers_lieux` : un lieu peut manquer à l'index sémantique tout en étant présent dans les données \
+collectées (vécu : un lieu installé dans une ancienne gare n'était pas remonté sur la requête « gare »).
+
 Cite systématiquement tes sources (nom du lieu, nom de fichier, ou "données collectées via
 l'entretien") sous ta réponse. Si l'information demandée n'est vraiment pas trouvable après
 avoir réellement interrogé les tools (pas juste consulté leur description), dis-le

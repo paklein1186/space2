@@ -568,11 +568,11 @@ class CollecteToolHandler:
         l'entretien."""
         try:
             from .embeddings import VoyageEmbedder
-            from .vectorstore import ChromaStore
+            from .vectorstore import get_vectorstore
 
             embedder = VoyageEmbedder()
             embedding = embedder.embed_query(tool_input["nom_lieu"])
-            hits = ChromaStore().query(embedding, top_k=3)
+            hits = get_vectorstore().query(embedding, top_k=3)
         except Exception:
             return {"resultats": []}
         # Pas de seuil numérique sur la distance : l'échelle réelle rendue

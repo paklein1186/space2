@@ -275,7 +275,7 @@ def ajouter_connaissance(store: Store, texte_brut: str, source_label: str,
     from datetime import datetime, timezone
 
     from .embeddings import VoyageEmbedder
-    from .vectorstore import ChromaStore
+    from .vectorstore import get_vectorstore
 
     resume = extraire_essentiel_general(store, texte_brut, source_label, client=client)
     if not resume:
@@ -283,7 +283,7 @@ def ajouter_connaissance(store: Store, texte_brut: str, source_label: str,
     try:
         embedder = VoyageEmbedder()
         embedding = embedder.embed_documents([resume])[0]
-        ChromaStore().upsert(
+        get_vectorstore().upsert(
             ids=[f"connaissance_{uuid.uuid4()}"],
             embeddings=[embedding],
             documents=[resume],
@@ -313,7 +313,7 @@ def ajouter_connaissance_longue(store: Store, texte_complet: str, source_label: 
 
     from ..ingest.chunking import chunk_text
     from .embeddings import VoyageEmbedder
-    from .vectorstore import ChromaStore
+    from .vectorstore import get_vectorstore
 
     texte_complet = (texte_complet or "").strip()
     if not texte_complet:
@@ -332,7 +332,7 @@ def ajouter_connaissance_longue(store: Store, texte_complet: str, source_label: 
         # jour ses chunks (upsert) plutôt que d'en créer des doublons.
         source_hash = sha256(source_label.encode("utf-8")).hexdigest()[:12]
         ids = [f"connaissance_longue_{source_hash}_{c.metadata['chunk_index']}" for c in chunks]
-        ChromaStore().upsert(
+        get_vectorstore().upsert(
             ids=ids, embeddings=embeddings,
             documents=[c.text for c in chunks], metadatas=[c.metadata for c in chunks],
         )
@@ -346,10 +346,10 @@ def dernier_ajout_connaissance(doc_type: str) -> str | None:
     vectoriel, ou None si la base de connaissances est vide pour ce
     doc_type — pour afficher "dernier scan" côté admin sans avoir à tenir
     un état séparé (la date est déjà portée par chaque document)."""
-    from .vectorstore import ChromaStore
+    from .vectorstore import get_vectorstore
 
     try:
-        metadatas = ChromaStore().get_metadatas({"doc_type": doc_type})
+        metadatas = get_vectorstore().get_metadatas({"doc_type": doc_type})
     except Exception:
         return None
     dates = [m["date_ajout"] for m in metadatas if m.get("date_ajout")]

@@ -23,7 +23,7 @@ from ..db.store import LieuDerive, Store
 from ..questionnaire.schema import CATEGORIES_POSSIBLES, field_label
 from .embeddings import VoyageEmbedder
 from .usage import log_usage
-from .vectorstore import ChromaStore
+from .vectorstore import ChromaStore, get_vectorstore
 
 MODEL = "claude-haiku-4-5"
 PROMPT_VERSION = "enrichissement-v3"
@@ -121,7 +121,7 @@ def _embed_profil(tiers_lieu_id: str, nom_lieu: str, profil_texte: str,
     if not profil_texte:
         return
     embedder = embedder or VoyageEmbedder()
-    vectorstore = vectorstore or ChromaStore()
+    vectorstore = vectorstore or get_vectorstore()
     embedding = embedder.embed_documents([profil_texte])[0]
     vectorstore.upsert(
         ids=[f"profil_lieu::{tiers_lieu_id}"],
