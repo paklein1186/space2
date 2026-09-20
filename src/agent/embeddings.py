@@ -33,9 +33,11 @@ class VoyageEmbedder:
 
         # Timeout explicite : sans lui, une requête sans réponse peut bloquer
         # indéfiniment un enrichissement en masse au lieu d'échouer proprement.
-        self.client = voyageai.Client(
-            api_key=api_key or os.environ.get("VOYAGE_API_KEY"), timeout=60.0
-        )
+        # .strip() : une clé collée avec un retour à la ligne final (vécu sur
+        # Render) rend Voyage inutilisable — « Invalid leading whitespace,
+        # reserved character(s), or return character(s) in header value ».
+        cle = (api_key or os.environ.get("VOYAGE_API_KEY") or "").strip().strip("\"'") or None
+        self.client = voyageai.Client(api_key=cle, timeout=60.0)
 
     @_retry_on_rate_limit
     def embed_documents(self, texts: list) -> list:
