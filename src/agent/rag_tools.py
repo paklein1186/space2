@@ -50,7 +50,7 @@ TOOL_DEFINITIONS = [
                              "enum": ["profil_lieu", "interview", "rapport", "dataset_summary", "geodata",
                                       "connaissance_bibliotheque", "connaissance_trois_tiers"],
                              "description": "optionnel, pour restreindre la recherche à un type de source"},
-                "top_k": {"type": "integer", "default": 6},
+                "top_k": {"type": "integer", "default": 10},
             },
             "required": ["query"],
         },
@@ -204,7 +204,7 @@ class RagToolHandler:
 
     def search_knowledge_base(self, tool_input: dict) -> dict:
         query = tool_input["query"]
-        top_k = tool_input.get("top_k", 6)
+        top_k = tool_input.get("top_k", 10)
         where = {"doc_type": tool_input["doc_type"]} if tool_input.get("doc_type") else None
         embedding = self.embedder.embed_query(query)
         hits = self.vectorstore.query(embedding, top_k=top_k, where=where)
