@@ -168,6 +168,16 @@ class Store(ABC):
         ...
 
     @abstractmethod
+    def get_public_answers_batch(self, tiers_lieu_ids: list) -> dict:
+        """Réponses structurées PUBLIQUES, fusionnées par lieu :
+        {tiers_lieu_id: {champ_id: valeur}}. Exclut les réponses marquées
+        `confidentiel` et celles des contributeurs bloqués ; sans identifiant
+        de contributeur (agrégat anonyme). Le filtrage des champs réservés à
+        certains rôles (finances, RH...) relève de l'appelant, qui connaît le
+        schéma du questionnaire — utilisée par l'API publique (src/api)."""
+        ...
+
+    @abstractmethod
     def get_reponses_pour_champs(self, champ_ids: list) -> list:
         """Réponses à un ensemble de champs, tous lieux confondus — chaque
         élément : {tiers_lieu_id, contributeur_id, champ_id, valeur}. Utilisé

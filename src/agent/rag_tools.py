@@ -18,6 +18,9 @@ import pandas as pd
 from ..annuaire import field_label
 from ..db.store import Store
 from .embeddings import VoyageEmbedder
+from .structured_query import apply_condition as _apply_condition
+from .structured_query import rendre_hashable as _rendre_hashable
+from .structured_query import run_structured_query
 from .vectorstore import ChromaStore
 
 CATALOG_PATH = Path("data/catalog.json")
@@ -175,19 +178,6 @@ def bonnes_pratiques_dataframe(store: Store) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def _rendre_hashable(df: pd.DataFrame) -> pd.DataFrame:
-    """Convertit toute colonne contenant des valeurs liste (ex. réponse à un
-    champ multi_choice) en chaîne jointe — pandas a besoin de valeurs
-    hashables pour describe()/groupby()/isin(), et une liste ne l'est pas."""
-    if df.empty:
-        return df
-    df = df.copy()
-    for col in df.columns:
-        if df[col].map(lambda v: isinstance(v, list)).any():
-            df[col] = df[col].apply(lambda v: ", ".join(map(str, v)) if isinstance(v, list) else v)
-    return df
-
-
 class RagToolHandler:
     def __init__(self, store: Store, embedder: Optional[VoyageEmbedder] = None,
                  vectorstore: Optional[ChromaStore] = None):
@@ -267,69 +257,10 @@ class RagToolHandler:
         df = self._load_dataframe(dataset_name)
         if df is None:
             return {"error": f"dataset inconnu: {dataset_name}"}
-        # La colonne "valeur" de reponses_tiers_lieux (et "categories"/
-        # "mots_cles" de lieux_enrichis) contient des listes pour les champs
-        # multi_choice — describe()/groupby_count()/filter() lèvent tous
-        # TypeError: unhashable type: 'list' dès que Claude choisit une telle
-        # colonne pour grouper, dédupliquer ou comparer. Les rendre hashables
-        # ici, une fois pour toutes les opérations, plutôt que de gérer le
-        # cas dans chacune séparément.
-        df = _rendre_hashable(df)
-
-        if operation == "head":
-            n = params.get("n", 5)
-            return {"rows": df.head(n).to_dict(orient="records")}
-
-        if operation == "describe":
-            return {"describe": json.loads(df.describe(include="all").to_json())}
-
-        if operation == "filter":
-            filtered = df
-            for cond in params.get("conditions", []):
-                filtered = _apply_condition(filtered, cond)
-            return {"row_count": len(filtered), "rows": filtered.head(50).to_dict(orient="records")}
-
-        if operation == "groupby_count":
-            by = params.get("by", [])
-            target = params.get("target_column")
-            if not by:
-                return {"error": "groupby_count nécessite 'by'"}
-            colonnes_inconnues = [c for c in [*by, target] if c and c not in df.columns]
-            if colonnes_inconnues:
-                return {
-                    "error": f"colonne(s) inconnue(s) pour ce dataset : {colonnes_inconnues}",
-                    "colonnes_disponibles": list(df.columns),
-                }
-            if target:
-                result = df.groupby(by)[target].nunique()
-            else:
-                result = df.groupby(by).size()
-            return {"result": json.loads(result.to_json())}
-
-        return {"error": f"opération inconnue: {operation}"}
+        return run_structured_query(df, operation, params)
 
     def execute(self, tool_name: str, tool_input: dict) -> dict:
         handler = getattr(self, tool_name, None)
         if handler is None:
             return {"error": f"tool inconnu: {tool_name}"}
         return handler(tool_input)
-
-
-def _apply_condition(df: pd.DataFrame, cond: dict) -> pd.DataFrame:
-    column, op, value = cond["column"], cond["op"], cond.get("value")
-    if column not in df.columns:
-        return df.iloc[0:0]
-    series = df[column]
-    if op == "eq":
-        return df[series == value]
-    if op == "ne":
-        return df[series != value]
-    if op == "in":
-        return df[series.isin(value)]
-    if op == "gt":
-        return df[series > value]
-    if op == "lt":
-        return df[series < value]
-    if op == "contains":
-        return df[series.apply(lambda v: (value in v) if isinstance(v, (list, tuple)) else (str(value) in str(v)))]
-    raise ValueError(f"Opérateur de filtre inconnu: {op}")

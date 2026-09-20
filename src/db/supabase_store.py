@@ -225,6 +225,36 @@ class SupabaseStore(Store):
             out.setdefault(r["tiers_lieu_id"], {}).setdefault(r["contributeur_id"], {})[r["champ_id"]] = r["valeur"]
         return out
 
+    def get_public_answers_batch(self, tiers_lieu_ids: list) -> dict:
+        if not tiers_lieu_ids:
+            return {}
+        result = (
+            self.client.table("reponses")
+            .select("tiers_lieu_id,contributeur_id,champ_id,valeur")
+            .in_("tiers_lieu_id", tiers_lieu_ids)
+            .eq("confidentiel", False)
+            .order("maj_le")
+            .execute()
+        )
+        # Bloqués : même sémantique que get_answers (exclusion explicite
+        # uniquement — un contributeur absent de la table ne doit pas
+        # masquer ses réponses, voir _contributeurs_bloques).
+        bloques: dict = {}
+        try:
+            for c in (
+                self.client.table("contributeurs").select("id,tiers_lieu_id")
+                .in_("tiers_lieu_id", tiers_lieu_ids).eq("bloque", True).execute().data
+            ):
+                bloques.setdefault(c["tiers_lieu_id"], set()).add(c["id"])
+        except Exception:
+            bloques = {}
+        out: dict = {}
+        for r in result.data:
+            if r["contributeur_id"] in bloques.get(r["tiers_lieu_id"], set()):
+                continue
+            out.setdefault(r["tiers_lieu_id"], {})[r["champ_id"]] = r["valeur"]
+        return out
+
     def get_reponses_pour_champs(self, champ_ids: list) -> list:
         if not champ_ids:
             return []

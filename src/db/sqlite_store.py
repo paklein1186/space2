@@ -322,6 +322,24 @@ class SqliteStore(Store):
             for tiers_lieu_id in tiers_lieu_ids
         }
 
+    def get_public_answers_batch(self, tiers_lieu_ids: list) -> dict:
+        if not tiers_lieu_ids:
+            return {}
+        placeholders = ",".join("?" * len(tiers_lieu_ids))
+        rows = self.conn.execute(
+            f"select r.tiers_lieu_id, r.champ_id, r.valeur from reponses r "
+            f"left join contributeurs c on c.id = r.contributeur_id "
+            f"where r.tiers_lieu_id in ({placeholders}) and r.confidentiel = 0 "
+            f"and coalesce(c.bloque, 0) = 0 order by r.rowid",
+            tiers_lieu_ids,
+        ).fetchall()
+        out: dict = {}
+        for r in rows:
+            out.setdefault(r["tiers_lieu_id"], {})[r["champ_id"]] = (
+                json.loads(r["valeur"]) if r["valeur"] is not None else None
+            )
+        return out
+
     def get_reponses_pour_champs(self, champ_ids: list) -> list:
         if not champ_ids:
             return []
