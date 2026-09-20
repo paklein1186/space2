@@ -137,6 +137,15 @@ def main():
         check("secret non configuré → tout refusé (fail closed)",
               http.post("/ask", json=corps, headers=h).status_code == 401)
         check("/health public", http.get("/health").json() == {"status": "ok"})
+        os.environ["CTG_WEBHOOK_SECRET"] = "s3cret"
+        os.environ["VOYAGE_API_KEY"] = "pa-CLESECRETE  \n"
+        check("/diagnostic sans secret → 401", http.get("/diagnostic").status_code == 401)
+        diag = http.get("/diagnostic", headers={"X-Webhook-Secret": "s3cret"}).json()
+        check("/diagnostic : signale les espaces/retours de la clé, sans jamais la renvoyer",
+              diag["voyage"]["variable"]["espaces_ou_retours_aux_bords"] is True
+              and "CLESECRETE" not in str(diag))
+        os.environ.pop("VOYAGE_API_KEY")
+        os.environ.pop("CTG_WEBHOOK_SECRET")
         m = http.get("/manifest")
         check("/manifest public (sans secret)", m.status_code == 200)
         fiche = m.json()

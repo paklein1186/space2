@@ -125,6 +125,32 @@ def health() -> dict:
     return {"status": "ok"}
 
 
+@app.get("/diagnostic", dependencies=[Depends(verifier_secret)])
+def diagnostic() -> dict:
+    """Vérifie la configuration sans jamais renvoyer de secret : forme des
+    variables sensibles et résultat d'un appel réel à Voyage (message expurgé)."""
+    from .ask_agent import _SECRETS
+
+    def forme(nom: str) -> dict:
+        v = os.environ.get(nom)
+        if v is None:
+            return {"definie": False}
+        return {"definie": True, "longueur": len(v), "espaces_ou_retours_aux_bords": v != v.strip(),
+                "guillemets_aux_bords": v[:1] in "\"'" or v[-1:] in "\"'"}
+
+    voyage = {"variable": forme("VOYAGE_API_KEY")}
+    try:
+        from ..agent.embeddings import VoyageEmbedder
+        vecteur = VoyageEmbedder().embed_query("test")
+        voyage["appel"] = {"ok": True, "dimensions": len(vecteur)}
+    except Exception as exc:
+        voyage["appel"] = {"ok": False, "type": type(exc).__name__,
+                           "message": _SECRETS.sub("[secret]", str(exc))[:300]}
+    return {"voyage": voyage, "anthropic": forme("ANTHROPIC_API_KEY"),
+            "supabase_url": forme("SUPABASE_URL"), "supabase_service_key": forme("SUPABASE_SERVICE_KEY"),
+            "acces_complet": acces_complet_actif()}
+
+
 @app.get("/manifest")
 def manifest() -> dict:
     return construire_manifest(acces_complet_actif())
