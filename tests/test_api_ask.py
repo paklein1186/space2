@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from fastapi.testclient import TestClient
 
+from tests.faux import FauxClient, bloc_texte, bloc_tool
 from src.api import app as api_app
 from src.api.ask_agent import AskAgent, OutilsPublics
 from src.api.public_data import DonneesPubliques, champ_public
@@ -26,31 +27,6 @@ from src.questionnaire.schema import all_fields
 def check(label, condition):
     print(f"[{'OK ' if condition else 'FAIL'}] {label}")
     assert condition, label
-
-
-def bloc_texte(texte):
-    return types.SimpleNamespace(type="text", text=texte)
-
-
-def bloc_tool(id_, nom, entree):
-    b = types.SimpleNamespace(type="tool_use", id=id_, name=nom, input=entree)
-    b.model_dump = lambda exclude_none=True: {"type": "tool_use", "id": id_, "name": nom, "input": entree}
-    return b
-
-
-class FauxClient:
-    """Rejoue une liste de réponses ; enregistre les kwargs de chaque appel."""
-
-    def __init__(self, reponses):
-        self.reponses = list(reponses)
-        self.appels = []
-        self.messages = self
-
-    def create(self, **kwargs):
-        self.appels.append(kwargs)
-        contenu = self.reponses.pop(0) if self.reponses else [bloc_texte("fin")]
-        return types.SimpleNamespace(content=contenu, usage=types.SimpleNamespace(
-            input_tokens=1, output_tokens=1))
 
 
 def main():
@@ -108,7 +84,7 @@ def main():
 
         client = FauxClient([[bloc_tool(f"t{i}", "list_datasets", {})] for i in range(10)])
         AskAgent(OutilsPublics(source), client=client).ask([{"role": "user", "content": "?"}])
-        check("nombre de tours borné", len(client.appels) <= 4)
+        check("nombre de tours borné (8)", len(client.appels) == 8)
         check("dernier tour sans tools (tool_choice none)",
               client.appels[-1].get("tool_choice") == {"type": "none"})
 

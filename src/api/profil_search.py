@@ -91,7 +91,7 @@ class ProfilSearch:
             self._en_cours = True
         threading.Thread(target=_tache, daemon=True).start()
 
-    def search(self, query: str, top_k: int = 6, doc_type: Optional[str] = None) -> list:
+    def search(self, query: str, top_k: int = 6, doc_type: Optional[str] = None, embedding=None) -> list:
         if self._charge_a is None:
             self.rafraichir()   # premier appel : pas d'index à servir en attendant
         elif time.monotonic() - self._charge_a >= self.ttl:
@@ -100,7 +100,7 @@ class ProfilSearch:
         ids = [i for i in vecteurs if doc_type is None or docs[i][0] == doc_type]
         if not ids:
             return []
-        q = np.asarray(self.embedder.embed_query(query), dtype=float)
+        q = np.asarray(embedding if embedding is not None else self.embedder.embed_query(query), dtype=float)
         q = q / (np.linalg.norm(q) or 1.0)
         scores = np.array([float(vecteurs[i][1] @ q) for i in ids])
         hits = []

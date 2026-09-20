@@ -18,6 +18,8 @@ services:
         sync: false
       - key: VOYAGE_API_KEY
         sync: false
+      - key: ASK_MODEL
+        value: claude-sonnet-5
       - key: CTG_ASK_FULL_ACCESS
         value: "true"
       - key: SUPABASE_URL

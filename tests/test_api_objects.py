@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from fastapi.testclient import TestClient
 
+from tests.faux import FauxVectorStore
 from src.agent.objets_ctg import organisations_ctg_dataframe
 from src.api import app as api_app
 from src.api.ask_agent import OutilsComplets
@@ -173,7 +174,8 @@ def main():
         # --- exposition à l'agent /ask ---
         pub = construire_datasets(store)
         check("mode public : dataset organisations_ctg", "Coop Musique" in set(pub["organisations_ctg"]["nom"]))
-        outils = OutilsComplets(store, ProfilSearch(store, embedder=FauxEmbedder(), ttl=0), ttl=0)
+        outils = OutilsComplets(store, ProfilSearch(store, embedder=FauxEmbedder(), ttl=0), ttl=0,
+                                vectorstore=FauxVectorStore([]))
         check("mode complet : list_datasets contient organisations_ctg",
               "organisations_ctg" in {d["name"] for d in outils.execute("list_datasets", {})["datasets"]})
         res = outils.execute("query_structured_data", {

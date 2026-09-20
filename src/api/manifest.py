@@ -8,11 +8,11 @@ from __future__ import annotations
 
 import os
 
-from .ask_agent import MODELE_DEFAUT
+from .ask_agent import BUDGET_SECONDES, modele_configure
 
 # À incrémenter quand le comportement de l'agent change (jeux de données,
 # limites, règles) — pas seulement quand le texte de la fiche change.
-VERSION = "1.3"
+VERSION = "1.4"
 
 _LIEU = {
     "tiers_lieu": "Nom du lieu",
@@ -123,6 +123,7 @@ l'exception de ce que les répondants ont explicitement marqué confidentiel.
 - Compter et croiser (par pays, région, catégorie…).
 - Retrouver les réponses détaillées au questionnaire (modèle économique, gouvernance, ressources, besoins…).
 - Retrouver des lieux par recherche sémantique sur leur profil, et des retours d'expérience concrets.
+- Retrouver un passage précis dans les interviews et rapports déposés, ainsi que dans les résumés de datasets et de géodonnées.
 - Rapporter l'activité publique remontée de Changethegame pour les lieux liés.
 - Retrouver les organisations, entités, quêtes et posts de Changethegame (par thème, territoire ou sens).
 
@@ -131,8 +132,8 @@ l'exception de ce que les répondants ont explicitement marqué confidentiel.
 un lieu ayant de telles réponses, seule sa synthèse publique est utilisée.
 - Les synthèses sont générées par IA à partir des réponses des lieux : elles peuvent être incomplètes ou dater.
 - Couverture inégale : certains lieux n'ont pas de pays, de coordonnées ou peu de données.
-- Pas de recherche dans les interviews ou rapports déposés, ni sur le web.
-- Réponse limitée à 25 s : une question trop large peut recevoir « reformulez plus précisément ».
+- Pas de recherche sur le web ; les connaissances ajoutées depuis la Bibliothèque de Space2 ne sont pas consultées.
+- Réponse limitée à {budget} s : au-delà, la réponse en cours est rendue interrompue.
 - Il cite ses sources (noms de lieux) à chaque réponse.
 
 Modèle : {modele}. Données : Space2 (space2.streamlit.app).
@@ -154,7 +155,7 @@ Assistant d'analyse sur les tiers-lieux recensés par Space2 (surtout en Belgiqu
 - Les réponses reposent sur des synthèses générées par IA à partir des réponses des lieux : elles peuvent être incomplètes ou dater.
 - Couverture inégale : certains lieux n'ont pas de pays renseigné ou peu de données.
 - Pas de recherche dans les documents (interviews, rapports) ni sur le web.
-- Réponse limitée à 25 s : une question trop large peut recevoir « reformulez plus précisément ».
+- Réponse limitée à {budget} s : au-delà, la réponse en cours est rendue interrompue.
 - Il cite ses sources (noms de lieux) à chaque réponse.
 
 Modèle : {modele}. Données : Space2 (space2.streamlit.app).
@@ -162,7 +163,7 @@ Modèle : {modele}. Données : Space2 (space2.streamlit.app).
 
 
 def construire_manifest(acces_complet: bool = True) -> dict:
-    modele = os.environ.get("API_ASK_MODEL") or MODELE_DEFAUT
+    modele = modele_configure()
     datasets = DATASETS_COMPLET if acces_complet else DATASETS_PUBLICS
     return {
         "name": "Space2 — Bibliothèque Tiers-lieux",
@@ -170,7 +171,7 @@ def construire_manifest(acces_complet: bool = True) -> dict:
                         "de Space2" + (" (hors ce qui est marqué confidentiel)." if acces_complet
                                        else ", données publiques uniquement.")),
         "purpose": "Trouver des lieux, comparer des approches, retrouver besoins et activité.",
-        "readme": (README_COMPLET if acces_complet else README_PUBLIC).format(modele=modele),
+        "readme": (README_COMPLET if acces_complet else README_PUBLIC).format(modele=modele, budget=int(BUDGET_SECONDES)),
         "variables": [{
             "name": "context",
             "description": ("Optionnel. Décrit l'espace d'où vient la question. "
@@ -182,6 +183,9 @@ def construire_manifest(acces_complet: bool = True) -> dict:
         "version": VERSION,
         "model": modele,
         "access": "full_without_confidential" if acces_complet else "public_only",
+        "response_modes": {"json": "POST /ask -> {content}",
+                           "sse": "POST /ask avec Accept: text/event-stream -> lignes `data: {type: start|delta|status|done|error}`"},
+        "limits": {"budget_seconds": BUDGET_SECONDES},
         "datasets": [
             {"name": nom, "description": description,
              "columns": [{"name": c, "description": d} for c, d in colonnes.items()]}

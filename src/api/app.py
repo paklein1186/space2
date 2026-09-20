@@ -11,11 +11,14 @@
 Lancement : `uvicorn src.api.app:app --host 0.0.0.0 --port $PORT`
 Variables : CTG_WEBHOOK_SECRET (obligatoire — sans lui l'API refuse tout),
 ANTHROPIC_API_KEY, SUPABASE_URL + SUPABASE_SERVICE_KEY (sinon SQLite local),
-API_ASK_MODEL (optionnel, défaut claude-haiku-4-5)."""
+ASK_MODEL (optionnel, défaut claude-sonnet-5 ; ancien nom accepté : API_ASK_MODEL),
+CTG_ASK_FULL_ACCESS, CTG_OWNER_USER_ID, VOYAGE_API_KEY."""
 
 from __future__ import annotations
 
 import hmac
+import json
+import logging
 import os
 import threading
 import time
@@ -25,13 +28,14 @@ from datetime import datetime
 from typing import Any, Literal, Optional
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
 load_dotenv()
 
 from ..db.factory import get_admin_store  # noqa: E402
-from .ask_agent import MODELE_DEFAUT, acces_complet_actif, creer_agent  # noqa: E402
+from .ask_agent import acces_complet_actif, creer_agent, modele_configure  # noqa: E402
 from .ctg_objects import traiter_objets  # noqa: E402
 from .manifest import construire_manifest  # noqa: E402
 from .public_data import flux_lieux  # noqa: E402
@@ -112,7 +116,7 @@ def get_agent() -> AskAgent:
     global _agent
     with _agent_lock:
         if _agent is None:
-            _agent = creer_agent(get_admin_store(), model=os.environ.get("API_ASK_MODEL", MODELE_DEFAUT))
+            _agent = creer_agent(get_admin_store(), model=modele_configure())
         return _agent
 
 
@@ -156,14 +160,35 @@ def manifest() -> dict:
     return construire_manifest(acces_complet_actif())
 
 
-@app.post("/ask", response_model=AskResponse, dependencies=[Depends(verifier_secret)])
-def ask(requete: AskRequest) -> AskResponse:
-    limiter_debit()
+def _sse(agent, messages: list, context: Optional[dict]):
+    """Flux SSE : lignes `data: {json}` — types start, delta (texte au fil de
+    l'eau), status (outil lancé), done (réponse finale complète) ou error."""
+    def evenement(e: dict) -> str:
+        return f"data: {json.dumps(e, ensure_ascii=False)}\n\n"
+
+    yield evenement({"type": "start"})
     try:
-        contenu = get_agent().ask([m.model_dump() for m in requete.messages], requete.context)
+        for e in agent.ask_stream(messages, context):
+            yield evenement(e)
+    except Exception as exc:
+        logging.getLogger("space2.api").warning("erreur /ask (SSE) : %s", type(exc).__name__)
+        yield evenement({"type": "error", "message": "upstream error"})
+
+
+@app.post("/ask", dependencies=[Depends(verifier_secret)])
+def ask(requete: AskRequest, request: Request):
+    """Réponse JSON `{content}` par défaut ; flux SSE si l'appelant envoie
+    `Accept: text/event-stream`."""
+    limiter_debit()
+    messages = [m.model_dump() for m in requete.messages]
+    try:
+        agent = get_agent()
+        if "text/event-stream" in request.headers.get("accept", "").lower():
+            return StreamingResponse(_sse(agent, messages, requete.context), media_type="text/event-stream",
+                                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+        return AskResponse(content=agent.ask(messages, requete.context))
     except Exception:
         raise HTTPException(status_code=502, detail="upstream error")
-    return AskResponse(content=contenu)
 
 
 # -- Flux lieux ------------------------------------------------------------

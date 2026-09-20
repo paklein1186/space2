@@ -20,7 +20,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src.agent.enrichissement import CHAMPS_DERIVES
 from src.agent.structured_query import run_structured_query
 from src.api import manifest
-from src.api.ask_agent import (MAX_TOURS, MAX_TOURS_COMPLET, TOOLS, AskAgent, OutilsComplets,
+from tests.faux import FauxVectorStore
+from src.api.ask_agent import (MAX_TOKENS, MAX_TOURS, TOOLS, AskAgent, OutilsComplets,
                                OutilsPublics, creer_agent)
 from src.api.profil_search import ProfilSearch
 from src.api.public_data import construire_datasets
@@ -116,7 +117,7 @@ def main():
         check("get_lieux_avec_confidentiel", store.get_lieux_avec_confidentiel([normal.id, sensible.id]) == {sensible.id})
 
         profils = ProfilSearch(store, embedder=FauxEmbedder(), ttl=0)
-        outils = OutilsComplets(store, profils, ttl=0)
+        outils = OutilsComplets(store, profils, ttl=0, vectorstore=FauxVectorStore([]))
 
         # --- réponses détaillées ---
         rep = outils._load_dataframe("reponses_tiers_lieux")
@@ -144,8 +145,8 @@ def main():
               "SECRET_CONFIDENTIEL" not in str(res))
         check("recherche : lieu avec confidentiel présent via sa synthèse publique",
               any(h["metadata"]["source_file"] == "Lieu Sensible" and "Résumé public sensible" in h["text"] for h in res))
-        check("recherche : doc_type autre que profil_lieu → erreur explicite",
-              "error" in outils.execute("search_knowledge_base", {"query": "x", "doc_type": "interview"}))
+        check("recherche : connaissances de la Bibliothèque exclues (doc_type refusé)",
+              "error" in outils.execute("search_knowledge_base", {"query": "x", "doc_type": "connaissance_bibliotheque"}))
         appels = list(profils._embedder.appels_documents)
         outils.execute("search_knowledge_base", {"query": "musique"})
         check("recherche : profils inchangés → pas de nouveaux embeddings",
@@ -171,7 +172,8 @@ def main():
             def embed_query(self, texte):
                 raise RuntimeError("Error communicating: header 'Bearer pa-SECRETSECRETSECRETSECRET12345\\n'")
 
-        casse = OutilsComplets(store, ProfilSearch(store, embedder=EmbedderCasse(), ttl=10_000), ttl=0)
+        casse = OutilsComplets(store, ProfilSearch(store, embedder=EmbedderCasse(), ttl=10_000), ttl=0,
+                               vectorstore=FauxVectorStore([]))
         casse.profils.rafraichir()
         erreur = casse.execute("search_knowledge_base", {"query": "x"})
         check("recherche en échec : message expurgé (aucun secret renvoyé au modèle)",
@@ -198,17 +200,20 @@ def main():
         # --- choix du mode ---
         os.environ["CTG_ASK_FULL_ACCESS"] = "true"
         agent = creer_agent(store)
-        check("mode complet par défaut : 6 tours, outils du site + near",
-              agent.max_tours == MAX_TOURS_COMPLET == 6 and isinstance(agent.outils, OutilsComplets)
+        check("mode complet par défaut : 8 tours, 6000 tokens, sonnet-5, outils du site + near",
+              agent.max_tours == MAX_TOURS == 8 and agent.max_tokens == MAX_TOKENS == 6000
+              and agent.model == "claude-sonnet-5" and isinstance(agent.outils, OutilsComplets)
               and "near" in str(agent.tools) and "search_knowledge_base" in str(agent.tools))
         check("mode complet : prompt mentionne near, synonymes et confidentialité",
-              all(m in agent.system_prompt for m in ("near", "synonymes", "confidentielles", "Blanmont")))
+              all(m in agent.system_prompt for m in ("near", "synonymes", "confidentielles", "Blanmont",
+                                                     "context.language", "nom exact"))
+              and "concise" not in agent.system_prompt.lower())
         os.environ.pop("CTG_ASK_FULL_ACCESS")
         check("défaut (variable absente) = accès complet", isinstance(creer_agent(store).outils, OutilsComplets))
         os.environ["CTG_ASK_FULL_ACCESS"] = "false"
         agent = creer_agent(store)
-        check("false : comportement public d'origine (4 tours, mêmes outils, pas de near)",
-              agent.max_tours == MAX_TOURS == 4 and isinstance(agent.outils, OutilsPublics)
+        check("false : jeux de données publics, mêmes outils d'origine, pas de near",
+              isinstance(agent.outils, OutilsPublics)
               and agent.tools is TOOLS and "near" not in str(agent.tools))
         os.environ.pop("CTG_ASK_FULL_ACCESS")
 
