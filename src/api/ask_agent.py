@@ -286,14 +286,16 @@ class AskAgent:
                 return erreur_publique(exc)
 
     def _executer_tous(self, appels: list) -> list:
-        """Exécute les tool_use d'un même tour l'un après l'autre : le client
-        Supabase partage une connexion HTTP/2 qui n'est pas sûre en accès
-        concurrent (vécu : RemoteProtocolError « COMPRESSION_ERROR » quand
-        deux outils lisaient la base en parallèle). Les jeux de données sont
-        mis en cache, l'écart de temps est faible."""
+        """Exécute les tool_use d'un même tour, en parallèle s'il y en a
+        plusieurs (appels indépendants et en lecture seule). Sûr grâce au client
+        Supabase en HTTP/1.1 (voir supabase_store.creer_client)."""
+        if len(appels) == 1:
+            resultats = [self._executer(appels[0].name, appels[0].input)]
+        else:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=len(appels)) as executor:
+                resultats = list(executor.map(lambda a: self._executer(a.name, a.input), appels))
         return [{"type": "tool_result", "tool_use_id": a.id,
-                 "content": json.dumps(self._executer(a.name, a.input), ensure_ascii=False, default=str)}
-                for a in appels]
+                 "content": json.dumps(r, ensure_ascii=False, default=str)} for a, r in zip(appels, resultats)]
 
     def warmup(self) -> None:
         fn = getattr(self.outils, "warmup", None)

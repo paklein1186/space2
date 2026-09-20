@@ -111,7 +111,7 @@ def main():
         [[bloc_texte("A"), bloc_tool("t", "list_datasets", {})], [bloc_texte("B")]])).ask(
         [{"role": "user", "content": "?"}]) == "B")
 
-    # --- outils : séquentiels, un nouvel essai sur erreur réseau transitoire ---
+    # --- outils : parallèles, un nouvel essai sur erreur réseau transitoire ---
     class RemoteProtocolError(Exception):
         pass
 
@@ -141,8 +141,8 @@ def main():
     instables = OutilsInstables(echecs=0)
     AskAgent(instables, client=FauxClient([[bloc_tool("a", "x", {}), bloc_tool("b", "y", {}), bloc_tool("c", "z", {})],
                                            [bloc_texte("ok")]])).ask([{"role": "user", "content": "?"}])
-    check("plusieurs outils dans un tour : jamais en parallèle (connexion HTTP/2 partagée)",
-          instables.appels == 3 and instables.max_concurrent == 1)
+    check("plusieurs outils dans un tour : exécutés en parallèle, tous les résultats renvoyés",
+          instables.appels == 3 and instables.max_concurrent > 1)
 
     # --- dernier tour forcé sans outils (peu de temps restant) ---
     client = FauxClient([[bloc_texte("Vite.")]])

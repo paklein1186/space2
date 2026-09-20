@@ -30,6 +30,19 @@ def _to_dataclass(cls, row: dict):
 PAGE = 1000  # plafond de lignes par requête PostgREST
 
 
+def creer_client(url: str, key: str) -> Client:
+    """Client Supabase en HTTP/1.1 : le client par défaut multiplexe en HTTP/2
+    sur une connexion unique, qui n'est pas sûre en accès concurrent — mesuré :
+    ~3 % de requêtes en échec (ReadError, RemoteProtocolError COMPRESSION_ERROR)
+    dès que plusieurs threads lisent en même temps (outils de l'agent en
+    parallèle, pages Streamlit). Avec HTTP/1.1 : aucune erreur, même vitesse."""
+    import httpx
+    from supabase.lib.client_options import SyncClientOptions
+
+    http = httpx.Client(http2=False, timeout=httpx.Timeout(60.0, connect=10.0))
+    return create_client(url, (key or "").strip(), options=SyncClientOptions(httpx_client=http))
+
+
 def _lire_tout(fabrique_requete) -> list:
     """Lit toutes les lignes d'une requête par pages de PAGE : sans cela,
     PostgREST tronque silencieusement à 1000 lignes (la table `reponses` en
@@ -49,7 +62,7 @@ class SupabaseStore(Store):
         """Si `client` est fourni (ex. déjà authentifié via OTP dans app.py),
         il est réutilisé tel quel — indispensable pour que les policies RLS
         s'appliquent au bon utilisateur plutôt qu'à une session anonyme."""
-        self.client: Client = client or create_client(url, key)
+        self.client: Client = client or creer_client(url, key)
 
     def get_or_create_tiers_lieu(self, owner_user_id: str, nom: str) -> TiersLieu:
         # Recherche globale (tous propriétaires confondus), insensible à la

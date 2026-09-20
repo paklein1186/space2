@@ -31,8 +31,8 @@ class SupabaseVectorStore:
 
     def __init__(self, url: str, key: str, client=None):
         if client is None:
-            from supabase import create_client
-            client = create_client(url, (key or "").strip())
+            from ..db.supabase_store import creer_client
+            client = creer_client(url, key)
         self.client = client
 
     @staticmethod
