@@ -168,12 +168,21 @@ class Store(ABC):
     def get_all_answers_by_contributeur(self, tiers_lieu_id: str) -> dict: ...
 
     @abstractmethod
-    def get_all_answers_by_contributeur_batch(self, tiers_lieu_ids: list) -> dict:
+    def get_all_answers_by_contributeur_batch(self, tiers_lieu_ids: list,
+                                               exclure_confidentiel: bool = False) -> dict:
         """Version batch de get_all_answers_by_contributeur : une seule paire
         de requêtes (contributeurs bloqués + réponses) pour plusieurs lieux à
         la fois, clé = tiers_lieu_id, au lieu de N x 2 appels séquentiels —
         utilisée par les vues agrégées (Observatoire) qui parcourent tous les
-        lieux d'un coup."""
+        lieux d'un coup. `exclure_confidentiel=True` écarte en plus les
+        réponses marquées `confidentiel` (API /ask)."""
+        ...
+
+    @abstractmethod
+    def get_lieux_avec_confidentiel(self, tiers_lieu_ids: list) -> set:
+        """Ids des lieux ayant au moins une réponse marquée `confidentiel` —
+        leurs synthèses générées (lieu_derive.donnees, profil sémantique) ont
+        pu absorber cette réponse et ne doivent pas sortir telles quelles."""
         ...
 
     @abstractmethod

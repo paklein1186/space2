@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from fastapi.testclient import TestClient
 
 from src.api import app as api_app
-from src.api.ask_agent import AskAgent
+from src.api.ask_agent import AskAgent, OutilsPublics
 from src.api.public_data import DonneesPubliques, champ_public
 from src.db.sqlite_store import SqliteStore
 from src.db.store import LieuDerive
@@ -101,24 +101,25 @@ def main():
                        {"dataset_name": "lieux", "operation": "head", "params": {"n": 3}})],
             [bloc_texte("Réponse.\nSources : Lieu Public")],
         ])
-        reponse = AskAgent(source, client=client).ask([{"role": "user", "content": "Quels lieux ?"}])
+        reponse = AskAgent(OutilsPublics(source), client=client).ask([{"role": "user", "content": "Quels lieux ?"}])
         check("l'agent renvoie le texte final", reponse.startswith("Réponse."))
         check("le résultat du tool est renvoyé au modèle",
               "Lieu Public" in client.appels[1]["messages"][-1]["content"][0]["content"])
 
         client = FauxClient([[bloc_tool(f"t{i}", "list_datasets", {})] for i in range(10)])
-        AskAgent(source, client=client).ask([{"role": "user", "content": "?"}])
+        AskAgent(OutilsPublics(source), client=client).ask([{"role": "user", "content": "?"}])
         check("nombre de tours borné", len(client.appels) <= 4)
         check("dernier tour sans tools (tool_choice none)",
               client.appels[-1].get("tool_choice") == {"type": "none"})
 
         client = FauxClient([[bloc_texte("x")]])
-        rep = AskAgent(source, client=client, budget=1.0).ask([{"role": "user", "content": "?"}])
+        rep = AskAgent(OutilsPublics(source), client=client, budget=1.0).ask([{"role": "user", "content": "?"}])
         check("budget épuisé → message explicite sans appel LLM", not client.appels and "temps" in rep)
 
         # --- HTTP ---
         os.environ["CTG_WEBHOOK_SECRET"] = "s3cret"
-        api_app._agent = AskAgent(source, client=FauxClient([[bloc_texte("ok\nSources : aucune")]]))
+        os.environ["CTG_ASK_FULL_ACCESS"] = "false"
+        api_app._agent = AskAgent(OutilsPublics(source), client=FauxClient([[bloc_texte("ok\nSources : aucune")]]))
         http = TestClient(api_app.app)
         corps = {"messages": [{"role": "user", "content": "Bonjour"}]}
         check("sans secret → 401", http.post("/ask", json=corps).status_code == 401)

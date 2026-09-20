@@ -329,10 +329,12 @@ class SqliteStore(Store):
             merged[r["champ_id"]] = json.loads(r["valeur"]) if r["valeur"] is not None else None
         return merged
 
-    def get_all_answers_by_contributeur(self, tiers_lieu_id: str) -> dict:
+    def get_all_answers_by_contributeur(self, tiers_lieu_id: str,
+                                         exclure_confidentiel: bool = False) -> dict:
         bloques = self._contributeurs_bloques(tiers_lieu_id)
         rows = self.conn.execute(
-            "select contributeur_id, champ_id, valeur from reponses where tiers_lieu_id = ?",
+            "select contributeur_id, champ_id, valeur from reponses where tiers_lieu_id = ?"
+            + (" and confidentiel = 0" if exclure_confidentiel else ""),
             (tiers_lieu_id,),
         ).fetchall()
         result: dict = {}
@@ -344,14 +346,24 @@ class SqliteStore(Store):
             )
         return result
 
-    def get_all_answers_by_contributeur_batch(self, tiers_lieu_ids: list) -> dict:
+    def get_all_answers_by_contributeur_batch(self, tiers_lieu_ids: list,
+                                               exclure_confidentiel: bool = False) -> dict:
         # SQLite est local (pas de latence réseau par appel) : une boucle sur
         # la méthode déjà existante suffit, pas besoin d'une requête groupée
         # comme pour Supabase (voir la version de supabase_store.py).
         return {
-            tiers_lieu_id: self.get_all_answers_by_contributeur(tiers_lieu_id)
+            tiers_lieu_id: self.get_all_answers_by_contributeur(tiers_lieu_id, exclure_confidentiel)
             for tiers_lieu_id in tiers_lieu_ids
         }
+
+    def get_lieux_avec_confidentiel(self, tiers_lieu_ids: list) -> set:
+        if not tiers_lieu_ids:
+            return set()
+        placeholders = ",".join("?" * len(tiers_lieu_ids))
+        rows = self.conn.execute(
+            f"select distinct tiers_lieu_id from reponses where confidentiel = 1 "
+            f"and tiers_lieu_id in ({placeholders})", tiers_lieu_ids).fetchall()
+        return {r["tiers_lieu_id"] for r in rows}
 
     def get_public_answers_batch(self, tiers_lieu_ids: list) -> dict:
         if not tiers_lieu_ids:

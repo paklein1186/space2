@@ -27,6 +27,23 @@ def _to_dataclass(cls, row: dict):
     return cls(**{k: v for k, v in row.items() if k in cls.__dataclass_fields__})
 
 
+PAGE = 1000  # plafond de lignes par requête PostgREST
+
+
+def _lire_tout(fabrique_requete) -> list:
+    """Lit toutes les lignes d'une requête par pages de PAGE : sans cela,
+    PostgREST tronque silencieusement à 1000 lignes (la table `reponses` en
+    comptait 925 le 2026-09-20). `fabrique_requete` doit renvoyer une requête
+    NEUVE, triée de façon stable, à chaque appel."""
+    lignes, debut = [], 0
+    while True:
+        page = fabrique_requete().range(debut, debut + PAGE - 1).execute().data
+        lignes.extend(page)
+        if len(page) < PAGE:
+            return lignes
+        debut += PAGE
+
+
 class SupabaseStore(Store):
     def __init__(self, url: str, key: str, client: Optional[Client] = None):
         """Si `client` est fourni (ex. déjà authentifié via OTP dans app.py),
@@ -195,7 +212,8 @@ class SupabaseStore(Store):
             out.setdefault(r["contributeur_id"], {})[r["champ_id"]] = r["valeur"]
         return out
 
-    def get_all_answers_by_contributeur_batch(self, tiers_lieu_ids: list) -> dict:
+    def get_all_answers_by_contributeur_batch(self, tiers_lieu_ids: list,
+                                               exclure_confidentiel: bool = False) -> dict:
         if not tiers_lieu_ids:
             return {}
         try:
@@ -212,31 +230,40 @@ class SupabaseStore(Store):
             # voir _contributeurs_bloques).
             bloques_par_lieu = {}
 
-        reponses_result = (
-            self.client.table("reponses")
-            .select("tiers_lieu_id,contributeur_id,champ_id,valeur")
-            .in_("tiers_lieu_id", tiers_lieu_ids)
-            .execute()
-        )
+        def requete():
+            q = (self.client.table("reponses")
+                 .select("tiers_lieu_id,contributeur_id,champ_id,valeur")
+                 .in_("tiers_lieu_id", tiers_lieu_ids))
+            if exclure_confidentiel:
+                q = q.eq("confidentiel", False)
+            return q.order("tiers_lieu_id").order("contributeur_id").order("champ_id")
+
         out: dict = {}
-        for r in reponses_result.data:
+        for r in _lire_tout(requete):
             bloques = bloques_par_lieu.get(r["tiers_lieu_id"], set())
             if r["contributeur_id"] in bloques:
                 continue
             out.setdefault(r["tiers_lieu_id"], {}).setdefault(r["contributeur_id"], {})[r["champ_id"]] = r["valeur"]
         return out
 
+    def get_lieux_avec_confidentiel(self, tiers_lieu_ids: list) -> set:
+        if not tiers_lieu_ids:
+            return set()
+        lignes = _lire_tout(lambda: (
+            self.client.table("reponses").select("tiers_lieu_id,contributeur_id,champ_id")
+            .in_("tiers_lieu_id", tiers_lieu_ids).eq("confidentiel", True)
+            .order("tiers_lieu_id").order("contributeur_id").order("champ_id")))
+        return {r["tiers_lieu_id"] for r in lignes}
+
     def get_public_answers_batch(self, tiers_lieu_ids: list) -> dict:
         if not tiers_lieu_ids:
             return {}
-        result = (
+        lignes = _lire_tout(lambda: (
             self.client.table("reponses")
             .select("tiers_lieu_id,contributeur_id,champ_id,valeur")
             .in_("tiers_lieu_id", tiers_lieu_ids)
             .eq("confidentiel", False)
-            .order("maj_le")
-            .execute()
-        )
+            .order("maj_le").order("tiers_lieu_id").order("contributeur_id").order("champ_id")))
         # Bloqués : même sémantique que get_answers (exclusion explicite
         # uniquement — un contributeur absent de la table ne doit pas
         # masquer ses réponses, voir _contributeurs_bloques).
@@ -250,7 +277,7 @@ class SupabaseStore(Store):
         except Exception:
             bloques = {}
         out: dict = {}
-        for r in result.data:
+        for r in lignes:
             if r["contributeur_id"] in bloques.get(r["tiers_lieu_id"], set()):
                 continue
             out.setdefault(r["tiers_lieu_id"], {})[r["champ_id"]] = r["valeur"]

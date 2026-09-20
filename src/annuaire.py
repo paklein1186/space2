@@ -13,7 +13,7 @@ import streamlit as st
 
 from .db.store import Store
 from .i18n import t, t_categorie
-from .questionnaire.schema import all_fields
+from .questionnaire.schema import all_fields, field_label  # noqa: F401 (field_label ré-exporté)
 
 # Palette de secours pour la vignette d'un lieu sans photo — couleur stable
 # par lieu (dérivée du nom), pas aléatoire à chaque rechargement.
@@ -123,7 +123,6 @@ def besoins_chips_html(besoins: list) -> str:
     return f'<div style="margin:4px 0;">{chips}</div>'
 
 
-_LABELS_BY_FIELD_ID = {f.id: f.label for _, _, f in all_fields()}
 
 # Ordre et clés i18n des sections homogénéisées de l'Annuaire — doit
 # correspondre à agent.enrichissement.CHAMPS_LONGUEUR_CIBLE + resume. Le
@@ -144,12 +143,6 @@ SECTIONS_SYNTHESE = [
     ("projets", "section.projets"),
     ("enjeux", "section.enjeux"),
 ]
-
-
-def field_label(champ_id: str) -> str:
-    if champ_id.startswith("libre::"):
-        return champ_id[len("libre::"):].strip() or champ_id
-    return _LABELS_BY_FIELD_ID.get(champ_id, champ_id)
 
 
 def build_fiche_lieu(store: Store, tiers_lieu) -> dict:

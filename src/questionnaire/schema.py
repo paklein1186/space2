@@ -1033,3 +1033,15 @@ def champ_public(champ_id: str) -> bool:
     if champ is None or champ.confidential_default:
         return False
     return champ.roles is None or set(TOUS_ROLES) <= set(champ.roles)
+
+
+_LABELS_BY_FIELD_ID = {f.id: f.label for _, _, f in all_fields()}
+
+
+def field_label(champ_id: str) -> str:
+    """Libellé lisible d'un champ (les champs libres "libre::<texte>" portent
+    leur libellé dans leur identifiant). Ici plutôt que dans annuaire.py, qui
+    dépend de Streamlit : l'API (src/api) doit pouvoir l'utiliser sans."""
+    if champ_id.startswith("libre::"):
+        return champ_id[len("libre::"):].strip() or champ_id
+    return _LABELS_BY_FIELD_ID.get(champ_id, champ_id)

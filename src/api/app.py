@@ -19,6 +19,7 @@ import os
 import threading
 import time
 import re
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any, Literal, Optional
 
@@ -29,15 +30,30 @@ from pydantic import BaseModel, Field, field_validator
 load_dotenv()
 
 from ..db.factory import get_admin_store  # noqa: E402
-from .ask_agent import MODELE_DEFAUT, AskAgent  # noqa: E402
+from .ask_agent import MODELE_DEFAUT, acces_complet_actif, creer_agent  # noqa: E402
 from .manifest import construire_manifest  # noqa: E402
-from .public_data import DonneesPubliques, flux_lieux  # noqa: E402
+from .public_data import flux_lieux  # noqa: E402
 
 MAX_MESSAGES = 20
 MAX_CARACTERES = 4000
 RATE_LIMIT_PAR_MINUTE = 30
 
-app = FastAPI(title="Space2 API", docs_url=None, redoc_url=None, openapi_url=None)
+def _prechauffer() -> None:
+    # Construit l'index sémantique des profils au démarrage : évite que la
+    # première question paie le calcul des embeddings dans son budget de 25 s.
+    try:
+        get_agent().warmup()
+    except Exception:
+        pass
+
+
+@asynccontextmanager
+async def lifespan(_app):
+    threading.Thread(target=_prechauffer, daemon=True).start()
+    yield
+
+
+app = FastAPI(title="Space2 API", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
 
 _agent: Optional[AskAgent] = None
 _agent_lock = threading.Lock()
@@ -94,9 +110,7 @@ def get_agent() -> AskAgent:
     global _agent
     with _agent_lock:
         if _agent is None:
-            store = get_admin_store()
-            _agent = AskAgent(DonneesPubliques(store), store=store,
-                              model=os.environ.get("API_ASK_MODEL", MODELE_DEFAUT))
+            _agent = creer_agent(get_admin_store(), model=os.environ.get("API_ASK_MODEL", MODELE_DEFAUT))
         return _agent
 
 
@@ -111,7 +125,7 @@ def health() -> dict:
 
 @app.get("/manifest")
 def manifest() -> dict:
-    return construire_manifest()
+    return construire_manifest(acces_complet_actif())
 
 
 @app.post("/ask", response_model=AskResponse, dependencies=[Depends(verifier_secret)])

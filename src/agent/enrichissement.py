@@ -19,9 +19,8 @@ import json
 
 from anthropic import Anthropic
 
-from ..annuaire import field_label
 from ..db.store import LieuDerive, Store
-from ..questionnaire.schema import CATEGORIES_POSSIBLES
+from ..questionnaire.schema import CATEGORIES_POSSIBLES, field_label
 from .embeddings import VoyageEmbedder
 from .usage import log_usage
 from .vectorstore import ChromaStore

@@ -15,8 +15,8 @@ from typing import Optional
 
 import pandas as pd
 
-from ..annuaire import field_label
 from ..db.store import Store
+from ..questionnaire.schema import field_label
 from .embeddings import VoyageEmbedder
 from .structured_query import apply_condition as _apply_condition
 from .structured_query import rendre_hashable as _rendre_hashable
