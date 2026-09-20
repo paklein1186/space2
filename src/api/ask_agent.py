@@ -16,7 +16,9 @@ from __future__ import annotations
 import concurrent.futures
 import copy
 import json
+import logging
 import os
+import re
 import threading
 import time
 from typing import Optional
@@ -40,6 +42,20 @@ MAX_TOKENS = 1500
 MAX_TOKENS_COMPLET = 2000
 DELAI_RECHERCHE_SEMANTIQUE = 8.0
 TTL_DATASETS = 300
+
+log = logging.getLogger("space2.api")
+
+# Un message d'exception peut contenir un secret (vécu : l'en-tête
+# « Bearer <clé Voyage> » dans une APIConnectionError, renvoyé tel quel au
+# modèle puis à l'utilisateur). Le détail va dans les journaux du serveur ;
+# le modèle ne reçoit que le type de l'erreur, expurgé.
+_SECRETS = re.compile(r"(Bearer\s+\S+|sk-ant-[\w-]+|pa-[\w-]{20,}|eyJ[\w.-]{20,})")
+
+
+def erreur_publique(exc: Exception) -> dict:
+    log.warning("erreur d'outil : %s: %s", type(exc).__name__, _SECRETS.sub("[secret]", str(exc))[:500])
+    return {"error": f"{type(exc).__name__} — détail dans les journaux du serveur"}
+
 
 MESSAGE_BUDGET_EPUISE = (
     "Je n'ai pas pu terminer l'analyse dans le temps imparti. Reformulez avec une question plus ciblée."
@@ -194,6 +210,9 @@ class OutilsComplets(RagToolHandler):
             return {"results": futur.result(timeout=DELAI_RECHERCHE_SEMANTIQUE)}
         except concurrent.futures.TimeoutError:
             return {"error": "recherche sémantique indisponible (délai) — utilise les filtres sur les datasets"}
+        except Exception as exc:
+            return {**erreur_publique(exc),
+                    "conseil": "recherche sémantique indisponible — utilise les filtres sur les datasets"}
 
     def warmup(self) -> None:
         self.profils.rafraichir()
@@ -220,7 +239,7 @@ class AskAgent:
         try:
             return self.outils.execute(nom, entree)
         except Exception as exc:
-            return {"error": f"{type(exc).__name__}: {exc}"}
+            return erreur_publique(exc)
 
     def warmup(self) -> None:
         fn = getattr(self.outils, "warmup", None)

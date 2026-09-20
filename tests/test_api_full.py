@@ -166,6 +166,23 @@ def main():
         check("l'index à jour contient le nouveau profil",
               "profil modifié" in str(outils.execute("search_knowledge_base", {"query": "numérique"})["results"]))
 
+        # --- une erreur d'outil ne divulgue jamais de secret ---
+        class EmbedderCasse(FauxEmbedder):
+            def embed_query(self, texte):
+                raise RuntimeError("Error communicating: header 'Bearer pa-SECRETSECRETSECRETSECRET12345\\n'")
+
+        casse = OutilsComplets(store, ProfilSearch(store, embedder=EmbedderCasse(), ttl=10_000), ttl=0)
+        casse.profils.rafraichir()
+        erreur = casse.execute("search_knowledge_base", {"query": "x"})
+        check("recherche en échec : message expurgé (aucun secret renvoyé au modèle)",
+              "error" in erreur and "SECRET" not in str(erreur) and "Bearer" not in str(erreur))
+        class OutilsQuiPlante:
+            def execute(self, nom, entree):
+                raise ValueError("clé sk-ant-api03-ABCDEFGHIJKLMNOP1234 refusée")
+        rep_outil = AskAgent(OutilsQuiPlante())._executer("x", {})
+        check("erreur générique d'outil : type seulement, pas de secret",
+              "ValueError" in rep_outil["error"] and "sk-ant" not in str(rep_outil))
+
         # --- outils via l'interface de l'agent ---
         near = outils.execute("query_structured_data", {
             "dataset_name": "lieux_enrichis", "operation": "near",
