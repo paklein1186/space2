@@ -30,13 +30,13 @@ def bloc_texte(texte):
 
 
 class FauxClient:
-    def __init__(self, reponse_texte):
-        self.reponse_texte, self.prompts = reponse_texte, []
+    def __init__(self, reponse_texte, stop_reason="end_turn"):
+        self.reponse_texte, self.stop_reason, self.prompts = reponse_texte, stop_reason, []
         self.messages = self
 
     def create(self, **kwargs):
         self.prompts.append(kwargs["messages"][0]["content"])
-        return types.SimpleNamespace(content=[bloc_texte(self.reponse_texte)],
+        return types.SimpleNamespace(content=[bloc_texte(self.reponse_texte)], stop_reason=self.stop_reason,
                                      usage=types.SimpleNamespace(input_tokens=1, output_tokens=1))
 
 
@@ -117,6 +117,33 @@ def main():
         client_court = FauxClient('{"lieux": []}')
         r_court = extraire_candidats(store, "un texte court", "source", client=client_court)
         check("extraction : document court → pas de mention de troncature", "tronque" not in r_court)
+
+        # --- réponse coupée à max_tokens (JSON en plein milieu d'une chaîne) : récupération partielle ---
+        json_coupe = (
+            '{"lieux": [\n'
+            '  {"nom": "Lieu Complet Un", "description": "d1", "commune": null, "pays": null, "citation": "c1"},\n'
+            '  {"nom": "Lieu Complet Deux", "description": "d2", "commune": null, "pays": null, "citation": "c2"},\n'
+            '  {"nom": "Lieu Coupe", "description": "phrase interrompue au milieu de la cha'
+        )
+        client_tronque = FauxClient(json_coupe, stop_reason="max_tokens")
+        r_tronque = extraire_candidats(store, "texte", "source coupée", client=client_tronque)
+        check("réponse tronquée : les objets complets sont récupérés, signalé dans le résultat",
+              r_tronque["proposes"] == 2 and r_tronque.get("reponse_tronquee") is True)
+        candidats_ce_cas = [c for c in store.list_candidats_lieux("propose") if c.source_label == "source coupée"]
+        check("réponse tronquée : le lieu coupé (objet incomplet) n'est jamais enregistré",
+              {c.nom for c in candidats_ce_cas} == {"Lieu Complet Un", "Lieu Complet Deux"})
+
+        # --- réponse coupée avant le moindre objet complet : rien à récupérer, pas d'erreur ---
+        client_coupe_tot = FauxClient('{"lieux": [\n  {"nom": "Lieu jamais term', stop_reason="max_tokens")
+        r_coupe_tot = extraire_candidats(store, "texte", "source", client=client_coupe_tot)
+        check("réponse coupée trop tôt : 0 proposé, signalé, jamais d'erreur qui ferait perdre l'appel",
+              r_coupe_tot == {"proposes": 0, "doublons_ecartes": 0, "reponse_tronquee": True})
+
+        # --- réponse non tronquée mais malgré tout invalide : toujours une vraie erreur (pas de faux salut) ---
+        client_casse_normal = FauxClient("ceci n'est pas du JSON", stop_reason="end_turn")
+        r_casse_normal = extraire_candidats(store, "texte", "source", client=client_casse_normal)
+        check("JSON invalide SANS troncature : erreur franche, pas de récupération silencieuse",
+              "erreur" in r_casse_normal)
 
         # --- acceptation ---
         candidat_b = next(c for c in store.list_candidats_lieux("propose") if c.nom == "Nouveau Lieu B")

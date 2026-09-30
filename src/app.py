@@ -1628,6 +1628,9 @@ def administration_tab(store, user_id: str) -> None:
                         message += f", {resultat_extraction['doublons_ecartes']} déjà recensé(s) écarté(s)"
                     if resultat_extraction.get("tronque"):
                         message += " (document tronqué : trop long pour être analysé en entier)"
+                    if resultat_extraction.get("reponse_tronquee"):
+                        message += " — le document en contient sans doute d'autres, non repérés cette fois " \
+                                   "(réponse du modèle trop longue pour tenir en un seul passage)"
                     st.success(message + " — à valider ci-dessous.")
                     st.session_state.pop("admin_extraction_source", None)
 
@@ -1663,6 +1666,9 @@ def administration_tab(store, user_id: str) -> None:
                         message += f", {resultat_extraction['doublons_ecartes']} déjà recensé(s) écarté(s)"
                     if resultat_extraction.get("tronque"):
                         message += " (document tronqué : trop long pour être analysé en entier)"
+                    if resultat_extraction.get("reponse_tronquee"):
+                        message += " — le document en contient sans doute d'autres, non repérés cette fois " \
+                                   "(réponse du modèle trop longue pour tenir en un seul passage)"
                     st.success(message + " — à valider ci-dessous.")
 
     candidats_lieux_en_attente = admin_store.list_candidats_lieux(statut="propose")

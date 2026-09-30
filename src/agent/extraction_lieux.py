@@ -97,19 +97,42 @@ def _normaliser_nom(nom: str) -> str:
     return re.sub(r"\s+", " ", (nom or "").strip()).casefold()
 
 
-def _parser_json(texte_reponse: str) -> dict:
+MAX_TOKENS_REPONSE = 8000
+
+
+def _degainer_balises_markdown(texte_reponse: str) -> str:
     texte_reponse = texte_reponse.strip()
     if texte_reponse.startswith("```"):
         texte_reponse = texte_reponse.split("```")[1]
         if texte_reponse.startswith("json"):
             texte_reponse = texte_reponse[4:]
-    return json.loads(texte_reponse)
+    return texte_reponse.strip()
+
+
+def _parser_json(texte_reponse: str, tolerant: bool = False) -> dict:
+    """`tolerant=True` (réponse coupée à max_tokens, en plein milieu d'un
+    objet ou d'une chaîne) : récupère les lieux dont l'objet JSON est
+    complet, abandonne seulement le dernier, entamé mais coupé — plutôt que
+    de perdre toute l'analyse pour un document qui en propose simplement
+    plus que ce qu'un seul appel peut écrire."""
+    texte_reponse = _degainer_balises_markdown(texte_reponse)
+    try:
+        return json.loads(texte_reponse)
+    except json.JSONDecodeError:
+        if not tolerant:
+            raise
+    for fin in reversed([m.end() for m in re.finditer(r"\}", texte_reponse)]):
+        try:
+            return json.loads(texte_reponse[:fin] + "]}")
+        except json.JSONDecodeError:
+            continue
+    return {"lieux": []}  # coupé avant le moindre objet complet : rien à récupérer
 
 
 def extraire_candidats(store: Store, texte: str, source_label: str, client: Optional[Anthropic] = None) -> dict:
     """Analyse `texte` et enregistre les lieux candidats retenus (statut
     "propose"). Renvoie {"proposes": n, "doublons_ecartes": n, "tronque"?:
-    True, "erreur"?: str}."""
+    True, "reponse_tronquee"?: True, "erreur"?: str}."""
     texte = (texte or "").strip()
     if not texte:
         return {"proposes": 0, "doublons_ecartes": 0}
@@ -118,15 +141,16 @@ def extraire_candidats(store: Store, texte: str, source_label: str, client: Opti
     prompt = PROMPT_TEMPLATE.format(source_label=source_label, texte=texte[:MAX_CARACTERES_SOURCE])
     client = client or Anthropic(timeout=120.0)
     try:
-        response = client.messages.create(model=MODEL, max_tokens=4000,
+        response = client.messages.create(model=MODEL, max_tokens=MAX_TOKENS_REPONSE,
                                           messages=[{"role": "user", "content": prompt}])
     except Exception as exc:
         return {"erreur": f"{type(exc).__name__}: {exc}"}
     log_usage(store, "extraction_lieux", MODEL, response.usage)
 
+    reponse_tronquee = getattr(response, "stop_reason", None) == "max_tokens"
     texte_reponse = "".join(b.text for b in response.content if b.type == "text")
     try:
-        data = _parser_json(texte_reponse)
+        data = _parser_json(texte_reponse, tolerant=reponse_tronquee)
     except (json.JSONDecodeError, IndexError) as exc:
         return {"erreur": f"Réponse du modèle illisible : {exc}"}
 
@@ -150,6 +174,8 @@ def extraire_candidats(store: Store, texte: str, source_label: str, client: Opti
     resultat = {"proposes": proposes, "doublons_ecartes": doublons}
     if tronque:
         resultat["tronque"] = True
+    if reponse_tronquee:
+        resultat["reponse_tronquee"] = True
     return resultat
 
 
