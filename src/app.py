@@ -1568,6 +1568,42 @@ def administration_tab(store, user_id: str) -> None:
                 else:
                     st.info("Aucun contenu exploitable trouvé sur ce lien.")
 
+        st.divider()
+        st.markdown("**Ajouter une connaissance depuis un fichier**")
+        st.caption(
+            "Pour un document dont vous n'avez pas de lien direct (reçu par email, scanné, pas "
+            "encore publié en ligne) : déposez-le ici. Même traitement que par lien — découpé en "
+            "plusieurs passages, pas réduit à un seul résumé."
+        )
+        fichier_connaissance = st.file_uploader(
+            "Document à analyser", type=["txt", "docx", "pdf"], key="admin_connaissance_fichier",
+        )
+        if fichier_connaissance is not None and st.button("Analyser et ajouter le fichier"):
+            from src.agent.web_crawl import ajouter_connaissance_longue, extraire_texte_fichier
+
+            try:
+                with st.spinner("Lecture du document..."):
+                    texte_complet = extraire_texte_fichier(fichier_connaissance)
+            except Exception as exc:
+                st.error(f"Impossible de lire ce fichier : {exc}")
+                texte_complet = None
+            if texte_complet and texte_complet.strip():
+                with st.spinner("Découpage et ajout à la base de connaissances..."):
+                    resultat = ajouter_connaissance_longue(
+                        admin_store, texte_complet, f"un document déposé ({fichier_connaissance.name})",
+                    )
+                if resultat.get("erreur"):
+                    st.error(resultat["erreur"])
+                elif resultat.get("chunks"):
+                    st.success(f"Ajouté à la base de connaissances : {resultat['chunks']} passage(s).")
+                else:
+                    st.info("Aucun contenu exploitable trouvé dans ce fichier.")
+            elif texte_complet is not None:
+                # Même cas que dans l'entretien (voir _transmettre_source_entretien) : un PDF
+                # scanné sans couche de texte n'échoue pas, mais n'extrait rien — sans ce
+                # message, le clic ne produirait aucun retour visible.
+                st.info("Aucun texte exploitable trouvé dans ce fichier (PDF scanné sans couche de texte ?).")
+
     with st.expander("Complétion des lieux (profondeur du questionnaire)", expanded=False):
         st.caption(
             "Pour chaque lieu, part des questions actuellement actives (tous rôles confondus, "
