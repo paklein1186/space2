@@ -69,6 +69,19 @@ class SupabaseVectorStore:
         return [r["metadata"] for r in
                 self.client.table(self.TABLE).select("metadata").eq("doc_type", doc_type).execute().data]
 
+    def lister_documents(self, where: dict) -> list:
+        """Documents complets (id, texte, métadonnées) correspondant à
+        `where` (clés admises : doc_type, source_file) — utilisé pour
+        reconstituer un document déjà ingéré (voir agent/extraction_lieux.
+        recomposer_texte_document)."""
+        if not set(where) <= {"doc_type", "source_file"}:
+            raise ValueError("lister_documents ne filtre que sur doc_type et/ou source_file")
+        query = self.client.table(self.TABLE).select("id,contenu,metadata")
+        for cle, valeur in where.items():
+            query = query.eq(cle, valeur)
+        rows = query.execute().data
+        return [{"id": r["id"], "text": r["contenu"], "metadata": r["metadata"]} for r in rows]
+
     def supprimer_absents(self, doc_type: str, ids_a_garder: set) -> int:
         """Supprime les documents de ce type dont l'id n'est pas dans
         `ids_a_garder` (ex. profils de lieux qui n'existent plus)."""
@@ -109,3 +122,14 @@ class ChromaStore:
         pour un doc_type donné), pas pour retrouver du contenu pertinent."""
         result = self.collection.get(where=where, include=["metadatas"])
         return result.get("metadatas") or []
+
+    def lister_documents(self, where: dict) -> list:
+        """Documents complets (id, texte, métadonnées) correspondant à
+        `where` (une ou plusieurs clés, ex. {"doc_type": ..., "source_file":
+        ...}) — utilisé pour reconstituer un document déjà ingéré (voir
+        agent/extraction_lieux.recomposer_texte_document)."""
+        conditions = [{cle: {"$eq": valeur}} for cle, valeur in where.items()]
+        chroma_where = conditions[0] if len(conditions) == 1 else {"$and": conditions}
+        result = self.collection.get(where=chroma_where, include=["documents", "metadatas"])
+        return [{"id": i, "text": d, "metadata": m} for i, d, m in
+                zip(result["ids"], result["documents"], result["metadatas"])]

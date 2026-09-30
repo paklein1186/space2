@@ -133,6 +133,13 @@ def main():
     check("count", magasin.count() == 3)
     check("get_metadatas (dernier scan)",
           max(m["date_ajout"] for m in magasin.get_metadatas({"doc_type": "connaissance_bibliotheque"})) == "2026-09-15")
+    docs = magasin.lister_documents({"doc_type": "connaissance_bibliotheque"})
+    check("lister_documents (1 clé) : id, texte, métadonnées, pas les profils",
+          {d["id"] for d in docs} == {"b", "c"} and next(d for d in docs if d["id"] == "b")["text"] == "doc permaculture")
+    docs2 = magasin.lister_documents({"doc_type": "connaissance_bibliotheque", "source_file": "Biblio2"})
+    check("lister_documents (2 clés) : filtre combiné", [d["id"] for d in docs2] == ["c"])
+    check("lister_documents : clé non supportée refusée",
+          not_ok(lambda: magasin.lister_documents({"tiers_lieu_id": "L1"})))
     magasin.upsert(["a"], [[1, 0, 0]], ["doc gare v2"], [{"doc_type": "profil_lieu", "tiers_lieu_id": "L1"}])
     check("upsert idempotent (pas de doublon, contenu mis à jour)",
           magasin.count() == 3 and client.lignes["a"]["contenu"] == "doc gare v2")

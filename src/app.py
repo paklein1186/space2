@@ -1631,6 +1631,40 @@ def administration_tab(store, user_id: str) -> None:
                     st.success(message + " — à valider ci-dessous.")
                     st.session_state.pop("admin_extraction_source", None)
 
+        st.divider()
+        st.markdown("**Relancer sur un document déjà ajouté**")
+        from src.agent.extraction_lieux import lister_documents_ingeres, recomposer_texte_document
+
+        documents_ingeres = lister_documents_ingeres()
+        if not documents_ingeres:
+            st.caption("Aucun document (lien ou fichier) ajouté pour l'instant.")
+        else:
+            options_documents = {
+                f"{d['source_label']} — {d['n_passages']} passage(s)"
+                + (f", ajouté le {d['date_ajout'][:10]}" if d["date_ajout"] else ""): d["source_label"]
+                for d in documents_ingeres
+            }
+            choix_document = st.selectbox(
+                "Document déjà indexé", list(options_documents),
+                help="Reconstitue le document depuis ses passages déjà indexés — pas besoin de re-uploader.",
+            )
+            if st.button("🔎 Repérer des lieux candidats dans ce document", key="extraction_document_existant"):
+                from src.agent.extraction_lieux import extraire_candidats
+
+                source_label_choisie = options_documents[choix_document]
+                with st.spinner("Reconstitution du document et analyse..."):
+                    texte_reconstitue = recomposer_texte_document(source_label_choisie)
+                    resultat_extraction = extraire_candidats(admin_store, texte_reconstitue, source_label_choisie)
+                if resultat_extraction.get("erreur"):
+                    st.error(resultat_extraction["erreur"])
+                else:
+                    message = f"{resultat_extraction['proposes']} lieu(x) candidat(s) proposé(s)"
+                    if resultat_extraction["doublons_ecartes"]:
+                        message += f", {resultat_extraction['doublons_ecartes']} déjà recensé(s) écarté(s)"
+                    if resultat_extraction.get("tronque"):
+                        message += " (document tronqué : trop long pour être analysé en entier)"
+                    st.success(message + " — à valider ci-dessous.")
+
     candidats_lieux_en_attente = admin_store.list_candidats_lieux(statut="propose")
     titre_candidats = "Lieux candidats extraits des connaissances"
     if candidats_lieux_en_attente:

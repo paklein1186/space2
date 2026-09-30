@@ -47,6 +47,52 @@ TEXTE :
 """
 
 
+DOC_TYPES_CONNAISSANCE_LONGUE = ("connaissance_bibliotheque", "connaissance_trois_tiers")
+PREFIXE_ID_LONGUE = "connaissance_longue_"
+
+
+def lister_documents_ingeres() -> list:
+    """Documents déjà ajoutés à la base de connaissances via « Ajouter une
+    connaissance depuis un lien/fichier » (ajouter_connaissance_longue),
+    regroupés par source : [{"source_label", "n_passages", "date_ajout"}],
+    du plus récemment ajouté au plus ancien — pour relancer l'extraction sur
+    un document déjà en place sans devoir le re-uploader. N'inclut pas les
+    connaissances courtes (bouton 🧠 de la Bibliothèque, scan Trois-Tiers) :
+    un seul extrait chacune, sans intérêt pour repérer des lieux nommés."""
+    from .vectorstore import get_vectorstore
+
+    vectorstore = get_vectorstore()
+    par_source: dict = {}
+    for doc_type in DOC_TYPES_CONNAISSANCE_LONGUE:
+        for doc in vectorstore.lister_documents({"doc_type": doc_type}):
+            if not doc["id"].startswith(PREFIXE_ID_LONGUE):
+                continue
+            source = doc["metadata"].get("source_file") or "(source inconnue)"
+            entree = par_source.setdefault(source, {"source_label": source, "n_passages": 0, "date_ajout": None})
+            entree["n_passages"] += 1
+            date = doc["metadata"].get("date_ajout")
+            if date and (entree["date_ajout"] is None or date > entree["date_ajout"]):
+                entree["date_ajout"] = date
+    return sorted(par_source.values(), key=lambda e: e["date_ajout"] or "", reverse=True)
+
+
+def recomposer_texte_document(source_label: str) -> str:
+    """Reconstitue le texte d'un document déjà ingéré, à partir de ses
+    passages triés selon leur position d'origine (chunk_index). Les passages
+    se recouvrent légèrement (voir ingest/chunking.py) : la reconstitution
+    n'est donc pas caractère pour caractère l'original, mais fidèle pour une
+    relecture par le LLM d'extraction."""
+    from .vectorstore import get_vectorstore
+
+    vectorstore = get_vectorstore()
+    documents = []
+    for doc_type in DOC_TYPES_CONNAISSANCE_LONGUE:
+        documents += vectorstore.lister_documents({"doc_type": doc_type, "source_file": source_label})
+    documents = [d for d in documents if d["id"].startswith(PREFIXE_ID_LONGUE)]
+    documents.sort(key=lambda d: d["metadata"].get("chunk_index", 0))
+    return "\n\n".join(d["text"] for d in documents)
+
+
 def _normaliser_nom(nom: str) -> str:
     return re.sub(r"\s+", " ", (nom or "").strip()).casefold()
 
