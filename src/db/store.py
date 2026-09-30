@@ -116,6 +116,28 @@ class Litige:
 
 
 @dataclass
+class CandidatLieu:
+    """Lieu proposé par extraction automatique (IA) depuis un document de la
+    base de connaissances — voir agent/extraction_lieux.py. Jamais créé comme
+    lieu directement : reste au statut "propose" jusqu'à ce qu'un admin
+    l'accepte (crée le lieu) ou le rejette, depuis le panneau
+    d'administration."""
+
+    nom: str
+    description: str
+    source_label: str
+    id: str = ""  # vide = création
+    commune: Optional[str] = None
+    pays: Optional[str] = None
+    citation: Optional[str] = None
+    statut: str = "propose"  # "propose" | "accepte" | "rejete"
+    tiers_lieu_id: Optional[str] = None  # posé quand accepte
+    cree_le: Optional[str] = None
+    traite_le: Optional[str] = None
+    traite_par: Optional[str] = None
+
+
+@dataclass
 class ConversationBibliotheque:
     """Historique de chat de l'assistant Bibliothèque, par utilisateur —
     jamais rattaché à un lieu précis (la Bibliothèque interroge l'ensemble
@@ -249,6 +271,25 @@ class Store(ABC):
         élément : {tiers_lieu_id, contributeur_id, champ_id, valeur}. Utilisé
         pour lister les répondants d'une campagne prioritaire (email, lieu,
         rôle) indépendamment du lieu auquel ils appartiennent."""
+        ...
+
+    @abstractmethod
+    def save_candidat_lieu(self, candidat: CandidatLieu) -> CandidatLieu:
+        """Enregistre un lieu candidat proposé par extraction (statut
+        "propose"). Renvoie le candidat avec son id posé."""
+        ...
+
+    @abstractmethod
+    def list_candidats_lieux(self, statut: Optional[str] = None) -> list:
+        """Candidats du statut donné (ou tous), du plus récent au plus
+        ancien — utilisé par le panneau de validation admin."""
+        ...
+
+    @abstractmethod
+    def traiter_candidat_lieu(self, candidat_id: str, statut: str,
+                               tiers_lieu_id: Optional[str], traite_par: str) -> None:
+        """Marque un candidat "accepte" (avec le tiers_lieu_id créé/rattaché)
+        ou "rejete" (tiers_lieu_id=None)."""
         ...
 
     @abstractmethod

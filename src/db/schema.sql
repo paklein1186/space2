@@ -145,7 +145,7 @@ create table if not exists litiges (
 -- Traçabilité et suivi des coûts de chaque appel LLM.
 create table if not exists llm_calls (
     id uuid primary key default gen_random_uuid(),
-    type_appel text not null check (type_appel in ('entretien', 'enrichissement', 'rag_query', 'import_questionnaire', 'crawl_extraction', 'traduction_fiche')),
+    type_appel text not null check (type_appel in ('entretien', 'enrichissement', 'rag_query', 'import_questionnaire', 'crawl_extraction', 'traduction_fiche', 'extraction_lieux')),
     tiers_lieu_id uuid references tiers_lieux(id) on delete set null,
     model text not null,
     tokens_in integer not null,
@@ -646,3 +646,22 @@ language sql stable as $$
     order by d.embedding <=> query_embedding
     limit match_count;
 $$;
+
+-- ---- Lieux candidats extraits des connaissances (voir migration_013_candidats_lieux.sql) ----
+create table if not exists candidats_lieux (
+    id uuid primary key default gen_random_uuid(),
+    nom text not null,
+    description text not null default '',
+    source_label text not null,
+    commune text,
+    pays text,
+    citation text,
+    statut text not null default 'propose' check (statut in ('propose', 'accepte', 'rejete')),
+    tiers_lieu_id uuid references tiers_lieux(id) on delete set null,
+    cree_le timestamptz not null default now(),
+    traite_le timestamptz,
+    traite_par text
+);
+alter table candidats_lieux enable row level security;
+-- Pas de policy : accessible uniquement via get_admin_store() (clé service_role).
+

@@ -10,6 +10,7 @@ from supabase import Client, create_client
 
 from .store import (
     CampagnePrioritaire,
+    CandidatLieu,
     ConversationBibliotheque,
     Contributeur,
     LieuDerive,
@@ -350,6 +351,34 @@ class SupabaseStore(Store):
             .execute()
         )
         return result.data
+
+    def save_candidat_lieu(self, candidat: CandidatLieu) -> CandidatLieu:
+        payload = {
+            "nom": candidat.nom, "description": candidat.description, "source_label": candidat.source_label,
+            "commune": candidat.commune, "pays": candidat.pays, "citation": candidat.citation,
+            "statut": candidat.statut,
+        }
+        result = self.client.table("candidats_lieux").insert(payload).execute()
+        return _to_dataclass(CandidatLieu, result.data[0])
+
+    def list_candidats_lieux(self, statut: Optional[str] = None) -> list:
+        query = self.client.table("candidats_lieux").select("*").order("cree_le", desc=True)
+        if statut:
+            query = query.eq("statut", statut)
+        try:
+            result = query.execute()
+        except Exception:
+            # Table absente avant migration : aucun candidat plutôt qu'un
+            # plantage du panneau d'administration dès qu'on l'ouvre.
+            return []
+        return [_to_dataclass(CandidatLieu, row) for row in result.data]
+
+    def traiter_candidat_lieu(self, candidat_id: str, statut: str,
+                               tiers_lieu_id: Optional[str], traite_par: str) -> None:
+        self.client.table("candidats_lieux").update({
+            "statut": statut, "tiers_lieu_id": tiers_lieu_id, "traite_par": traite_par,
+            "traite_le": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", candidat_id).execute()
 
     def save_free_text_note(self, tiers_lieu_id: str, contributeur_id: str, section_id: Optional[str],
                              texte: str) -> None:

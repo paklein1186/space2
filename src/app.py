@@ -1565,6 +1565,9 @@ def administration_tab(store, user_id: str) -> None:
                     st.error(resultat["erreur"])
                 elif resultat.get("chunks"):
                     st.success(f"Ajouté à la base de connaissances : {resultat['chunks']} passage(s).")
+                    st.session_state["admin_extraction_source"] = {
+                        "texte": texte_complet, "label": f"une recherche ponctuelle ({url_connaissance})",
+                    }
                 else:
                     st.info("Aucun contenu exploitable trouvé sur ce lien.")
 
@@ -1596,6 +1599,9 @@ def administration_tab(store, user_id: str) -> None:
                     st.error(resultat["erreur"])
                 elif resultat.get("chunks"):
                     st.success(f"Ajouté à la base de connaissances : {resultat['chunks']} passage(s).")
+                    st.session_state["admin_extraction_source"] = {
+                        "texte": texte_complet, "label": f"un document déposé ({fichier_connaissance.name})",
+                    }
                 else:
                     st.info("Aucun contenu exploitable trouvé dans ce fichier.")
             elif texte_complet is not None:
@@ -1603,6 +1609,62 @@ def administration_tab(store, user_id: str) -> None:
                 # scanné sans couche de texte n'échoue pas, mais n'extrait rien — sans ce
                 # message, le clic ne produirait aucun retour visible.
                 st.info("Aucun texte exploitable trouvé dans ce fichier (PDF scanné sans couche de texte ?).")
+
+        source_extraction = st.session_state.get("admin_extraction_source")
+        if source_extraction:
+            st.divider()
+            st.caption(f"Dernier document ajouté : {source_extraction['label']}")
+            if st.button("🔎 Repérer des lieux candidats dans ce document"):
+                from src.agent.extraction_lieux import extraire_candidats
+
+                with st.spinner("Analyse du document à la recherche de lieux nommés..."):
+                    resultat_extraction = extraire_candidats(
+                        admin_store, source_extraction["texte"], source_extraction["label"])
+                if resultat_extraction.get("erreur"):
+                    st.error(resultat_extraction["erreur"])
+                else:
+                    message = f"{resultat_extraction['proposes']} lieu(x) candidat(s) proposé(s)"
+                    if resultat_extraction["doublons_ecartes"]:
+                        message += f", {resultat_extraction['doublons_ecartes']} déjà recensé(s) écarté(s)"
+                    if resultat_extraction.get("tronque"):
+                        message += " (document tronqué : trop long pour être analysé en entier)"
+                    st.success(message + " — à valider ci-dessous.")
+                    st.session_state.pop("admin_extraction_source", None)
+
+    candidats_lieux_en_attente = admin_store.list_candidats_lieux(statut="propose")
+    titre_candidats = "Lieux candidats extraits des connaissances"
+    if candidats_lieux_en_attente:
+        titre_candidats += f" ({len(candidats_lieux_en_attente)} à valider)"
+    with st.expander(titre_candidats, expanded=bool(candidats_lieux_en_attente)):
+        st.caption(
+            "Lieux nommés repérés par l'IA dans un document ajouté à la base de connaissances "
+            "(bouton « Repérer des lieux candidats » ci-dessus). Rien n'est créé sans validation : "
+            "Accepter crée le lieu (synthèse minimale tirée du document, PAS publié au Portfolio), "
+            "Rejeter l'écarte définitivement."
+        )
+        if not candidats_lieux_en_attente:
+            st.caption("Aucun candidat en attente de validation.")
+        else:
+            from src.agent.extraction_lieux import accepter_candidat, rejeter_candidat
+
+            for candidat in candidats_lieux_en_attente:
+                with st.container(border=True):
+                    localisation = ", ".join(x for x in (candidat.commune, candidat.pays) if x)
+                    st.markdown(f"**{candidat.nom}**" + (f" — {localisation}" if localisation else ""))
+                    st.write(candidat.description)
+                    if candidat.citation:
+                        st.caption(f"« {candidat.citation} »")
+                    st.caption(f"Source : {candidat.source_label}")
+                    col_accepter, col_rejeter = st.columns(2)
+                    with col_accepter:
+                        if st.button("✅ Accepter", key=f"accepter_candidat_{candidat.id}"):
+                            lieu_cree = accepter_candidat(admin_store, candidat, user_id)
+                            st.success(f"« {lieu_cree.nom} » ajouté à l'Annuaire.")
+                            st.rerun()
+                    with col_rejeter:
+                        if st.button("❌ Rejeter", key=f"rejeter_candidat_{candidat.id}"):
+                            rejeter_candidat(admin_store, candidat.id, user_id)
+                            st.rerun()
 
     with st.expander("Complétion des lieux (profondeur du questionnaire)", expanded=False):
         st.caption(

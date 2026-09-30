@@ -12,6 +12,7 @@ from typing import Optional
 
 from .store import (
     CampagnePrioritaire,
+    CandidatLieu,
     ConversationBibliotheque,
     Contributeur,
     LieuDerive,
@@ -169,6 +170,20 @@ create table if not exists acces_externes (
     guilde_id text,
     statut text not null default 'actif',
     maj_le text not null default (datetime('now'))
+);
+create table if not exists candidats_lieux (
+    id text primary key,
+    nom text not null,
+    description text not null default '',
+    source_label text not null,
+    commune text,
+    pays text,
+    citation text,
+    statut text not null default 'propose',
+    tiers_lieu_id text,
+    cree_le text not null default (datetime('now')),
+    traite_le text,
+    traite_par text
 );
 create table if not exists llm_calls (
     id text primary key,
@@ -495,6 +510,36 @@ class SqliteStore(Store):
         ]
 
     # -- notes libres --------------------------------------------------
+
+    def save_candidat_lieu(self, candidat: CandidatLieu) -> CandidatLieu:
+        candidat_id = candidat.id or str(uuid.uuid4())
+        self.conn.execute(
+            "insert into candidats_lieux (id, nom, description, source_label, commune, pays, citation, "
+            "statut) values (?, ?, ?, ?, ?, ?, ?, ?)",
+            (candidat_id, candidat.nom, candidat.description, candidat.source_label, candidat.commune,
+             candidat.pays, candidat.citation, candidat.statut),
+        )
+        self.conn.commit()
+        row = self.conn.execute("select * from candidats_lieux where id = ?", (candidat_id,)).fetchone()
+        return _candidat_lieu_from_row(row)
+
+    def list_candidats_lieux(self, statut: Optional[str] = None) -> list:
+        if statut:
+            rows = self.conn.execute(
+                "select * from candidats_lieux where statut = ? order by cree_le desc", (statut,)
+            ).fetchall()
+        else:
+            rows = self.conn.execute("select * from candidats_lieux order by cree_le desc").fetchall()
+        return [_candidat_lieu_from_row(r) for r in rows]
+
+    def traiter_candidat_lieu(self, candidat_id: str, statut: str,
+                               tiers_lieu_id: Optional[str], traite_par: str) -> None:
+        self.conn.execute(
+            "update candidats_lieux set statut = ?, tiers_lieu_id = ?, traite_par = ?, "
+            "traite_le = datetime('now') where id = ?",
+            (statut, tiers_lieu_id, traite_par, candidat_id),
+        )
+        self.conn.commit()
 
     def save_free_text_note(self, tiers_lieu_id: str, contributeur_id: str, section_id: Optional[str],
                              texte: str) -> None:
@@ -826,6 +871,16 @@ def _lieu_derive_from_row(data: dict) -> LieuDerive:
         donnees_publiques=json.loads(data["donnees_publiques"]) if data.get("donnees_publiques") else None,
         donnees_publiques_source_hash=data.get("donnees_publiques_source_hash"),
         donnees_publiques_maj=data.get("donnees_publiques_maj"),
+    )
+
+
+def _candidat_lieu_from_row(row) -> CandidatLieu:
+    d = dict(row)
+    return CandidatLieu(
+        id=d["id"], nom=d["nom"], description=d["description"], source_label=d["source_label"],
+        commune=d["commune"], pays=d["pays"], citation=d["citation"], statut=d["statut"],
+        tiers_lieu_id=d["tiers_lieu_id"], cree_le=d["cree_le"], traite_le=d["traite_le"],
+        traite_par=d["traite_par"],
     )
 
 
