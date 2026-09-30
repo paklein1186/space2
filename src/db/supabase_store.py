@@ -356,7 +356,7 @@ class SupabaseStore(Store):
         payload = {
             "nom": candidat.nom, "description": candidat.description, "source_label": candidat.source_label,
             "commune": candidat.commune, "pays": candidat.pays, "citation": candidat.citation,
-            "statut": candidat.statut,
+            "statut": candidat.statut, "tiers_lieu_id": candidat.tiers_lieu_id,
         }
         result = self.client.table("candidats_lieux").insert(payload).execute()
         return _to_dataclass(CandidatLieu, result.data[0])

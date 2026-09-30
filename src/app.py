@@ -1108,6 +1108,23 @@ def _admin_portfolio_form(store, lieu, derive) -> None:
                 st.rerun()
 
 
+def _message_resultat_extraction(resultat: dict) -> str:
+    morceaux = []
+    if resultat["proposes"]:
+        morceaux.append(f"{resultat['proposes']} nouveau(x) lieu(x) candidat(s)")
+    if resultat["infos_existantes"]:
+        morceaux.append(f"{resultat['infos_existantes']} info(s) complémentaire(s) pour des lieux déjà recensés")
+    message = " et ".join(morceaux) if morceaux else "Aucun lieu nommé identifié dans ce document"
+    if resultat["doublons_ecartes"]:
+        message += f" ({resultat['doublons_ecartes']} répétition(s) dans la réponse écartée(s))"
+    if resultat.get("tronque"):
+        message += " — document tronqué : trop long pour être analysé en entier"
+    if resultat.get("reponse_tronquee"):
+        message += (" — le document en contient sans doute d'autres, non repérés cette fois (réponse du "
+                    "modèle trop longue pour tenir en un seul passage)")
+    return message
+
+
 def _condition_text(condition) -> str | None:
     if condition is None:
         return None
@@ -1623,15 +1640,7 @@ def administration_tab(store, user_id: str) -> None:
                 if resultat_extraction.get("erreur"):
                     st.error(resultat_extraction["erreur"])
                 else:
-                    message = f"{resultat_extraction['proposes']} lieu(x) candidat(s) proposé(s)"
-                    if resultat_extraction["doublons_ecartes"]:
-                        message += f", {resultat_extraction['doublons_ecartes']} déjà recensé(s) écarté(s)"
-                    if resultat_extraction.get("tronque"):
-                        message += " (document tronqué : trop long pour être analysé en entier)"
-                    if resultat_extraction.get("reponse_tronquee"):
-                        message += " — le document en contient sans doute d'autres, non repérés cette fois " \
-                                   "(réponse du modèle trop longue pour tenir en un seul passage)"
-                    st.success(message + " — à valider ci-dessous.")
+                    st.success(_message_resultat_extraction(resultat_extraction) + " — à valider ci-dessous.")
                     st.session_state.pop("admin_extraction_source", None)
 
         st.divider()
@@ -1661,15 +1670,7 @@ def administration_tab(store, user_id: str) -> None:
                 if resultat_extraction.get("erreur"):
                     st.error(resultat_extraction["erreur"])
                 else:
-                    message = f"{resultat_extraction['proposes']} lieu(x) candidat(s) proposé(s)"
-                    if resultat_extraction["doublons_ecartes"]:
-                        message += f", {resultat_extraction['doublons_ecartes']} déjà recensé(s) écarté(s)"
-                    if resultat_extraction.get("tronque"):
-                        message += " (document tronqué : trop long pour être analysé en entier)"
-                    if resultat_extraction.get("reponse_tronquee"):
-                        message += " — le document en contient sans doute d'autres, non repérés cette fois " \
-                                   "(réponse du modèle trop longue pour tenir en un seul passage)"
-                    st.success(message + " — à valider ci-dessous.")
+                    st.success(_message_resultat_extraction(resultat_extraction) + " — à valider ci-dessous.")
 
     candidats_lieux_en_attente = admin_store.list_candidats_lieux(statut="propose")
     titre_candidats = "Lieux candidats extraits des connaissances"
@@ -1678,9 +1679,11 @@ def administration_tab(store, user_id: str) -> None:
     with st.expander(titre_candidats, expanded=bool(candidats_lieux_en_attente)):
         st.caption(
             "Lieux nommés repérés par l'IA dans un document ajouté à la base de connaissances "
-            "(bouton « Repérer des lieux candidats » ci-dessus). Rien n'est créé sans validation : "
-            "Accepter crée le lieu (synthèse minimale tirée du document, PAS publié au Portfolio), "
-            "Rejeter l'écarte définitivement."
+            "(bouton « Repérer des lieux candidats » ci-dessus). Rien n'est écrit sans validation : "
+            "pour un nom inconnu du recensement, Accepter crée le lieu (synthèse minimale tirée du "
+            "document, PAS publié au Portfolio) ; pour un lieu déjà recensé, Accepter ajoute une simple "
+            "note citant le document, sans jamais toucher aux données existantes de ce lieu. Rejeter "
+            "écarte le candidat définitivement, dans les deux cas."
         )
         if not candidats_lieux_en_attente:
             st.caption("Aucun candidat en attente de validation.")
@@ -1688,19 +1691,30 @@ def administration_tab(store, user_id: str) -> None:
             from src.agent.extraction_lieux import accepter_candidat, rejeter_candidat
 
             for candidat in candidats_lieux_en_attente:
+                lieu_deja_recense = bool(candidat.tiers_lieu_id)
                 with st.container(border=True):
-                    localisation = ", ".join(x for x in (candidat.commune, candidat.pays) if x)
-                    st.markdown(f"**{candidat.nom}**" + (f" — {localisation}" if localisation else ""))
+                    if lieu_deja_recense:
+                        st.markdown(f"**📎 Info pour un lieu déjà recensé : {candidat.nom}**")
+                    else:
+                        localisation = ", ".join(x for x in (candidat.commune, candidat.pays) if x)
+                        st.markdown(f"**🆕 Nouveau lieu : {candidat.nom}**" + (f" — {localisation}" if localisation else ""))
                     st.write(candidat.description)
                     if candidat.citation:
                         st.caption(f"« {candidat.citation} »")
                     st.caption(f"Source : {candidat.source_label}")
                     col_accepter, col_rejeter = st.columns(2)
                     with col_accepter:
-                        if st.button("✅ Accepter", key=f"accepter_candidat_{candidat.id}"):
-                            lieu_cree = accepter_candidat(admin_store, candidat, user_id)
-                            st.success(f"« {lieu_cree.nom} » ajouté à l'Annuaire.")
-                            st.rerun()
+                        label_accepter = "✅ Ajouter cette note au lieu" if lieu_deja_recense else "✅ Créer ce lieu"
+                        if st.button(label_accepter, key=f"accepter_candidat_{candidat.id}"):
+                            lieu = accepter_candidat(admin_store, candidat, user_id)
+                            if lieu is None:
+                                st.error("Ce lieu n'existe plus (supprimé depuis) : candidat laissé de côté.")
+                            elif lieu_deja_recense:
+                                st.success(f"Note ajoutée à la fiche de « {lieu.nom} ».")
+                                st.rerun()
+                            else:
+                                st.success(f"« {lieu.nom} » ajouté à l'Annuaire.")
+                                st.rerun()
                     with col_rejeter:
                         if st.button("❌ Rejeter", key=f"rejeter_candidat_{candidat.id}"):
                             rejeter_candidat(admin_store, candidat.id, user_id)

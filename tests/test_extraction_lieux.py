@@ -15,7 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.agent.extraction_lieux import accepter_candidat, extraire_candidats, rejeter_candidat
+from src.agent.extraction_lieux import accepter_candidat, compiler_info_lieu_existant, extraire_candidats, rejeter_candidat
 from src.db.sqlite_store import SqliteStore
 from src.db.store import CandidatLieu, LieuDerive
 
@@ -63,11 +63,12 @@ def main():
         check("list_candidats_lieux(statut='rejete') : le retrouve, traite_par posé",
               next(x for x in store.list_candidats_lieux("rejete") if x.id == c.id).traite_par == "admin@x.org")
 
-        # --- extraction : cas normal, doublons écartés (existants + au sein de la réponse) ---
-        store.get_or_create_tiers_lieu("u1", "Lieu Déjà Recensé")
+        # --- extraction : nouveaux lieux, info sur un lieu déjà recensé, doublons intra-réponse ---
+        lieu_deja_recense = store.get_or_create_tiers_lieu("u1", "Lieu Déjà Recensé")
         json_reponse = (
             '{"lieux": [\n'
-            '  {"nom": "Lieu Déjà Recensé", "description": "x", "commune": null, "pays": null, "citation": "x"},\n'
+            '  {"nom": "Lieu Déjà Recensé", "description": "Ce que le document en dit.", "commune": null, '
+            '"pays": null, "citation": "Une phrase sur ce lieu déjà connu."},\n'
             '  {"nom": "  lieu déjà RECENSÉ  ", "description": "x", "commune": null, "pays": null, "citation": "x"},\n'
             '  {"nom": "Nouveau Lieu A", "description": "Un tiers-lieu rural.", "commune": "Blanmont", '
             '"pays": "Belgique", "citation": "Nouveau Lieu A, à Blanmont, est un tiers-lieu rural."},\n'
@@ -79,12 +80,17 @@ def main():
         )
         client = FauxClient(json_reponse)
         resultat = extraire_candidats(store, "texte source du document...", "un document (guide.pdf)", client=client)
-        check("extraction : 2 proposés (A et B), 3 doublons écartés (1 existant + 1 casse/espaces + 1 intra-réponse)",
-              resultat == {"proposes": 2, "doublons_ecartes": 3})
-        noms_proposes = {c.nom for c in store.list_candidats_lieux("propose")}
-        check("extraction : les deux nouveaux lieux sont bien enregistrés, pas le doublon",
-              noms_proposes == {"Nouveau Lieu A", "Nouveau Lieu B"})
-        candidat_a = next(c for c in store.list_candidats_lieux("propose") if c.nom == "Nouveau Lieu A")
+        check("extraction : 2 nouveaux (A et B), 1 info sur lieu existant, 2 doublons intra-réponse écartés",
+              resultat == {"proposes": 2, "infos_existantes": 1, "doublons_ecartes": 2})
+        candidats_propose = store.list_candidats_lieux("propose")
+        check("extraction : le lieu déjà recensé N'EST PLUS écarté, il est proposé lui aussi (une seule fois)",
+              {c.nom for c in candidats_propose} == {"Nouveau Lieu A", "Nouveau Lieu B", "Lieu Déjà Recensé"})
+        candidat_existant = next(c for c in candidats_propose if c.nom == "Lieu Déjà Recensé")
+        check("extraction : ce candidat pointe déjà vers le lieu existant (avant même la validation)",
+              candidat_existant.tiers_lieu_id == lieu_deja_recense.id)
+        candidat_a = next(c for c in candidats_propose if c.nom == "Nouveau Lieu A")
+        check("extraction : un candidat de nouveau lieu n'a PAS de tiers_lieu_id avant validation",
+              candidat_a.tiers_lieu_id is None)
         check("extraction : commune/pays/citation transmis", candidat_a.commune == "Blanmont"
               and candidat_a.pays == "Belgique" and "Blanmont" in candidat_a.citation)
         check("extraction : source_label transmis", candidat_a.source_label == "un document (guide.pdf)")
@@ -98,10 +104,11 @@ def main():
 
         # --- cas limites ---
         check("extraction : texte vide → rien, aucun appel LLM",
-              extraire_candidats(store, "   ", "source", client=FauxClient("{}")) == {"proposes": 0, "doublons_ecartes": 0})
+              extraire_candidats(store, "   ", "source", client=FauxClient("{}"))
+              == {"proposes": 0, "infos_existantes": 0, "doublons_ecartes": 0})
         client_vide = FauxClient('{"lieux": []}')
         check("extraction : aucun lieu trouvé → proposes=0", extraire_candidats(
-            store, "texte", "source", client=client_vide) == {"proposes": 0, "doublons_ecartes": 0})
+            store, "texte", "source", client=client_vide) == {"proposes": 0, "infos_existantes": 0, "doublons_ecartes": 0})
         client_casse = FauxClient("ceci n'est pas du JSON")
         r_casse = extraire_candidats(store, "texte", "source", client=client_casse)
         check("extraction : JSON illisible → erreur explicite, pas de plantage", "erreur" in r_casse)
@@ -128,7 +135,8 @@ def main():
         client_tronque = FauxClient(json_coupe, stop_reason="max_tokens")
         r_tronque = extraire_candidats(store, "texte", "source coupée", client=client_tronque)
         check("réponse tronquée : les objets complets sont récupérés, signalé dans le résultat",
-              r_tronque["proposes"] == 2 and r_tronque.get("reponse_tronquee") is True)
+              r_tronque["proposes"] == 2 and r_tronque["infos_existantes"] == 0
+              and r_tronque.get("reponse_tronquee") is True)
         candidats_ce_cas = [c for c in store.list_candidats_lieux("propose") if c.source_label == "source coupée"]
         check("réponse tronquée : le lieu coupé (objet incomplet) n'est jamais enregistré",
               {c.nom for c in candidats_ce_cas} == {"Lieu Complet Un", "Lieu Complet Deux"})
@@ -137,7 +145,7 @@ def main():
         client_coupe_tot = FauxClient('{"lieux": [\n  {"nom": "Lieu jamais term', stop_reason="max_tokens")
         r_coupe_tot = extraire_candidats(store, "texte", "source", client=client_coupe_tot)
         check("réponse coupée trop tôt : 0 proposé, signalé, jamais d'erreur qui ferait perdre l'appel",
-              r_coupe_tot == {"proposes": 0, "doublons_ecartes": 0, "reponse_tronquee": True})
+              r_coupe_tot == {"proposes": 0, "infos_existantes": 0, "doublons_ecartes": 0, "reponse_tronquee": True})
 
         # --- réponse non tronquée mais malgré tout invalide : toujours une vraie erreur (pas de faux salut) ---
         client_casse_normal = FauxClient("ceci n'est pas du JSON", stop_reason="end_turn")
@@ -174,11 +182,60 @@ def main():
               store.get_lieu_derive(vrai_lieu.id).donnees["resume"] == "Vrai résumé, pas celui du candidat."
               and store.get_lieu_derive(vrai_lieu.id).prompt_version == "enrichissement-v3")
 
-        # --- rejet ---
+        # --- rejet (candidat de nouveau lieu) ---
         rejeter_candidat(store, candidat_b.id, "admin@x.org")
         check("rejet : candidat marqué 'rejete', aucun lieu créé",
               next(c for c in store.list_candidats_lieux("rejete") if c.id == candidat_b.id).tiers_lieu_id is None
               and not any(l.nom == "Nouveau Lieu B" for l in store.list_tiers_lieux()))
+
+        # --- acceptation d'un candidat "info sur lieu déjà recensé" (tiers_lieu_id posé DÈS la proposition) ---
+        nb_lieux_avant = len(store.list_tiers_lieux())
+        candidat_info = store.save_candidat_lieu(CandidatLieu(
+            nom="Lieu Avec Vraies Données", description="Une info trouvée dans un second document.",
+            source_label="un autre guide", citation="Une phrase qui en parle.", tiers_lieu_id=vrai_lieu.id))
+        lieu_info = accepter_candidat(store, candidat_info, "admin@x.org")
+        check("info sur lieu existant : renvoie le même lieu, AUCUN lieu créé",
+              lieu_info.id == vrai_lieu.id and len(store.list_tiers_lieux()) == nb_lieux_avant)
+        check("info sur lieu existant : la synthèse existante n'est jamais touchée",
+              store.get_lieu_derive(vrai_lieu.id).donnees["resume"] == "Vrai résumé, pas celui du candidat.")
+        # (vrai_lieu porte déjà 1 note du rattachement précédent, candidat_conflit ci-dessus)
+        notes_avant = len(store.get_free_text_notes(vrai_lieu.id))
+        nouvelle_note = next(n["texte"] for n in store.get_free_text_notes(vrai_lieu.id) if "un autre guide" in n["texte"])
+        check("info sur lieu existant : une note de plus, citant la source, la description et la citation",
+              notes_avant == 2 and "Une info trouvée dans un second document." in nouvelle_note
+              and "Une phrase qui en parle." in nouvelle_note)
+        candidat_info_traite = next(c for c in store.list_candidats_lieux("accepte") if c.id == candidat_info.id)
+        check("info sur lieu existant : candidat marqué 'accepte', tiers_lieu_id inchangé",
+              candidat_info_traite.tiers_lieu_id == vrai_lieu.id)
+
+        # --- même chose sur un lieu qui n'a encore AUCUNE synthèse : jamais créée par cette voie ---
+        lieu_sans_synthese = store.get_or_create_tiers_lieu("u1", "Lieu Sans Synthèse")
+        candidat_sans_synthese = store.save_candidat_lieu(CandidatLieu(
+            nom="Lieu Sans Synthèse", description="Info trouvée.", source_label="s",
+            tiers_lieu_id=lieu_sans_synthese.id))
+        accepter_candidat(store, candidat_sans_synthese, "admin@x.org")
+        check("info sur lieu sans synthèse : compiler_info_lieu_existant ne crée jamais de lieu_derive",
+              store.get_lieu_derive(lieu_sans_synthese.id) is None)
+        check("info sur lieu sans synthèse : la note existe malgré tout",
+              len(store.get_free_text_notes(lieu_sans_synthese.id)) == 1)
+
+        # --- lieu supprimé entre l'extraction et la validation : pas de plantage, candidat laissé "propose" ---
+        candidat_orphelin = store.save_candidat_lieu(CandidatLieu(
+            nom="Lieu Fantôme", description="d", source_label="s", tiers_lieu_id="id-qui-n-existe-pas"))
+        resultat_orphelin = compiler_info_lieu_existant(store, candidat_orphelin, "admin@x.org")
+        check("candidat orphelin (lieu supprimé) : renvoie None, pas d'exception",
+              resultat_orphelin is None)
+        check("candidat orphelin : reste au statut 'propose' (pas marqué accepté à tort)",
+              any(c.id == candidat_orphelin.id for c in store.list_candidats_lieux("propose")))
+
+        # --- rejet d'un candidat "info sur lieu existant" : jamais de note ajoutée ---
+        candidat_a_rejeter = store.save_candidat_lieu(CandidatLieu(
+            nom="Lieu Avec Vraies Données", description="Ne devrait jamais être notée.", source_label="s",
+            tiers_lieu_id=vrai_lieu.id))
+        rejeter_candidat(store, candidat_a_rejeter.id, "admin@x.org")
+        check("rejet d'une info sur lieu existant : aucune note supplémentaire ajoutée",
+              len(store.get_free_text_notes(vrai_lieu.id)) == notes_avant
+              and "Ne devrait jamais être notée." not in str(store.get_free_text_notes(vrai_lieu.id)))
     print("Tous les tests passent.")
 
 

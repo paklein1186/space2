@@ -117,11 +117,16 @@ class Litige:
 
 @dataclass
 class CandidatLieu:
-    """Lieu proposé par extraction automatique (IA) depuis un document de la
-    base de connaissances — voir agent/extraction_lieux.py. Jamais créé comme
-    lieu directement : reste au statut "propose" jusqu'à ce qu'un admin
-    l'accepte (crée le lieu) ou le rejette, depuis le panneau
-    d'administration."""
+    """Lieu (ou information sur un lieu) proposé par extraction automatique
+    (IA) depuis un document de la base de connaissances — voir
+    agent/extraction_lieux.py. Ne modifie jamais rien directement : reste au
+    statut "propose" jusqu'à ce qu'un admin l'accepte ou le rejette, depuis
+    le panneau d'administration. Deux cas, distingués par tiers_lieu_id :
+    - déjà posé à la proposition (le nom correspond à un lieu déjà recensé) :
+      accepter compile l'info du document en une note sur ce lieu, sans
+      jamais toucher à ses données existantes ;
+    - vide à la proposition (nom inconnu du recensement) : accepter crée un
+      nouveau lieu, et pose alors tiers_lieu_id sur celui-ci."""
 
     nom: str
     description: str
@@ -131,7 +136,7 @@ class CandidatLieu:
     pays: Optional[str] = None
     citation: Optional[str] = None
     statut: str = "propose"  # "propose" | "accepte" | "rejete"
-    tiers_lieu_id: Optional[str] = None  # posé quand accepte
+    tiers_lieu_id: Optional[str] = None
     cree_le: Optional[str] = None
     traite_le: Optional[str] = None
     traite_par: Optional[str] = None

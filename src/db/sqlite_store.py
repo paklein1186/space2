@@ -515,9 +515,9 @@ class SqliteStore(Store):
         candidat_id = candidat.id or str(uuid.uuid4())
         self.conn.execute(
             "insert into candidats_lieux (id, nom, description, source_label, commune, pays, citation, "
-            "statut) values (?, ?, ?, ?, ?, ?, ?, ?)",
+            "statut, tiers_lieu_id) values (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (candidat_id, candidat.nom, candidat.description, candidat.source_label, candidat.commune,
-             candidat.pays, candidat.citation, candidat.statut),
+             candidat.pays, candidat.citation, candidat.statut, candidat.tiers_lieu_id),
         )
         self.conn.commit()
         row = self.conn.execute("select * from candidats_lieux where id = ?", (candidat_id,)).fetchone()

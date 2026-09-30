@@ -131,11 +131,17 @@ def _parser_json(texte_reponse: str, tolerant: bool = False) -> dict:
 
 def extraire_candidats(store: Store, texte: str, source_label: str, client: Optional[Anthropic] = None) -> dict:
     """Analyse `texte` et enregistre les lieux candidats retenus (statut
-    "propose"). Renvoie {"proposes": n, "doublons_ecartes": n, "tronque"?:
-    True, "reponse_tronquee"?: True, "erreur"?: str}."""
+    "propose") : un nouveau lieu (tiers_lieu_id encore vide) si le nom ne
+    correspond à aucun lieu recensé, sinon une info complémentaire pour le
+    lieu déjà recensé (tiers_lieu_id posé dès la proposition, PAS un
+    doublon écarté) — voir accepter_candidat pour ce que chacun devient une
+    fois validé. Renvoie {"proposes": n, "infos_existantes": n,
+    "doublons_ecartes": n, "tronque"?: True, "reponse_tronquee"?: True,
+    "erreur"?: str}. `doublons_ecartes` ne compte que les répétitions du
+    même nom AU SEIN de cette réponse."""
     texte = (texte or "").strip()
     if not texte:
-        return {"proposes": 0, "doublons_ecartes": 0}
+        return {"proposes": 0, "infos_existantes": 0, "doublons_ecartes": 0}
 
     tronque = len(texte) > MAX_CARACTERES_SOURCE
     prompt = PROMPT_TEMPLATE.format(source_label=source_label, texte=texte[:MAX_CARACTERES_SOURCE])
@@ -154,24 +160,31 @@ def extraire_candidats(store: Store, texte: str, source_label: str, client: Opti
     except (json.JSONDecodeError, IndexError) as exc:
         return {"erreur": f"Réponse du modèle illisible : {exc}"}
 
-    noms_existants = {_normaliser_nom(l.nom) for l in store.list_tiers_lieux()}
-    proposes, doublons = 0, 0
+    lieux_existants = {_normaliser_nom(l.nom): l for l in store.list_tiers_lieux()}
+    noms_traites: set = set()
+    proposes, infos_existantes, doublons = 0, 0, 0
     for item in data.get("lieux") or []:
         nom = (item.get("nom") or "").strip()
         if not nom:
             continue
-        if _normaliser_nom(nom) in noms_existants:
+        cle = _normaliser_nom(nom)
+        if cle in noms_traites:
             doublons += 1
             continue
+        noms_traites.add(cle)
+        lieu_existant = lieux_existants.get(cle)
         store.save_candidat_lieu(CandidatLieu(
             nom=nom, description=(item.get("description") or "").strip(), source_label=source_label,
             commune=item.get("commune") or None, pays=item.get("pays") or None,
             citation=(item.get("citation") or "").strip() or None,
+            tiers_lieu_id=lieu_existant.id if lieu_existant else None,
         ))
-        noms_existants.add(_normaliser_nom(nom))  # écarte les doublons entre eux dans la même réponse
-        proposes += 1
+        if lieu_existant:
+            infos_existantes += 1
+        else:
+            proposes += 1
 
-    resultat = {"proposes": proposes, "doublons_ecartes": doublons}
+    resultat = {"proposes": proposes, "infos_existantes": infos_existantes, "doublons_ecartes": doublons}
     if tronque:
         resultat["tronque"] = True
     if reponse_tronquee:
@@ -179,13 +192,37 @@ def extraire_candidats(store: Store, texte: str, source_label: str, client: Opti
     return resultat
 
 
-def accepter_candidat(store: Store, candidat: CandidatLieu, admin_user_id: str):
-    """Crée (ou rattache si le nom existe déjà) le lieu Space2 correspondant
-    à un candidat validé par un admin : synthèse minimale issue du document
-    source, indexée pour la recherche sémantique, note de provenance pour
-    que le lieu concerné puisse la compléter. Jamais publié au Portfolio
-    automatiquement — à la discrétion de l'admin, comme pour tout autre lieu.
-    Renvoie le TiersLieu créé ou rattaché."""
+def _lieu_par_id(store: Store, tiers_lieu_id: str):
+    return next((l for l in store.list_tiers_lieux() if l.id == tiers_lieu_id), None)
+
+
+def compiler_info_lieu_existant(store: Store, candidat: CandidatLieu, admin_user_id: str):
+    """Un candidat dont le nom correspond à un lieu déjà recensé : n'écrit
+    JAMAIS ses données (résumé, coordonnées...), qui appartiennent au lieu
+    concerné — se contente d'ajouter une note citant ce que le document en
+    dit, pour que le lieu/steward la reprenne s'il le juge pertinent. Renvoie
+    le TiersLieu, ou None si ce lieu n'existe plus (supprimé entre-temps)."""
+    lieu = _lieu_par_id(store, candidat.tiers_lieu_id)
+    if lieu is None:
+        return None
+    contributeur = store.get_or_create_contributeur(admin_user_id, lieu.id, "steward")
+    citation = f" Citation : « {candidat.citation} »." if candidat.citation else ""
+    store.save_free_text_note(
+        lieu.id, contributeur.id, "extraction_connaissance",
+        f"Information complémentaire trouvée dans « {candidat.source_label} » : {candidat.description}{citation}",
+    )
+    store.traiter_candidat_lieu(candidat.id, "accepte", lieu.id, admin_user_id)
+    return lieu
+
+
+def creer_lieu_depuis_candidat(store: Store, candidat: CandidatLieu, admin_user_id: str):
+    """Crée (ou rattache si le nom existe déjà — un lieu créé entre
+    l'extraction et cette validation, par exemple) le lieu Space2
+    correspondant à un candidat validé par un admin : synthèse minimale
+    issue du document source, indexée pour la recherche sémantique, note de
+    provenance pour que le lieu concerné puisse la compléter. Jamais publié
+    au Portfolio automatiquement — à la discrétion de l'admin, comme pour
+    tout autre lieu. Renvoie le TiersLieu créé ou rattaché."""
     lieu = store.get_or_create_tiers_lieu(admin_user_id, candidat.nom)
     champs = {}
     if candidat.pays and not lieu.pays:
@@ -227,6 +264,15 @@ def accepter_candidat(store: Store, candidat: CandidatLieu, admin_user_id: str):
     )
     store.traiter_candidat_lieu(candidat.id, "accepte", lieu.id, admin_user_id)
     return lieu
+
+
+def accepter_candidat(store: Store, candidat: CandidatLieu, admin_user_id: str):
+    """Point d'entrée unique pour valider un candidat, quel que soit son
+    type : compile une note sur le lieu déjà recensé s'il y en a un
+    (tiers_lieu_id déjà posé à la proposition), sinon crée un nouveau lieu."""
+    if candidat.tiers_lieu_id:
+        return compiler_info_lieu_existant(store, candidat, admin_user_id)
+    return creer_lieu_depuis_candidat(store, candidat, admin_user_id)
 
 
 def rejeter_candidat(store: Store, candidat_id: str, admin_user_id: str) -> None:
