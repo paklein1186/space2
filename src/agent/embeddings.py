@@ -18,6 +18,11 @@ from voyageai.error import RateLimitError
 
 MODEL = "voyage-multilingual-2"
 BATCH_SIZE = 128
+# Marge sous la limite Voyage de 120 000 tokens par batch — atteinte en
+# pratique bien avant BATCH_SIZE textes sur un document long découpé en
+# chunks de ~1000 caractères (vécu : un guide PDF, 128 chunks ~= 123 000
+# tokens, requête rejetée par Voyage).
+MAX_TOKENS_PAR_LOT = 100_000
 
 _retry_on_rate_limit = retry(
     retry=retry_if_exception_type(RateLimitError),
@@ -42,10 +47,17 @@ class VoyageEmbedder:
     @_retry_on_rate_limit
     def embed_documents(self, texts: list) -> list:
         embeddings: list = []
-        for i in range(0, len(texts), BATCH_SIZE):
-            batch = texts[i : i + BATCH_SIZE]
-            result = self.client.embed(batch, model=MODEL, input_type="document")
-            embeddings.extend(result.embeddings)
+        lot: list = []
+        tokens_lot = 0
+        for texte in texts:
+            tokens_texte = self.client.count_tokens([texte], model=MODEL)
+            if lot and (len(lot) >= BATCH_SIZE or tokens_lot + tokens_texte > MAX_TOKENS_PAR_LOT):
+                embeddings.extend(self.client.embed(lot, model=MODEL, input_type="document").embeddings)
+                lot, tokens_lot = [], 0
+            lot.append(texte)
+            tokens_lot += tokens_texte
+        if lot:
+            embeddings.extend(self.client.embed(lot, model=MODEL, input_type="document").embeddings)
         return embeddings
 
     @_retry_on_rate_limit
