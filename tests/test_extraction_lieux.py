@@ -15,7 +15,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.agent.extraction_lieux import accepter_candidat, compiler_info_lieu_existant, extraire_candidats, rejeter_candidat
+import src.agent.extraction_lieux as extraction_lieux
+from src.agent.extraction_lieux import (accepter_candidat, compiler_info_lieu_existant, extraire_candidats,
+                                        rejeter_candidat, suggerer_lieu_proche)
 from src.db.sqlite_store import SqliteStore
 from src.db.store import CandidatLieu, LieuDerive
 
@@ -236,6 +238,42 @@ def main():
         check("rejet d'une info sur lieu existant : aucune note supplémentaire ajoutée",
               len(store.get_free_text_notes(vrai_lieu.id)) == notes_avant
               and "Ne devrait jamais être notée." not in str(store.get_free_text_notes(vrai_lieu.id)))
+
+        # --- noms qui ne diffèrent que par la ponctuation/les accents : vécu en production ---
+        quatre_quarts = store.get_or_create_tiers_lieu("u1", "Quatre Quarts")
+        la_pile = store.get_or_create_tiers_lieu("u1", "La PILE")
+        jardin = store.get_or_create_tiers_lieu("u1", "Le Jardin des Aubépines")
+        tous_les_lieux = store.list_tiers_lieux()
+
+        check("normalisation : trait d'union = espace (Quatre-Quarts / Quatre Quarts, vécu réel)",
+              extraction_lieux._normaliser_nom("Quatre-Quarts") == extraction_lieux._normaliser_nom("Quatre Quarts"))
+        check("normalisation : accents ignorés (Tiers-Lieux de Vaux-sur-Sure / ...-Sûre)",
+              extraction_lieux._normaliser_nom("Tiers-Lieux de Vaux-sur-Sure")
+              != extraction_lieux._normaliser_nom("Tiers-Lieu de Vaux-sur-Sûre"))  # "Lieux" vs "Lieu" : PAS identiques
+
+        check("suggestion : sous-titre après un tiret (La PILE - Pépinière...) -> La PILE",
+              suggerer_lieu_proche("La PILE - Pépinière d'Initiatives Locales Engagées", tous_les_lieux).id
+              == la_pile.id)
+        check("suggestion : sous-titre entre parenthèses (Jardin des Aubépines (test Modave)) -> Le Jardin...",
+              suggerer_lieu_proche("Jardin des Aubépines (test Modave)", tous_les_lieux).id == jardin.id)
+        check("suggestion : variante de ponctuation pure -> trouvée aussi (utile même hors auto-fusion)",
+              suggerer_lieu_proche("Quatre-Quarts", tous_les_lieux).id == quatre_quarts.id)
+        check("suggestion : nom sans rapport -> aucune suggestion",
+              suggerer_lieu_proche("Un Endroit Totalement Différent", tous_les_lieux) is None)
+        check("suggestion : un nom générique/très court ne déclenche pas un faux positif",
+              suggerer_lieu_proche("La", tous_les_lieux) is None)
+
+        # --- bout en bout : la variante ponctuation n'est plus un doublon créé à tort ---
+        json_ponctuation = (
+            '{"lieux": [{"nom": "Quatre-Quarts", "description": "Tiers-lieu dans une ancienne gare.", '
+            '"commune": null, "pays": null, "citation": "c"}]}'
+        )
+        resultat_ponctuation = extraire_candidats(store, "texte", "un lien", client=FauxClient(json_ponctuation))
+        check("bout en bout : 'Quatre-Quarts' n'est plus proposé comme nouveau lieu (c'est Quatre Quarts)",
+              resultat_ponctuation == {"proposes": 0, "infos_existantes": 1, "doublons_ecartes": 0})
+        candidat_ponctuation = next(c for c in store.list_candidats_lieux("propose") if c.nom == "Quatre-Quarts")
+        check("bout en bout : le candidat pointe directement vers le VRAI lieu déjà recensé",
+              candidat_ponctuation.tiers_lieu_id == quatre_quarts.id)
     print("Tous les tests passent.")
 
 

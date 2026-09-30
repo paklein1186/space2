@@ -4,13 +4,27 @@ lieux nommés mentionnés dans le texte, avec une citation à l'appui. Ne crée
 JAMAIS de lieu directement — chaque candidat reste au statut "propose"
 (CandidatLieu, voir db/store.py) jusqu'à ce qu'un admin l'accepte ou le
 rejette depuis le panneau d'administration (accepter_candidat/rejeter_candidat
-ci-dessous). Un candidat dont le nom ressemble à un lieu déjà recensé est
-écarté avant même d'être proposé, pour ne pas alourdir la relecture."""
+ci-dessous).
+
+Un nom qui correspond à un lieu déjà recensé (une fois la casse, les accents
+et la ponctuation normalisés) n'est jamais reproposé comme nouveau lieu : le
+candidat pointe directement vers ce lieu (tiers_lieu_id), et sa validation
+compile une note plutôt que de créer un doublon — vécu : "Quatre-Quarts"
+(trait d'union) et "Quatre Quarts" (espace, déjà recensé) sont la même
+adresse. Un nom qui RESSEMBLE fortement à un lieu déjà recensé, sans être une
+correspondance certaine (ex. "La PILE - Pépinière d'Initiatives..." pour le
+lieu déjà recensé "La PILE"), n'est PAS fusionné automatiquement — le risque
+de rapprocher deux lieux réellement distincts qui partagent un mot est trop
+réel pour une fusion silencieuse — mais signalé (suggerer_lieu_proche) pour
+qu'un admin tranche en connaissance de cause plutôt que de créer un doublon
+sans le savoir."""
 
 from __future__ import annotations
 
 import json
 import re
+import unicodedata
+from difflib import SequenceMatcher
 from hashlib import sha256
 from typing import Optional
 
@@ -93,8 +107,46 @@ def recomposer_texte_document(source_label: str) -> str:
     return "\n\n".join(d["text"] for d in documents)
 
 
+SEUIL_RATIO_RESSEMBLANCE = 0.72
+LONGUEUR_MIN_COEUR = 6  # sous ce seuil, un cœur de nom est trop générique pour signaler une ressemblance
+
+
 def _normaliser_nom(nom: str) -> str:
-    return re.sub(r"\s+", " ", (nom or "").strip()).casefold()
+    """Sans accents, sans distinction trait d'union/espace/apostrophe : deux
+    noms qui ne diffèrent QUE sur ces points sont la même adresse, pas deux
+    lieux différents (ex. "Quatre-Quarts" / "Quatre Quarts")."""
+    nom = unicodedata.normalize("NFKD", nom or "")
+    nom = "".join(c for c in nom if not unicodedata.combining(c))
+    nom = re.sub(r"[-–—'’]", " ", nom.casefold())
+    return re.sub(r"\s+", " ", nom).strip()
+
+
+def _coeur_nom(nom: str) -> str:
+    """Partie avant un sous-titre explicatif (parenthèse, deux-points, tiret
+    isolé) — ex. « La PILE - Pépinière d'Initiatives... » -> « La PILE »."""
+    return re.split(r"\s+[-–—:]\s+|\s*\(", nom or "", maxsplit=1)[0].strip()
+
+
+def suggerer_lieu_proche(nom: str, lieux_existants: list):
+    """Lieu déjà recensé dont le nom RESSEMBLE fortement à `nom`, sans que la
+    correspondance soit certaine (celle-ci est déjà traitée en amont, voir
+    extraire_candidats) — une simple suggestion pour qu'un admin vérifie
+    avant de créer un nouveau lieu, jamais une fusion automatique : un nom
+    court peut être partagé par deux lieux bien distincts. Renvoie le
+    TiersLieu le plus proche, ou None."""
+    cle, coeur = _normaliser_nom(nom), _normaliser_nom(_coeur_nom(nom))
+    meilleur, meilleur_score = None, 0.0
+    for lieu in lieux_existants:
+        cle_lieu, coeur_lieu = _normaliser_nom(lieu.nom), _normaliser_nom(_coeur_nom(lieu.nom))
+        contient = (len(coeur) >= LONGUEUR_MIN_COEUR and coeur in cle_lieu) or \
+                   (len(coeur_lieu) >= LONGUEUR_MIN_COEUR and coeur_lieu in cle)
+        ratio = SequenceMatcher(None, cle, cle_lieu).ratio()
+        if not (contient or ratio >= SEUIL_RATIO_RESSEMBLANCE):
+            continue
+        score = 1.0 if contient else ratio
+        if score > meilleur_score:
+            meilleur, meilleur_score = lieu, score
+    return meilleur
 
 
 MAX_TOKENS_REPONSE = 8000

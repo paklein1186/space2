@@ -1688,8 +1688,9 @@ def administration_tab(store, user_id: str) -> None:
         if not candidats_lieux_en_attente:
             st.caption("Aucun candidat en attente de validation.")
         else:
-            from src.agent.extraction_lieux import accepter_candidat, rejeter_candidat
+            from src.agent.extraction_lieux import accepter_candidat, rejeter_candidat, suggerer_lieu_proche
 
+            lieux_pour_suggestion = store.list_tiers_lieux()  # une seule lecture pour toute la liste
             for candidat in candidats_lieux_en_attente:
                 lieu_deja_recense = bool(candidat.tiers_lieu_id)
                 with st.container(border=True):
@@ -1698,6 +1699,10 @@ def administration_tab(store, user_id: str) -> None:
                     else:
                         localisation = ", ".join(x for x in (candidat.commune, candidat.pays) if x)
                         st.markdown(f"**🆕 Nouveau lieu : {candidat.nom}**" + (f" — {localisation}" if localisation else ""))
+                        lieu_proche = suggerer_lieu_proche(candidat.nom, lieux_pour_suggestion)
+                        if lieu_proche:
+                            st.warning(f"⚠️ Ressemble à « {lieu_proche.nom} », déjà recensé — vérifiez avant "
+                                      "de créer, pour éviter un doublon (ou rejetez si c'est bien le même lieu).")
                     st.write(candidat.description)
                     if candidat.citation:
                         st.caption(f"« {candidat.citation} »")
