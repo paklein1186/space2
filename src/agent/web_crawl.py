@@ -149,39 +149,72 @@ def _normaliser_url(url: str) -> str:
     return url
 
 
-def fetch_page_text(url: str) -> str:
-    """Récupère le texte visible d'une page (hors script/style/nav/footer),
-    nettoyé des espaces superflus. Lève une exception explicite en cas
-    d'échec réseau/HTTP plutôt que de renvoyer un texte vide silencieux."""
+DOCX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+
+def _extraire_depuis_octets(contenu: bytes, suffix: str) -> str:
+    """Écrit `contenu` dans un fichier temporaire et en extrait le texte via
+    ingest.loaders — même extraction que pour un fichier déposé via
+    st.file_uploader (voir extraire_texte_fichier)."""
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=True) as tmp:
+        tmp.write(contenu)
+        tmp.flush()
+        return extract_text(Path(tmp.name))
+
+
+def _texte_brut_url(url: str) -> str:
+    """Texte brut d'une URL, paragraphes déjà séparés par une ligne vide, quel
+    que soit son type de contenu réel : PDF/docx via l'extraction dédiée
+    (pypdf/python-docx) ; page web via BeautifulSoup (chaque ligne visible
+    devient un paragraphe). Un type de contenu binaire non pris en charge
+    (image, archive, audio...) lève une erreur explicite plutôt que d'être
+    parsé comme du HTML — vécu : un lien vers un PDF de 20 Mo, sa réponse
+    brute (le PDF binaire) interprétée telle quelle comme du HTML faute de
+    détection, avait produit environ 24 500 passages de charabia binaire lors
+    de l'ajout à la base de connaissances, saturant l'API d'embedding et le
+    stockage vectoriel pendant de longues minutes pour un résultat inutilisable."""
     url = _normaliser_url(url)
     response = requests.get(url, timeout=TIMEOUT_S, headers={"User-Agent": USER_AGENT})
     response.raise_for_status()
-    soup = BeautifulSoup(response.text, "html.parser")
-    for tag in soup(["script", "style", "nav", "footer", "noscript"]):
-        tag.decompose()
-    texte = soup.get_text(separator=" ")
-    texte = re.sub(r"\s+", " ", texte).strip()
-    return texte[:MAX_TEXTE_BRUT]
+    content_type = (response.headers.get("content-type") or "").split(";")[0].strip().lower()
+    chemin = url.split("?")[0].lower()
 
+    if content_type == "application/pdf" or chemin.endswith(".pdf"):
+        return _extraire_depuis_octets(response.content, ".pdf")
+    if content_type == DOCX_CONTENT_TYPE or chemin.endswith(".docx"):
+        return _extraire_depuis_octets(response.content, ".docx")
+    if content_type and not (content_type.startswith("text/") or content_type == "application/xhtml+xml"):
+        raise ValueError(
+            f"Type de contenu non pris en charge pour ce lien ({content_type or 'inconnu'}) — "
+            "formats gérés : page web, PDF, docx. Pour un autre format, déposez le fichier directement."
+        )
 
-def fetch_page_text_complet(url: str) -> str:
-    """Comme fetch_page_text, mais SANS tronquer à MAX_TEXTE_BRUT et en
-    conservant une frontière de paragraphe par ligne (chaque ligne non vide
-    devient un paragraphe séparé par une ligne blanche) — nécessaire à
-    chunk_text pour découper correctement. À réserver à l'ingestion d'un
-    document long (rapport, guide) : fetch_page_text seule, en résumant en
-    quelques phrases un texte tronqué à 8000 caractères, avait réduit un
-    rapport de 179 000 caractères documentant 23 accompagnements individuels
-    à un unique paragraphe global — perdant l'essentiel du détail."""
-    url = _normaliser_url(url)
-    response = requests.get(url, timeout=TIMEOUT_S, headers={"User-Agent": USER_AGENT})
-    response.raise_for_status()
     soup = BeautifulSoup(response.text, "html.parser")
     for tag in soup(["script", "style", "nav", "footer", "noscript"]):
         tag.decompose()
     texte = soup.get_text(separator="\n")
     lignes = [re.sub(r"[ \t]+", " ", l).strip() for l in texte.split("\n")]
     return "\n\n".join(l for l in lignes if l)
+
+
+def fetch_page_text(url: str) -> str:
+    """Récupère le texte d'une page ou d'un document (hors script/style/nav/
+    footer pour une page web), nettoyé des espaces superflus. Lève une
+    exception explicite en cas d'échec réseau/HTTP ou de type de contenu non
+    pris en charge, plutôt que de renvoyer un texte vide ou du charabia
+    silencieusement."""
+    texte = re.sub(r"\s+", " ", _texte_brut_url(url)).strip()
+    return texte[:MAX_TEXTE_BRUT]
+
+
+def fetch_page_text_complet(url: str) -> str:
+    """Comme fetch_page_text, mais SANS tronquer à MAX_TEXTE_BRUT — nécessaire
+    à chunk_text pour découper correctement. À réserver à l'ingestion d'un
+    document long (rapport, guide) : fetch_page_text seule, en résumant en
+    quelques phrases un texte tronqué à 8000 caractères, avait réduit un
+    rapport de 179 000 caractères documentant 23 accompagnements individuels
+    à un unique paragraphe global — perdant l'essentiel du détail."""
+    return _texte_brut_url(url)
 
 
 def extraire_texte_fichier(uploaded_file) -> str:
