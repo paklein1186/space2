@@ -221,6 +221,23 @@ def main():
         check("info sur lieu sans synthèse : la note existe malgré tout",
               len(store.get_free_text_notes(lieu_sans_synthese.id)) == 1)
 
+        # --- panneau admin : l'admin choisit un AUTRE lieu que celui rapproché à l'extraction ---
+        autre_lieu = store.get_or_create_tiers_lieu("u1", "Lieu Choisi Par L'Admin")
+        candidat_a_rediriger = store.save_candidat_lieu(CandidatLieu(
+            nom="Un Nom Ambigu", description="Info à rediriger par l'admin.", source_label="s",
+            tiers_lieu_id=vrai_lieu.id))  # rapproché à l'extraction vers vrai_lieu
+        lieu_redirige = compiler_info_lieu_existant(store, candidat_a_rediriger, "admin@x.org",
+                                                     tiers_lieu_id=autre_lieu.id)
+        check("override admin : la note part sur le lieu choisi par l'admin, pas celui rapproché à l'extraction",
+              lieu_redirige.id == autre_lieu.id
+              and any("Info à rediriger" in n["texte"] for n in store.get_free_text_notes(autre_lieu.id))
+              and not any("Info à rediriger" in n["texte"] for n in store.get_free_text_notes(vrai_lieu.id)))
+        check("override admin : fonctionne aussi pour un candidat proposé comme NOUVEAU lieu (tiers_lieu_id vide)",
+              compiler_info_lieu_existant(
+                  store, store.save_candidat_lieu(CandidatLieu(
+                      nom="Candidat Nouveau Redirige", description="d", source_label="s")),
+                  "admin@x.org", tiers_lieu_id=autre_lieu.id).id == autre_lieu.id)
+
         # --- lieu supprimé entre l'extraction et la validation : pas de plantage, candidat laissé "propose" ---
         candidat_orphelin = store.save_candidat_lieu(CandidatLieu(
             nom="Lieu Fantôme", description="d", source_label="s", tiers_lieu_id="id-qui-n-existe-pas"))

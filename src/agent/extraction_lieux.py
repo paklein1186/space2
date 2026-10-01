@@ -292,13 +292,22 @@ def _lieu_par_id(store: Store, tiers_lieu_id: str):
     return next((l for l in store.list_tiers_lieux() if l.id == tiers_lieu_id), None)
 
 
-def compiler_info_lieu_existant(store: Store, candidat: CandidatLieu, admin_user_id: str):
+def compiler_info_lieu_existant(store: Store, candidat: CandidatLieu, admin_user_id: str,
+                                tiers_lieu_id: Optional[str] = None):
     """Un candidat dont le nom correspond à un lieu déjà recensé : n'écrit
     JAMAIS ses données (résumé, coordonnées...), qui appartiennent au lieu
     concerné — se contente d'ajouter une note citant ce que le document en
-    dit, pour que le lieu/steward la reprenne s'il le juge pertinent. Renvoie
-    le TiersLieu, ou None si ce lieu n'existe plus (supprimé entre-temps)."""
-    lieu = _lieu_par_id(store, candidat.tiers_lieu_id)
+    dit, pour que le lieu/steward la reprenne s'il le juge pertinent.
+
+    `tiers_lieu_id` cible explicitement un lieu — utilisé par le panneau
+    admin quand il diffère du rapprochement fait à l'extraction (candidat.
+    tiers_lieu_id, utilisé par défaut si non fourni) : un admin peut choisir
+    un autre lieu que celui suggéré, y compris pour un candidat proposé comme
+    nouveau lieu (tiers_lieu_id alors vide à l'origine).
+
+    Renvoie le TiersLieu, ou None si ce lieu n'existe plus (supprimé
+    entre-temps) ou si aucun lieu cible n'est connu."""
+    lieu = _lieu_par_id(store, tiers_lieu_id or candidat.tiers_lieu_id)
     if lieu is None:
         return None
     contributeur = store.get_or_create_contributeur(admin_user_id, lieu.id, "steward")

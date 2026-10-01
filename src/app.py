@@ -1688,75 +1688,101 @@ def administration_tab(store, user_id: str) -> None:
         if not candidats_lieux_en_attente:
             st.caption("Aucun candidat en attente de validation.")
         else:
-            from src.agent.extraction_lieux import accepter_candidat, rejeter_candidat, suggerer_lieu_proche
+            from src.agent.extraction_lieux import (compiler_info_lieu_existant, creer_lieu_depuis_candidat,
+                                                    rejeter_candidat, suggerer_lieu_proche)
+
+            ACTION_IGNORER = "— Ignorer —"
+            ACTION_CREER = "✅ Accepter (nouveau lieu)"
+            ACTION_MAJ = "🔗 Mettre à jour (lieu existant)"
+            ACTION_REJETER = "❌ Rejeter"
+            SANS_CIBLE = "—"
 
             st.caption(
-                "Cochez, puis une seule action groupée — plus rapide que traiter chaque candidat un par un "
-                "quand il y en a beaucoup. Par défaut, les infos sur des lieux déjà recensés sont précochées "
-                "(risque faible : une note, jamais une donnée écrasée) ; décochez les exceptions."
+                "Pour chaque candidat, choisissez une action, puis « Appliquer » une seule fois — plus "
+                "rapide que traiter chaque candidat un par un quand il y en a beaucoup. Accepter crée un "
+                "nouveau lieu (synthèse minimale tirée du document, PAS publié au Portfolio). Mettre à jour "
+                "ajoute une simple note au lieu choisi dans « Lieu existant », sans jamais toucher à ses "
+                "données. Par défaut, un candidat déjà rapproché d'un lieu par l'IA est préréglé sur Mettre "
+                "à jour, vers ce lieu ; vous pouvez changer le lieu cible, ou choisir Accepter à la place."
             )
+            noms_lieux = sorted(l.nom for l in store.list_tiers_lieux())
             lieux_pour_suggestion = store.list_tiers_lieux()  # une seule lecture pour toute la liste
             lignes_candidats = []
             for candidat in candidats_lieux_en_attente:
                 lieu_deja_recense = bool(candidat.tiers_lieu_id)
                 if lieu_deja_recense:
-                    type_et_cible = f"📎 Existant → {next((l.nom for l in lieux_pour_suggestion if l.id == candidat.tiers_lieu_id), '?')}"
+                    cible = next((l.nom for l in lieux_pour_suggestion if l.id == candidat.tiers_lieu_id), None)
+                    action_defaut = ACTION_MAJ
                 else:
                     lieu_proche = suggerer_lieu_proche(candidat.nom, lieux_pour_suggestion)
-                    type_et_cible = f"⚠️ 🆕 ressemble à « {lieu_proche.nom} »" if lieu_proche else "🆕 Nouveau lieu"
+                    cible = lieu_proche.nom if lieu_proche else None
+                    action_defaut = ACTION_IGNORER
                 localisation = ", ".join(x for x in (candidat.commune, candidat.pays) if x)
                 description = candidat.description + (f" « {candidat.citation} »" if candidat.citation else "")
                 lignes_candidats.append({
-                    "id": candidat.id, "Traiter": lieu_deja_recense, "Type": type_et_cible, "Nom": candidat.nom,
+                    "id": candidat.id, "Action": action_defaut, "Nom": candidat.nom,
+                    "Ressemblance détectée": cible or "", "Lieu existant": cible or SANS_CIBLE,
                     "Localisation": localisation, "Description": description, "Source": candidat.source_label,
                 })
 
             with st.form("form_candidats_lieux"):
                 edite_candidats = st.data_editor(
                     pd.DataFrame(lignes_candidats), key="editor_candidats_lieux", use_container_width=True,
-                    hide_index=True, disabled=["Type", "Nom", "Localisation", "Description", "Source"],
+                    hide_index=True,
+                    disabled=["Nom", "Ressemblance détectée", "Localisation", "Description", "Source"],
                     column_config={
                         "id": None,
-                        "Traiter": st.column_config.CheckboxColumn(required=True),
+                        "Action": st.column_config.SelectboxColumn(
+                            options=[ACTION_IGNORER, ACTION_CREER, ACTION_MAJ, ACTION_REJETER], required=True),
+                        "Lieu existant": st.column_config.SelectboxColumn(options=[SANS_CIBLE] + noms_lieux,
+                                                                          required=True),
+                        "Ressemblance détectée": st.column_config.TextColumn(
+                            help="Lieu déjà recensé que l'IA (ou une simple ressemblance de noms) rapproche "
+                                 "de ce candidat — vide si aucun."),
                         "Description": st.column_config.TextColumn(width="large"),
                     },
                 )
-                col_accepter, col_rejeter = st.columns(2)
-                soumis_accepter = col_accepter.form_submit_button("✅ Accepter la sélection")
-                soumis_rejeter = col_rejeter.form_submit_button("❌ Rejeter la sélection")
+                soumis = st.form_submit_button("Appliquer")
 
-            if soumis_accepter or soumis_rejeter:
-                selection = edite_candidats[edite_candidats["Traiter"]]
-                if selection.empty:
-                    st.warning("Aucun candidat coché.")
-                else:
-                    candidats_par_id = {c.id: c for c in candidats_lieux_en_attente}
-                    crees, notees, rejetes, orphelins = 0, 0, 0, 0
-                    for candidat_id in selection["id"]:
-                        candidat = candidats_par_id[candidat_id]
-                        if soumis_accepter:
-                            lieu = accepter_candidat(admin_store, candidat, user_id)
-                            if lieu is None:
-                                orphelins += 1
-                            elif candidat.tiers_lieu_id:
-                                notees += 1
-                            else:
-                                crees += 1
+            if soumis:
+                candidats_par_id = {c.id: c for c in candidats_lieux_en_attente}
+                crees, notees, rejetes, orphelins, sans_cible = 0, 0, 0, 0, 0
+                for _, ligne in edite_candidats.iterrows():
+                    action = ligne["Action"]
+                    if action == ACTION_IGNORER:
+                        continue
+                    candidat = candidats_par_id[ligne["id"]]
+                    if action == ACTION_REJETER:
+                        rejeter_candidat(admin_store, candidat.id, user_id)
+                        rejetes += 1
+                    elif action == ACTION_CREER:
+                        creer_lieu_depuis_candidat(admin_store, candidat, user_id)
+                        crees += 1
+                    elif action == ACTION_MAJ:
+                        nom_cible = ligne["Lieu existant"]
+                        if nom_cible == SANS_CIBLE:
+                            sans_cible += 1
+                            continue
+                        lieu_cible = next((l for l in lieux_pour_suggestion if l.nom == nom_cible), None)
+                        lieu = compiler_info_lieu_existant(admin_store, candidat, user_id,
+                                                           tiers_lieu_id=lieu_cible.id if lieu_cible else None)
+                        if lieu is None:
+                            orphelins += 1
                         else:
-                            rejeter_candidat(admin_store, candidat.id, user_id)
-                            rejetes += 1
-                    if soumis_accepter:
-                        message = []
-                        if crees:
-                            message.append(f"{crees} lieu(x) créé(s)")
-                        if notees:
-                            message.append(f"{notees} note(s) ajoutée(s)")
-                        if orphelins:
-                            message.append(f"{orphelins} candidat(s) laissé(s) de côté (lieu supprimé depuis)")
-                        st.success(", ".join(message) or "Rien à faire.")
-                    else:
-                        st.success(f"{rejetes} candidat(s) rejeté(s).")
-                    st.rerun()
+                            notees += 1
+                message = []
+                if crees:
+                    message.append(f"{crees} lieu(x) créé(s)")
+                if notees:
+                    message.append(f"{notees} note(s) ajoutée(s)")
+                if rejetes:
+                    message.append(f"{rejetes} candidat(s) rejeté(s)")
+                if sans_cible:
+                    message.append(f"{sans_cible} ignoré(s) (« Mettre à jour » sans lieu choisi)")
+                if orphelins:
+                    message.append(f"{orphelins} candidat(s) laissé(s) de côté (lieu supprimé depuis)")
+                st.success(", ".join(message) if message else "Aucune action choisie.")
+                st.rerun()
 
     with st.expander("Complétion des lieux (profondeur du questionnaire)", expanded=False):
         st.caption(
