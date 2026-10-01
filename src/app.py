@@ -720,10 +720,13 @@ def _fiche_dialog(store, fiche, est_admin: bool, user_id: str):
         # Badinage Artistique, toujours sans point après plusieurs essais
         # manuels le temps de penser à y retourner). Jamais bloquant en cas
         # d'échec (adresse absente ou introuvable) : le lieu reste simplement
-        # sans point, sans rien demander à personne.
+        # sans point, sans rien demander à personne. lieu.commune en repli :
+        # un lieu créé depuis un candidat d'extraction n'a jamais de réponse
+        # « adresse » du tout, seulement sa commune posée directement sur la
+        # fiche (voir extraction_lieux.creer_lieu_depuis_candidat).
         from src.geocoding import geocoder_lieu_admin
 
-        resultat_geo = geocoder_lieu_admin(store, lieu.id, lieu.pays)
+        resultat_geo = geocoder_lieu_admin(store, lieu.id, lieu.pays, commune_connue=lieu.commune)
         st.session_state["fiche_geocodee_lieu_id"] = lieu.id
         if resultat_geo["statut"] == "ok":
             st.rerun()

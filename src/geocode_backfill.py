@@ -6,8 +6,11 @@ fois après migration_010, puis au besoin) :
 Un lieu qui a déjà des coordonnées est traité par reverse-géocodage de ce
 point (commune cohérente avec la position servie) ; sinon, par géocodage (avec
 repli progressif sur une version plus générale de l'adresse, voir
-`geocoding.geocoder_adresse_avec_repli`) de sa réponse « adresse » (qui pose
-aussi ses coordonnées). Une requête par lieu, au plus une par seconde
+`geocoding.geocoder_adresse_avec_repli`) de sa réponse « adresse », ou à
+défaut de sa commune déjà connue (lieu créé depuis un candidat d'extraction :
+jamais de réponse « adresse », seulement une commune posée directement sur la
+fiche — voir `extraction_lieux.creer_lieu_depuis_candidat`) — l'un ou l'autre
+pose aussi les coordonnées. Une requête par lieu, au plus une par seconde
 (politique d'usage de Nominatim).
 
 Pour un diagnostic en lecture seule (quels lieux manquent de coordonnées, et
@@ -35,7 +38,9 @@ def main(force: bool = False) -> None:
     adresses = store.get_public_answers_batch([l.id for l in lieux])
     faits = echecs = 0
     for lieu in lieux:
-        if (lieu.commune or lieu.code_postal) and not force:
+        deja_complet = (lieu.latitude is not None and lieu.longitude is not None
+                        and lieu.commune and lieu.code_postal)
+        if deja_complet and not force:
             continue
         maj = {}
         adresse = (adresses.get(lieu.id) or {}).get("adresse") or ""
@@ -50,7 +55,8 @@ def main(force: bool = False) -> None:
                 if detail and detail.get("code_postal"):
                     maj["code_postal"] = detail["code_postal"]
         else:
-            detail = geocoder_adresse_avec_repli(adresse, lieu.pays)
+            requete = adresse or lieu.commune or ""
+            detail = geocoder_adresse_avec_repli(requete, lieu.pays) if requete else None
             if detail:
                 maj = {k: v for k, v in detail.items() if v is not None}
         time.sleep(PAUSE_S)

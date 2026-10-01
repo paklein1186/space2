@@ -149,13 +149,18 @@ def commune_cp_depuis_coordonnees(latitude: float, longitude: float,
         return None
 
 
-def geocoder_lieu_admin(store, tiers_lieu_id: str, pays: Optional[str] = None) -> dict:
-    """Géocode à la demande un lieu qui n'a jamais eu de coordonnées — un lieu
-    importé (CSV/CommunEcter) sans géo dans la source, ou dont la réponse
-    « adresse » a été enregistrée avant l'auto-géocodage de l'entretien (voir
-    `collecte_tools.save_answer_tool`) : ni l'un ni l'autre ne se rattrape tout
-    seuls. Déclenchement unitaire et immédiat depuis la fiche admin — à la
-    différence de `geocode_backfill`, un script de rattrapage en masse,
+def geocoder_lieu_admin(store, tiers_lieu_id: str, pays: Optional[str] = None,
+                        commune_connue: Optional[str] = None) -> dict:
+    """Géocode à la demande un lieu qui n'a jamais eu de coordonnées. Utilise
+    la réponse « adresse » quand elle existe ; sinon, un lieu créé en
+    acceptant un candidat d'extraction (`creer_lieu_depuis_candidat`) n'en a
+    jamais eu — seule sa commune est connue (posée directement sur la fiche,
+    sans jamais passer par une réponse « adresse ») — d'où `commune_connue`,
+    à défaut géocodée elle-même pour placer au moins le lieu au centre de ce
+    village/cette commune plutôt que nulle part (cas vécu : 13 lieux issus de
+    l'extraction, dont Badinage Artistique, tous sans la moindre réponse
+    « adresse »). Déclenchement unitaire et immédiat depuis la fiche admin —
+    à la différence de `geocode_backfill`, un script de rattrapage en masse,
     limité à une requête Nominatim par seconde sur l'ensemble des lieux.
     Utilise le repli progressif de `geocoder_adresse_avec_repli` (rue mal
     formée → on retombe sur la commune/le village). Pose latitude/longitude
@@ -164,9 +169,10 @@ def geocoder_lieu_admin(store, tiers_lieu_id: str, pays: Optional[str] = None) -
     {"statut": "sans_adresse"} | {"statut": "introuvable"}."""
     adresses = store.get_public_answers_batch([tiers_lieu_id])
     adresse = (adresses.get(tiers_lieu_id) or {}).get("adresse") or ""
-    if not adresse.strip():
+    requete = adresse.strip() or (commune_connue or "").strip()
+    if not requete:
         return {"statut": "sans_adresse"}
-    detail = geocoder_adresse_avec_repli(adresse, pays)
+    detail = geocoder_adresse_avec_repli(requete, pays)
     if not detail:
         return {"statut": "introuvable"}
     store.update_tiers_lieu(tiers_lieu_id, latitude=detail["latitude"], longitude=detail["longitude"])
