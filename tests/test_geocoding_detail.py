@@ -84,6 +84,33 @@ def main():
         check("échec réseau → None, ne lève pas",
               geocoding.geocoder_adresse_detail("Gembloux") is None
               and geocoding.commune_cp_depuis_coordonnees(1, 1) is None)
+
+        # --- repli progressif (rue mal formée -> on retombe sur la commune) ---
+        def faux_get_selectif(reponses):
+            appels = []
+
+            def _get(url, params=None, headers=None, timeout=None):
+                appels.append(params["q"])
+                return types.SimpleNamespace(raise_for_status=lambda: None, json=lambda: reponses.get(params["q"], []))
+            _get.appels = appels
+            return _get
+
+        geocoding.requests.get = faux_get_selectif({"Gembloux, Belgique": [{"lat": "50.56", "lon": "4.69", **be}]})
+        d = geocoding.geocoder_adresse_avec_repli("Rue Bidon 123, 5030, Gembloux", "Belgique")
+        check("repli : rue + code postal inconnus, la commune seule (dernier segment) est trouvée",
+              d == {"latitude": 50.56, "longitude": 4.69, "commune": "Gembloux", "code_postal": "5030"})
+        check("repli : essaie bien l'adresse complète puis chaque niveau intermédiaire avant la commune seule",
+              geocoding.requests.get.appels == [
+                  "Rue Bidon 123, 5030, Gembloux, Belgique", "5030, Gembloux, Belgique", "Gembloux, Belgique"])
+
+        geocoding.requests.get = faux_get_selectif({"Gembloux, Belgique": [{"lat": "50.56", "lon": "4.69", **be}]})
+        geocoding.geocoder_adresse_avec_repli("Gembloux", "Belgique")
+        check("repli : adresse déjà réussie au premier essai -> une seule requête",
+              len(geocoding.requests.get.appels) == 1)
+
+        geocoding.requests.get = faux_get_selectif({})
+        check("repli : aucun niveau ne donne de résultat -> None",
+              geocoding.geocoder_adresse_avec_repli("Rue Bidon 123, 5030, Nulle Part", "Belgique") is None)
     finally:
         geocoding.requests.get = reel
 

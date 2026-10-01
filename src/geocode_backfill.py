@@ -4,16 +4,22 @@ fois après migration_010, puis au besoin) :
     python3 -m src.geocode_backfill [--force]
 
 Un lieu qui a déjà des coordonnées est traité par reverse-géocodage de ce
-point (commune cohérente avec la position servie) ; sinon, par géocodage de sa
-réponse « adresse » (qui pose aussi ses coordonnées). Une requête par lieu, au
-plus une par seconde (politique d'usage de Nominatim)."""
+point (commune cohérente avec la position servie) ; sinon, par géocodage (avec
+repli progressif sur une version plus générale de l'adresse, voir
+`geocoding.geocoder_adresse_avec_repli`) de sa réponse « adresse » (qui pose
+aussi ses coordonnées). Une requête par lieu, au plus une par seconde
+(politique d'usage de Nominatim).
+
+Pour un diagnostic en lecture seule (quels lieux manquent de coordonnées, et
+lesquels ont au moins une adresse à géocoder) : python3 -m src.geocode_diagnostic
+"""
 
 from __future__ import annotations
 
 import sys
 import time
 
-from .geocoding import commune_cp_depuis_coordonnees, geocoder_adresse_detail
+from .geocoding import commune_cp_depuis_coordonnees, geocoder_adresse_avec_repli, geocoder_adresse_detail
 
 PAUSE_S = 1.1
 
@@ -44,7 +50,7 @@ def main(force: bool = False) -> None:
                 if detail and detail.get("code_postal"):
                     maj["code_postal"] = detail["code_postal"]
         else:
-            detail = geocoder_adresse_detail(adresse, lieu.pays)
+            detail = geocoder_adresse_avec_repli(adresse, lieu.pays)
             if detail:
                 maj = {k: v for k, v in detail.items() if v is not None}
         time.sleep(PAUSE_S)

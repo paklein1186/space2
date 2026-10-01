@@ -105,6 +105,26 @@ def geocoder_adresse_detail(adresse: str, pays: Optional[str] = None) -> Optiona
         return None
 
 
+def geocoder_adresse_avec_repli(adresse: str, pays: Optional[str] = None) -> Optional[dict]:
+    """Comme `geocoder_adresse_detail`, mais retente avec des versions de plus
+    en plus générales (segments de tête retirés un à un : typiquement rue,
+    puis code postal, pour ne garder que la commune/le village/le hameau) si
+    l'adresse complète n'est pas reconnue par Nominatim — un numéro ou un nom
+    de rue mal formé fait sinon échouer tout le géocodage alors que la
+    localité seule, elle, est quasi toujours reconnue. Place dans ce cas le
+    lieu au centre de cette localité plutôt que nulle part."""
+    detail = geocoder_adresse_detail(adresse, pays)
+    if detail:
+        return detail
+    segments = [s.strip() for s in adresse.split(",") if s.strip()]
+    for debut in range(1, len(segments)):
+        repli = ", ".join(segments[debut:])
+        detail = geocoder_adresse_detail(repli, pays)
+        if detail:
+            return detail
+    return None
+
+
 def geocoder_adresse(adresse: str, pays: Optional[str] = None) -> Optional[tuple]:
     """Renvoie (latitude, longitude) pour cette adresse, ou None."""
     detail = geocoder_adresse_detail(adresse, pays)
@@ -134,18 +154,19 @@ def geocoder_lieu_admin(store, tiers_lieu_id: str, pays: Optional[str] = None) -
     importé (CSV/CommunEcter) sans géo dans la source, ou dont la réponse
     « adresse » a été enregistrée avant l'auto-géocodage de l'entretien (voir
     `collecte_tools.save_answer_tool`) : ni l'un ni l'autre ne se rattrape tout
-    seuls, d'où ce déclenchement manuel depuis la fiche admin. `geocode_backfill`
-    ne convient pas ici : il saute tout lieu qui a déjà commune/code_postal,
-    même sans latitude/longitude (cas vécu : import CSV avec commune textuelle
-    mais sans colonnes geo.*). Pose latitude/longitude (+ commune/code_postal
-    quand disponibles, sans jamais bloquer dessus) sur le lieu. Renvoie
-    {"statut": "ok", "latitude", "longitude"} | {"statut": "sans_adresse"} |
-    {"statut": "introuvable"}."""
+    seuls. Déclenchement unitaire et immédiat depuis la fiche admin — à la
+    différence de `geocode_backfill`, un script de rattrapage en masse,
+    limité à une requête Nominatim par seconde sur l'ensemble des lieux.
+    Utilise le repli progressif de `geocoder_adresse_avec_repli` (rue mal
+    formée → on retombe sur la commune/le village). Pose latitude/longitude
+    (+ commune/code_postal quand disponibles, sans jamais bloquer dessus) sur
+    le lieu. Renvoie {"statut": "ok", "latitude", "longitude"} |
+    {"statut": "sans_adresse"} | {"statut": "introuvable"}."""
     adresses = store.get_public_answers_batch([tiers_lieu_id])
     adresse = (adresses.get(tiers_lieu_id) or {}).get("adresse") or ""
     if not adresse.strip():
         return {"statut": "sans_adresse"}
-    detail = geocoder_adresse_detail(adresse, pays)
+    detail = geocoder_adresse_avec_repli(adresse, pays)
     if not detail:
         return {"statut": "introuvable"}
     store.update_tiers_lieu(tiers_lieu_id, latitude=detail["latitude"], longitude=detail["longitude"])
