@@ -268,12 +268,48 @@ def main():
             '{"lieux": [{"nom": "Quatre-Quarts", "description": "Tiers-lieu dans une ancienne gare.", '
             '"commune": null, "pays": null, "citation": "c"}]}'
         )
-        resultat_ponctuation = extraire_candidats(store, "texte", "un lien", client=FauxClient(json_ponctuation))
+        client_ponctuation = FauxClient(json_ponctuation)
+        resultat_ponctuation = extraire_candidats(store, "texte", "un lien", client=client_ponctuation)
         check("bout en bout : 'Quatre-Quarts' n'est plus proposé comme nouveau lieu (c'est Quatre Quarts)",
               resultat_ponctuation == {"proposes": 0, "infos_existantes": 1, "doublons_ecartes": 0})
         candidat_ponctuation = next(c for c in store.list_candidats_lieux("propose") if c.nom == "Quatre-Quarts")
         check("bout en bout : le candidat pointe directement vers le VRAI lieu déjà recensé",
               candidat_ponctuation.tiers_lieu_id == quatre_quarts.id)
+
+        # --- rapprochement par la compréhension du modèle (au-delà d'une simple comparaison de texte) ---
+        check("le prompt fournit la liste des lieux déjà recensés, pour que le modèle puisse rapprocher",
+              "Quatre Quarts" in client_ponctuation.prompts[0] and "La PILE" in client_ponctuation.prompts[0])
+
+        json_semantique = (
+            '{"lieux": [{"nom": "Vaux-Hall", "description": "Ancien nom de ce tiers-lieu.", "commune": null, '
+            '"pays": null, "citation": "c", "lieu_existant": "La PILE"}]}'
+        )
+        r_semantique = extraire_candidats(store, "texte", "un document", client=FauxClient(json_semantique))
+        check("rapprochement sémantique : un nom textuellement sans rapport est quand même rattaché",
+              r_semantique == {"proposes": 0, "infos_existantes": 1, "doublons_ecartes": 0})
+        candidat_semantique = next(c for c in store.list_candidats_lieux("propose") if c.nom == "Vaux-Hall")
+        check("rapprochement sémantique : résolu vers le VRAI lieu (par nom exact, pas une supposition)",
+              candidat_semantique.tiers_lieu_id == la_pile.id)
+
+        json_casse = (
+            '{"lieux": [{"nom": "Un Autre Nom", "description": "d", "commune": null, "pays": null, '
+            '"citation": "c", "lieu_existant": "  quatre-quarts  "}]}'
+        )
+        r_casse2 = extraire_candidats(store, "texte", "s", client=FauxClient(json_casse))
+        check("rapprochement : la réponse du modèle est elle-même normalisée (casse, espaces, trait d'union)",
+              r_casse2["infos_existantes"] == 1
+              and next(c for c in store.list_candidats_lieux("propose") if c.nom == "Un Autre Nom").tiers_lieu_id
+              == quatre_quarts.id)
+
+        json_hallucine = (
+            '{"lieux": [{"nom": "Lieu Mystère", "description": "d", "commune": null, "pays": null, '
+            '"citation": "c", "lieu_existant": "Un Lieu Qui N\'Existe Pas Vraiment"}]}'
+        )
+        r_hallucine = extraire_candidats(store, "texte", "s", client=FauxClient(json_hallucine))
+        check("rapprochement halluciné (nom hors de la liste fournie) : jamais suivi aveuglément, traité en nouveau lieu",
+              r_hallucine == {"proposes": 1, "infos_existantes": 0, "doublons_ecartes": 0})
+        check("le candidat hallucine n'est rattaché à AUCUN lieu réel",
+              next(c for c in store.list_candidats_lieux("propose") if c.nom == "Lieu Mystère").tiers_lieu_id is None)
     print("Tous les tests passent.")
 
 

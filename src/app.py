@@ -1690,40 +1690,73 @@ def administration_tab(store, user_id: str) -> None:
         else:
             from src.agent.extraction_lieux import accepter_candidat, rejeter_candidat, suggerer_lieu_proche
 
+            st.caption(
+                "Cochez, puis une seule action groupée — plus rapide que traiter chaque candidat un par un "
+                "quand il y en a beaucoup. Par défaut, les infos sur des lieux déjà recensés sont précochées "
+                "(risque faible : une note, jamais une donnée écrasée) ; décochez les exceptions."
+            )
             lieux_pour_suggestion = store.list_tiers_lieux()  # une seule lecture pour toute la liste
+            lignes_candidats = []
             for candidat in candidats_lieux_en_attente:
                 lieu_deja_recense = bool(candidat.tiers_lieu_id)
-                with st.container(border=True):
-                    if lieu_deja_recense:
-                        st.markdown(f"**📎 Info pour un lieu déjà recensé : {candidat.nom}**")
-                    else:
-                        localisation = ", ".join(x for x in (candidat.commune, candidat.pays) if x)
-                        st.markdown(f"**🆕 Nouveau lieu : {candidat.nom}**" + (f" — {localisation}" if localisation else ""))
-                        lieu_proche = suggerer_lieu_proche(candidat.nom, lieux_pour_suggestion)
-                        if lieu_proche:
-                            st.warning(f"⚠️ Ressemble à « {lieu_proche.nom} », déjà recensé — vérifiez avant "
-                                      "de créer, pour éviter un doublon (ou rejetez si c'est bien le même lieu).")
-                    st.write(candidat.description)
-                    if candidat.citation:
-                        st.caption(f"« {candidat.citation} »")
-                    st.caption(f"Source : {candidat.source_label}")
-                    col_accepter, col_rejeter = st.columns(2)
-                    with col_accepter:
-                        label_accepter = "✅ Ajouter cette note au lieu" if lieu_deja_recense else "✅ Créer ce lieu"
-                        if st.button(label_accepter, key=f"accepter_candidat_{candidat.id}"):
+                if lieu_deja_recense:
+                    type_et_cible = f"📎 Existant → {next((l.nom for l in lieux_pour_suggestion if l.id == candidat.tiers_lieu_id), '?')}"
+                else:
+                    lieu_proche = suggerer_lieu_proche(candidat.nom, lieux_pour_suggestion)
+                    type_et_cible = f"⚠️ 🆕 ressemble à « {lieu_proche.nom} »" if lieu_proche else "🆕 Nouveau lieu"
+                localisation = ", ".join(x for x in (candidat.commune, candidat.pays) if x)
+                description = candidat.description + (f" « {candidat.citation} »" if candidat.citation else "")
+                lignes_candidats.append({
+                    "id": candidat.id, "Traiter": lieu_deja_recense, "Type": type_et_cible, "Nom": candidat.nom,
+                    "Localisation": localisation, "Description": description, "Source": candidat.source_label,
+                })
+
+            with st.form("form_candidats_lieux"):
+                edite_candidats = st.data_editor(
+                    pd.DataFrame(lignes_candidats), key="editor_candidats_lieux", use_container_width=True,
+                    hide_index=True, disabled=["Type", "Nom", "Localisation", "Description", "Source"],
+                    column_config={
+                        "id": None,
+                        "Traiter": st.column_config.CheckboxColumn(required=True),
+                        "Description": st.column_config.TextColumn(width="large"),
+                    },
+                )
+                col_accepter, col_rejeter = st.columns(2)
+                soumis_accepter = col_accepter.form_submit_button("✅ Accepter la sélection")
+                soumis_rejeter = col_rejeter.form_submit_button("❌ Rejeter la sélection")
+
+            if soumis_accepter or soumis_rejeter:
+                selection = edite_candidats[edite_candidats["Traiter"]]
+                if selection.empty:
+                    st.warning("Aucun candidat coché.")
+                else:
+                    candidats_par_id = {c.id: c for c in candidats_lieux_en_attente}
+                    crees, notees, rejetes, orphelins = 0, 0, 0, 0
+                    for candidat_id in selection["id"]:
+                        candidat = candidats_par_id[candidat_id]
+                        if soumis_accepter:
                             lieu = accepter_candidat(admin_store, candidat, user_id)
                             if lieu is None:
-                                st.error("Ce lieu n'existe plus (supprimé depuis) : candidat laissé de côté.")
-                            elif lieu_deja_recense:
-                                st.success(f"Note ajoutée à la fiche de « {lieu.nom} ».")
-                                st.rerun()
+                                orphelins += 1
+                            elif candidat.tiers_lieu_id:
+                                notees += 1
                             else:
-                                st.success(f"« {lieu.nom} » ajouté à l'Annuaire.")
-                                st.rerun()
-                    with col_rejeter:
-                        if st.button("❌ Rejeter", key=f"rejeter_candidat_{candidat.id}"):
+                                crees += 1
+                        else:
                             rejeter_candidat(admin_store, candidat.id, user_id)
-                            st.rerun()
+                            rejetes += 1
+                    if soumis_accepter:
+                        message = []
+                        if crees:
+                            message.append(f"{crees} lieu(x) créé(s)")
+                        if notees:
+                            message.append(f"{notees} note(s) ajoutée(s)")
+                        if orphelins:
+                            message.append(f"{orphelins} candidat(s) laissé(s) de côté (lieu supprimé depuis)")
+                        st.success(", ".join(message) or "Rien à faire.")
+                    else:
+                        st.success(f"{rejetes} candidat(s) rejeté(s).")
+                    st.rerun()
 
     with st.expander("Complétion des lieux (profondeur du questionnaire)", expanded=False):
         st.caption(

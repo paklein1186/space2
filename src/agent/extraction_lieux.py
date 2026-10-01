@@ -44,13 +44,24 @@ hybrides ou espaces concrets NOMMÉS explicitement dans ce texte (par leur nom p
 ajoutés au recensement de la plateforme "Lieux hybrides et territoires" — pas des lieux génériques ou
 hypothétiques donnés en exemple théorique, seulement des lieux réels et identifiés par leur nom.
 
-Pour chacun, donne :
+Voici les lieux DÉJÀ recensés sur la plateforme (nom — commune, pays) :
+{lieux_existants}
+
+Pour chacun des lieux que tu repères dans le texte, donne :
 - nom : le nom exact du lieu tel qu'il apparaît dans le texte
 - description : 1 à 3 phrases résumant ce que le texte en dit (activité, spécificité, ce qui le rend
   pertinent) — uniquement à partir du texte, n'invente rien
 - commune : la commune ou localité mentionnée pour ce lieu, si le texte la précise (sinon null)
 - pays : le pays, si mentionné ou clairement déductible du contexte (sinon null)
 - citation : une courte citation exacte du texte (une phrase) qui justifie l'existence de ce lieu
+- lieu_existant : si ce lieu est en réalité LE MÊME que l'un de ceux déjà recensés listés ci-dessus — même
+  sous un autre nom, une abréviation, une ancienne dénomination, une graphie différente ou formulé
+  autrement —, le nom EXACT de ce lieu existant, copié caractère pour caractère depuis la liste fournie.
+  Base-toi sur le sens et le contexte (même commune, même activité, même historique), pas seulement sur
+  une ressemblance textuelle superficielle : un nom partagé par coïncidence entre deux lieux bien distincts
+  ne doit PAS être rapproché. Si tu as un doute raisonnable, mets null plutôt que de rapprocher à tort —
+  dans le doute, un nouveau lieu proposé par erreur est sans conséquence (un humain le validera), alors
+  qu'un rapprochement erroné pourrait associer l'information d'un lieu à la fiche d'un autre.
 
 N'invente aucun lieu, aucun nom, aucune donnée absente du texte. S'il n'y a aucun lieu nommé identifiable,
 réponds avec une liste vide. Réponds UNIQUEMENT avec un objet JSON {{"lieux": [...]}} au format ci-dessus,
@@ -181,22 +192,47 @@ def _parser_json(texte_reponse: str, tolerant: bool = False) -> dict:
     return {"lieux": []}  # coupé avant le moindre objet complet : rien à récupérer
 
 
+def _lister_lieux_pour_prompt(lieux: list) -> str:
+    if not lieux:
+        return "(aucun lieu recensé pour l'instant)"
+    lignes = []
+    for l in sorted(lieux, key=lambda x: x.nom.lower()):
+        localisation = ", ".join(x for x in (l.commune, l.pays) if x)
+        lignes.append(f"- {l.nom}" + (f" — {localisation}" if localisation else ""))
+    return "\n".join(lignes)
+
+
 def extraire_candidats(store: Store, texte: str, source_label: str, client: Optional[Anthropic] = None) -> dict:
     """Analyse `texte` et enregistre les lieux candidats retenus (statut
-    "propose") : un nouveau lieu (tiers_lieu_id encore vide) si le nom ne
+    "propose") : un nouveau lieu (tiers_lieu_id encore vide) si le lieu ne
     correspond à aucun lieu recensé, sinon une info complémentaire pour le
     lieu déjà recensé (tiers_lieu_id posé dès la proposition, PAS un
     doublon écarté) — voir accepter_candidat pour ce que chacun devient une
-    fois validé. Renvoie {"proposes": n, "infos_existantes": n,
-    "doublons_ecartes": n, "tronque"?: True, "reponse_tronquee"?: True,
-    "erreur"?: str}. `doublons_ecartes` ne compte que les répétitions du
-    même nom AU SEIN de cette réponse."""
+    fois validé.
+
+    Le rapprochement avec un lieu déjà recensé s'appuie sur la compréhension
+    du modèle (la liste des lieux déjà recensés lui est fournie dans le
+    prompt, avec consigne de se fonder sur le sens — un ancien nom, une
+    abréviation, une autre graphie — pas sur une simple ressemblance de
+    surface) plutôt que sur une comparaison de chaînes de caractères : un nom
+    de lieu peut être reformulé de bien des façons dans un document, qu'une
+    comparaison textuelle ne peut pas toutes anticiper. Le nom renvoyé par le
+    modèle n'est accepté que s'il correspond EXACTEMENT (après normalisation)
+    à un lieu de la liste fournie — jamais de confiance aveugle dans un
+    identifiant halluciné.
+
+    Renvoie {"proposes": n, "infos_existantes": n, "doublons_ecartes": n,
+    "tronque"?: True, "reponse_tronquee"?: True, "erreur"?: str}.
+    `doublons_ecartes` ne compte que les répétitions du même nom AU SEIN de
+    cette réponse."""
     texte = (texte or "").strip()
     if not texte:
         return {"proposes": 0, "infos_existantes": 0, "doublons_ecartes": 0}
 
+    lieux_actuels = store.list_tiers_lieux()
     tronque = len(texte) > MAX_CARACTERES_SOURCE
-    prompt = PROMPT_TEMPLATE.format(source_label=source_label, texte=texte[:MAX_CARACTERES_SOURCE])
+    prompt = PROMPT_TEMPLATE.format(source_label=source_label, texte=texte[:MAX_CARACTERES_SOURCE],
+                                    lieux_existants=_lister_lieux_pour_prompt(lieux_actuels))
     client = client or Anthropic(timeout=120.0)
     try:
         response = client.messages.create(model=MODEL, max_tokens=MAX_TOKENS_REPONSE,
@@ -212,7 +248,7 @@ def extraire_candidats(store: Store, texte: str, source_label: str, client: Opti
     except (json.JSONDecodeError, IndexError) as exc:
         return {"erreur": f"Réponse du modèle illisible : {exc}"}
 
-    lieux_existants = {_normaliser_nom(l.nom): l for l in store.list_tiers_lieux()}
+    lieux_par_nom = {_normaliser_nom(l.nom): l for l in lieux_actuels}
     noms_traites: set = set()
     proposes, infos_existantes, doublons = 0, 0, 0
     for item in data.get("lieux") or []:
@@ -224,7 +260,15 @@ def extraire_candidats(store: Store, texte: str, source_label: str, client: Opti
             doublons += 1
             continue
         noms_traites.add(cle)
-        lieu_existant = lieux_existants.get(cle)
+        # Rapprochement choisi par le modèle, résolu UNIQUEMENT par correspondance
+        # exacte contre les vrais lieux fournis dans le prompt (jamais de confiance
+        # aveugle dans un nom halluciné) ; à défaut, repli sur une correspondance
+        # exacte du nom du lieu lui-même (ex. le modèle a oublié de renseigner
+        # lieu_existant alors que le nom repéré est déjà, tel quel, un lieu recensé).
+        nom_rapproche = (item.get("lieu_existant") or "").strip()
+        lieu_existant = lieux_par_nom.get(_normaliser_nom(nom_rapproche)) if nom_rapproche else None
+        if lieu_existant is None:
+            lieu_existant = lieux_par_nom.get(cle)
         store.save_candidat_lieu(CandidatLieu(
             nom=nom, description=(item.get("description") or "").strip(), source_label=source_label,
             commune=item.get("commune") or None, pays=item.get("pays") or None,
