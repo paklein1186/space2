@@ -710,6 +710,23 @@ def _fiche_dialog(store, fiche, est_admin: bool, user_id: str):
         with st.spinner("Mise à jour de la synthèse..."):
             _auto_enrich_one(store, lieu)
         st.session_state["fiche_enrichie_lieu_id"] = lieu.id
+
+    if ((lieu.latitude is None or lieu.longitude is None)
+            and st.session_state.get("fiche_geocodee_lieu_id") != lieu.id):
+        # Comme l'auto-enrichissement ci-dessus : une tentative automatique à
+        # l'ouverture plutôt qu'un bouton à penser à cliquer — un bouton
+        # manuel (sans réseau ni coût LLM, donc rien à économiser) ne faisait
+        # que déplacer le problème sur l'admin au lieu de le résoudre (vécu :
+        # Badinage Artistique, toujours sans point après plusieurs essais
+        # manuels le temps de penser à y retourner). Jamais bloquant en cas
+        # d'échec (adresse absente ou introuvable) : le lieu reste simplement
+        # sans point, sans rien demander à personne.
+        from src.geocoding import geocoder_lieu_admin
+
+        resultat_geo = geocoder_lieu_admin(store, lieu.id, lieu.pays)
+        st.session_state["fiche_geocodee_lieu_id"] = lieu.id
+        if resultat_geo["statut"] == "ok":
+            st.rerun()
     derive = store.get_lieu_derive(lieu.id)
 
     render_fiche_header(store, lieu, derive, nombre_contributeurs=fiche["nombre_contributeurs"])
@@ -741,19 +758,13 @@ def _fiche_dialog(store, fiche, est_admin: bool, user_id: str):
                     st.rerun()
 
     if est_admin and (lieu.latitude is None or lieu.longitude is None):
-        st.warning(t("fiche_dialog.pas_de_point_carto"))
-        if st.button(t("fiche_dialog.geocoder_bouton"), key=f"geocoder_{lieu.id}"):
-            from src.geocoding import geocoder_lieu_admin
-
-            with st.spinner(t("fiche_dialog.geocoder_analyse")):
-                resultat_geo = geocoder_lieu_admin(store, lieu.id, lieu.pays)
-            if resultat_geo["statut"] == "ok":
-                st.success(t("fiche_dialog.geocoder_ok"))
-                st.rerun()
-            elif resultat_geo["statut"] == "sans_adresse":
-                st.info(t("fiche_dialog.geocoder_sans_adresse"))
-            else:
-                st.info(t("fiche_dialog.geocoder_introuvable"))
+        # Le géocodage automatique à l'ouverture (ci-dessus) a déjà été tenté
+        # pour cette fiche — s'il n'y a toujours pas de coordonnées à ce
+        # stade, soit le lieu n'a aucune adresse connue, soit Nominatim ne l'a
+        # pas reconnue même avec repli (voir geocoder_adresse_avec_repli) :
+        # dans les deux cas, rien d'autre à tenter automatiquement tant que
+        # personne ne complète ou corrige l'adresse.
+        st.caption(t("fiche_dialog.pas_de_point_carto"))
 
     if est_admin:
         with st.expander(t("fiche_dialog.ajouter_info_titre")):

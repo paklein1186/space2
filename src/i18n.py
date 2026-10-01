@@ -219,19 +219,8 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "en": "Could not fetch that link: {erreur}",
     },
     "fiche_dialog.pas_de_point_carto": {
-        "fr": "Ce lieu n'a pas encore de point sur la carte (pas de coordonnées connues).",
-        "en": "This space has no point on the map yet (no known coordinates).",
-    },
-    "fiche_dialog.geocoder_bouton": {"fr": "Géocoder ce lieu maintenant", "en": "Geocode this space now"},
-    "fiche_dialog.geocoder_analyse": {"fr": "Géocodage en cours...", "en": "Geocoding..."},
-    "fiche_dialog.geocoder_ok": {"fr": "Coordonnées trouvées et enregistrées.", "en": "Coordinates found and saved."},
-    "fiche_dialog.geocoder_sans_adresse": {
-        "fr": "Aucune adresse connue pour ce lieu : rien à géocoder.",
-        "en": "No known address for this space: nothing to geocode.",
-    },
-    "fiche_dialog.geocoder_introuvable": {
-        "fr": "Adresse connue mais introuvable par le service de géocodage.",
-        "en": "Address known but not found by the geocoding service.",
+        "fr": "Ce lieu n'a pas encore de point sur la carte (adresse absente ou non reconnue).",
+        "en": "This space has no point on the map yet (no address on file, or not recognised).",
     },
 
     "moderation.historique_titre": {"fr": "Historique & modération", "en": "History & moderation"},
