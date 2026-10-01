@@ -188,6 +188,26 @@ TOOL_DEFINITIONS = [
         },
     },
     {
+        "name": "analyser_lien",
+        "description": (
+            "Récupère et analyse une page web pertinente pour CE lieu que le répondant a partagée "
+            "dans la conversation (site du lieu, dépôt git, page OpenCollective, fiche MoviLab...) — "
+            "pas une recherche, une page dont l'URL est déjà connue. Renvoie ce que la page apporte "
+            "de substantiel (resume vide si rien d'exploitable, ex. page de connexion ou erreur). "
+            "Le lien et le résumé sont aussi enregistrés automatiquement (note libre, et lien "
+            "externe du lieu si aucun n'est encore connu) : pas besoin d'appeler save_free_text_note "
+            "en plus pour ça. N'appeler qu'une fois par lien partagé, jamais en boucle."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {"type": "string", "description": "URL exacte partagée par le répondant"},
+                "nom_lieu": {"type": "string", "description": "nom du lieu tel que donné par le répondant"},
+            },
+            "required": ["url", "nom_lieu"],
+        },
+    },
+    {
         "name": "skip_optional_module",
         "description": (
             "À appeler si le répondant décline explicitement de continuer avec "
@@ -589,6 +609,45 @@ class CollecteToolHandler:
                 for h in hits
             ],
         }
+
+    def analyser_lien(self, tool_input: dict) -> dict:
+        """Récupère et résume une page dont le répondant a donné l'URL
+        (site web, git, OpenCollective, MoviLab...) — même pipeline léger
+        (Haiku) que le panneau "Transmettre une source" de l'entretien et le
+        scan admin (voir web_crawl.extraire_essentiel), mais déclenché
+        depuis la conversation elle-même plutôt qu'un widget séparé. Le
+        résumé est systématiquement capturé en note libre, et le lien posé
+        comme `lien_externe` du lieu s'il n'y en a pas déjà un (pas de
+        lieu_derive pour ce lieu, ex. tout début d'entretien ? le lien
+        n'est alors pas encore mémorisé — seule la note l'est, sans
+        bloquer l'entretien pour autant)."""
+        from .web_crawl import NOTE_SECTION_CRAWL, extraire_essentiel, fetch_page_text
+
+        url = tool_input["url"].strip()
+        try:
+            texte_brut = fetch_page_text(url)
+        except Exception as exc:
+            return {"resume": "", "erreur": f"{type(exc).__name__}: {exc}"}
+
+        resume = extraire_essentiel(self.store, self.tiers_lieu_id, tool_input["nom_lieu"], texte_brut,
+                                    f"le lien transmis ({url})")
+        if not resume:
+            return {"resume": "", "enregistre": False}
+
+        self.store.save_free_text_note(
+            self.tiers_lieu_id, self.contributeur_id, NOTE_SECTION_CRAWL,
+            f"Extrait du lien transmis par le répondant ({url}) :\n\n{resume}",
+        )
+        lien_externe_pose = False
+        try:
+            derive = self.store.get_lieu_derive(self.tiers_lieu_id)
+            if derive and not derive.lien_externe:
+                self.store.update_lieu_derive_liens(self.tiers_lieu_id, lien_externe=url,
+                                                     photo_url=derive.photo_url)
+                lien_externe_pose = True
+        except Exception:
+            pass  # bonus, jamais bloquant pour la note déjà enregistrée
+        return {"resume": resume, "enregistre": True, "lien_externe_pose": lien_externe_pose}
 
     def rechercher_web(self, tool_input: dict) -> dict:
         """Recherche web publique (API Brave Search) — voir web_crawl.
