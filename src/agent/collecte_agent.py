@@ -64,6 +64,15 @@ Règles :
   corrige, pas la suggestion brute. Rien de pertinent ? Dis-le simplement
   ("Je pars de zéro pour ce lieu") et n'insiste pas — un seul appel par
   entretien, jamais répété par la suite.
+- Au même moment (dès le nom du lieu connu, juste après `rechercher_connaissances_existantes`),
+  demande PROACTIVEMENT au répondant s'il a un lien à partager sur le lieu — site web, dépôt git,
+  page OpenCollective, fiche MoviLab, ou autre. Ne pose pas ça comme une question de formulaire
+  isolée : amène-la naturellement ("Avant de commencer, avez-vous un site ou une page qui présente
+  le lieu ? Ça m'évitera de vous redemander des infos qui y seraient déjà."). S'il en donne un,
+  appelle `analyser_lien` tout de suite — voir la règle dédiée plus bas pour ce que ça déclenche.
+  Ne pose jamais cette question si un lien pour ce lieu est déjà connu (mentionné dans le résumé de
+  reprise, ou déjà analysé plus tôt dans CETTE conversation) ; sinon, une seule fois par entretien,
+  jamais répétée — s'il n'en a pas, continue simplement, sans insister.
 - Si `rechercher_connaissances_existantes` n'a rien donné de pertinent ET
   qu'une information basique manque encore (adresse, site du lieu), tu peux
   appeler `rechercher_web` (recherche internet) — une seule fois, jamais de
@@ -330,6 +339,14 @@ def opening_message(store, tiers_lieu_id: str, nom_lieu: str = "", contributeur_
     identite += _INSTRUCTIONS_MODE.get(mode_entretien, "")
 
     derive = store.get_lieu_derive(tiers_lieu_id)
+    if derive and derive.lien_externe:
+        # Évite de redemander un lien dès l'ouverture quand un lien externe
+        # est déjà connu pour ce lieu (saisi manuellement, importé via
+        # CommunEcter, ou posé par un précédent analyser_lien) — voir la
+        # règle dédiée dans SYSTEM_PROMPT ("ne pose jamais cette question si
+        # un lien ... est déjà connu").
+        identite += f" Un lien externe est déjà connu pour ce lieu ({derive.lien_externe}) : ne redemande pas de lien en ouverture."
+
     if derive and derive.donnees.get("resume"):
         return (
             f"{identite} Tu reprends l'entretien sur un lieu déjà partiellement documenté. "
