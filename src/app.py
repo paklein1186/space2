@@ -740,6 +740,21 @@ def _fiche_dialog(store, fiche, est_admin: bool, user_id: str):
                     store.update_lieu_derive_liens(lieu.id, nouveau_lien or None, nouvelle_photo or None)
                     st.rerun()
 
+    if est_admin and (lieu.latitude is None or lieu.longitude is None):
+        st.warning(t("fiche_dialog.pas_de_point_carto"))
+        if st.button(t("fiche_dialog.geocoder_bouton"), key=f"geocoder_{lieu.id}"):
+            from src.geocoding import geocoder_lieu_admin
+
+            with st.spinner(t("fiche_dialog.geocoder_analyse")):
+                resultat_geo = geocoder_lieu_admin(store, lieu.id, lieu.pays)
+            if resultat_geo["statut"] == "ok":
+                st.success(t("fiche_dialog.geocoder_ok"))
+                st.rerun()
+            elif resultat_geo["statut"] == "sans_adresse":
+                st.info(t("fiche_dialog.geocoder_sans_adresse"))
+            else:
+                st.info(t("fiche_dialog.geocoder_introuvable"))
+
     if est_admin:
         with st.expander(t("fiche_dialog.ajouter_info_titre")):
             st.caption(t("fiche_dialog.ajouter_info_aide"))

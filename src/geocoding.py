@@ -127,3 +127,30 @@ def commune_cp_depuis_coordonnees(latitude: float, longitude: float,
         return extraire_commune_cp(response.json(), adresse)
     except Exception:
         return None
+
+
+def geocoder_lieu_admin(store, tiers_lieu_id: str, pays: Optional[str] = None) -> dict:
+    """Géocode à la demande un lieu qui n'a jamais eu de coordonnées — un lieu
+    importé (CSV/CommunEcter) sans géo dans la source, ou dont la réponse
+    « adresse » a été enregistrée avant l'auto-géocodage de l'entretien (voir
+    `collecte_tools.save_answer_tool`) : ni l'un ni l'autre ne se rattrape tout
+    seuls, d'où ce déclenchement manuel depuis la fiche admin. `geocode_backfill`
+    ne convient pas ici : il saute tout lieu qui a déjà commune/code_postal,
+    même sans latitude/longitude (cas vécu : import CSV avec commune textuelle
+    mais sans colonnes geo.*). Pose latitude/longitude (+ commune/code_postal
+    quand disponibles, sans jamais bloquer dessus) sur le lieu. Renvoie
+    {"statut": "ok", "latitude", "longitude"} | {"statut": "sans_adresse"} |
+    {"statut": "introuvable"}."""
+    adresses = store.get_public_answers_batch([tiers_lieu_id])
+    adresse = (adresses.get(tiers_lieu_id) or {}).get("adresse") or ""
+    if not adresse.strip():
+        return {"statut": "sans_adresse"}
+    detail = geocoder_adresse_detail(adresse, pays)
+    if not detail:
+        return {"statut": "introuvable"}
+    store.update_tiers_lieu(tiers_lieu_id, latitude=detail["latitude"], longitude=detail["longitude"])
+    try:
+        store.update_tiers_lieu(tiers_lieu_id, commune=detail.get("commune"), code_postal=detail.get("code_postal"))
+    except Exception:
+        pass
+    return {"statut": "ok", "latitude": detail["latitude"], "longitude": detail["longitude"]}

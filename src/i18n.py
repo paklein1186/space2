@@ -218,6 +218,21 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "fr": "Impossible de récupérer ce lien : {erreur}",
         "en": "Could not fetch that link: {erreur}",
     },
+    "fiche_dialog.pas_de_point_carto": {
+        "fr": "Ce lieu n'a pas encore de point sur la carte (pas de coordonnées connues).",
+        "en": "This space has no point on the map yet (no known coordinates).",
+    },
+    "fiche_dialog.geocoder_bouton": {"fr": "Géocoder ce lieu maintenant", "en": "Geocode this space now"},
+    "fiche_dialog.geocoder_analyse": {"fr": "Géocodage en cours...", "en": "Geocoding..."},
+    "fiche_dialog.geocoder_ok": {"fr": "Coordonnées trouvées et enregistrées.", "en": "Coordinates found and saved."},
+    "fiche_dialog.geocoder_sans_adresse": {
+        "fr": "Aucune adresse connue pour ce lieu : rien à géocoder.",
+        "en": "No known address for this space: nothing to geocode.",
+    },
+    "fiche_dialog.geocoder_introuvable": {
+        "fr": "Adresse connue mais introuvable par le service de géocodage.",
+        "en": "Address known but not found by the geocoding service.",
+    },
 
     "moderation.historique_titre": {"fr": "Historique & modération", "en": "History & moderation"},
     "moderation.contributeurs_titre": {"fr": "Contributeurs de ce lieu", "en": "Contributors to this space"},
