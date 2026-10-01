@@ -740,6 +740,27 @@ def _fiche_dialog(store, fiche, est_admin: bool, user_id: str):
                     store.update_lieu_derive_liens(lieu.id, nouveau_lien or None, nouvelle_photo or None)
                     st.rerun()
 
+    if est_admin:
+        with st.expander(t("fiche_dialog.ajouter_info_titre")):
+            st.caption(t("fiche_dialog.ajouter_info_aide"))
+            with st.form(f"ajouter_info_{lieu.id}", clear_on_submit=True):
+                texte_info = st.text_area(t("fiche_dialog.ajouter_info_input"), height=100)
+                if st.form_submit_button(t("fiche_dialog.ajouter_info_bouton")) and texte_info.strip():
+                    from src.agent.web_crawl import ajouter_info_lieu_admin
+
+                    with st.spinner(t("fiche_dialog.ajouter_info_analyse")):
+                        resultat_info = ajouter_info_lieu_admin(store, lieu.id, lieu.nom, user_id, texte_info)
+                    if resultat_info["statut"] == "note_directe":
+                        st.success(t("fiche_dialog.ajouter_info_note_ok"))
+                        st.rerun()
+                    elif resultat_info["statut"] == "lien_analyse":
+                        st.success(t("fiche_dialog.ajouter_info_lien_ok"))
+                        st.rerun()
+                    elif resultat_info["statut"] == "rien_d_utile":
+                        st.info(t("fiche_dialog.ajouter_info_rien"))
+                    else:
+                        st.error(t("fiche_dialog.ajouter_info_erreur", erreur=resultat_info.get("erreur", "")))
+
     with st.expander(t("fiche_dialog.voir_reponses_brutes")):
         for label, entries in fiche["par_champ"].items():
             valeurs = ", ".join(str(e["valeur"]) for e in entries)

@@ -440,3 +440,51 @@ def extraire_et_enregistrer(store: Store, tiers_lieu_id: str, contributeur_id: s
         f"Extrait du site web du lieu ({url}) :\n\n{resume}",
     )
     return "enregistre"
+
+
+NOTE_SECTION_ADMIN = "note_admin"
+_URL_SIMPLE_RE = re.compile(r"^(https?://)?[\w.-]+\.[a-zA-Z]{2,}(/\S*)?$")
+
+
+def ressemble_a_une_url(texte: str) -> bool:
+    """Distingue un lien collé (pas d'espace, forme domaine.tld[/chemin])
+    d'une info libre tapée par un admin — pour router automatiquement vers
+    l'extraction depuis une page (si lien) ou l'enregistrement direct en
+    note (si texte), sans lui demander de préciser lequel."""
+    texte = (texte or "").strip()
+    return bool(texte) and " " not in texte and "\n" not in texte and bool(_URL_SIMPLE_RE.match(texte))
+
+
+def ajouter_info_lieu_admin(store: Store, tiers_lieu_id: str, nom_lieu: str, user_id: str, texte: str,
+                            client=None) -> dict:
+    """Ajoute une info admin sur CE lieu, depuis la fiche (pas l'entretien) :
+    si `texte` ressemble à un lien, le récupère et en extrait l'essentiel
+    (même pipeline léger que `analyser_lien`/le scan admin, voir
+    `extraire_essentiel`) ; sinon l'enregistre tel quel. Dans les deux cas,
+    enregistré comme note libre ; le lien externe du lieu n'est posé que
+    s'il n'y en a pas déjà un (jamais écrasé — voir la même règle dans
+    `collecte_tools.analyser_lien`). Renvoie {"statut": "note_directe" |
+    "lien_analyse" | "rien_d_utile" | "erreur", "resume"?, "erreur"?}."""
+    from ..questionnaire.schema import Role
+
+    contributeur = store.get_or_create_contributeur(user_id, tiers_lieu_id, Role.AUTRE.value)
+    if not ressemble_a_une_url(texte):
+        store.save_free_text_note(tiers_lieu_id, contributeur.id, NOTE_SECTION_ADMIN, texte.strip())
+        return {"statut": "note_directe"}
+
+    url = texte.strip()
+    try:
+        texte_brut = fetch_page_text(url)
+    except Exception as exc:
+        return {"statut": "erreur", "erreur": f"{type(exc).__name__}: {exc}"}
+    resume = extraire_essentiel(store, tiers_lieu_id, nom_lieu, texte_brut, f"le lien transmis ({url})", client=client)
+    if not resume:
+        return {"statut": "rien_d_utile"}
+    store.save_free_text_note(
+        tiers_lieu_id, contributeur.id, NOTE_SECTION_CRAWL,
+        f"Extrait du lien transmis par un admin ({url}) :\n\n{resume}",
+    )
+    derive = store.get_lieu_derive(tiers_lieu_id)
+    if derive and not derive.lien_externe:
+        store.update_lieu_derive_liens(tiers_lieu_id, lien_externe=url, photo_url=derive.photo_url)
+    return {"statut": "lien_analyse", "resume": resume}

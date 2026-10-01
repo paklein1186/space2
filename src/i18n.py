@@ -189,6 +189,35 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "en": "View all raw answers and testimonials",
     },
     "fiche_dialog.temoignages_libres": {"fr": "Témoignages libres", "en": "Free-form testimonials"},
+    "fiche_dialog.ajouter_info_titre": {
+        "fr": "Ajouter une info ou un lien (admin)",
+        "en": "Add info or a link (admin)",
+    },
+    "fiche_dialog.ajouter_info_aide": {
+        "fr": "Collez un lien (site du lieu, dépôt git, OpenCollective, MoviLab...) : la page est "
+              "récupérée et résumée automatiquement. Ou tapez directement une info : elle est "
+              "enregistrée telle quelle. Dans les deux cas, ajouté comme note sur ce lieu — pris en "
+              "compte à la prochaine synthèse.",
+        "en": "Paste a link (the space's website, a git repo, OpenCollective, MoviLab...): the page "
+              "is fetched and summarised automatically. Or type info directly: it's saved as-is. "
+              "Either way, added as a note on this space — picked up at the next synthesis.",
+    },
+    "fiche_dialog.ajouter_info_input": {"fr": "Lien ou info", "en": "Link or info"},
+    "fiche_dialog.ajouter_info_bouton": {"fr": "Analyser et ajouter", "en": "Analyse and add"},
+    "fiche_dialog.ajouter_info_analyse": {"fr": "Analyse en cours...", "en": "Analysing..."},
+    "fiche_dialog.ajouter_info_note_ok": {"fr": "Ajouté comme note sur ce lieu.", "en": "Added as a note on this space."},
+    "fiche_dialog.ajouter_info_lien_ok": {
+        "fr": "Lien analysé et ajouté comme note sur ce lieu.",
+        "en": "Link analysed and added as a note on this space.",
+    },
+    "fiche_dialog.ajouter_info_rien": {
+        "fr": "Rien d'exploitable trouvé sur cette page.",
+        "en": "Nothing usable found on that page.",
+    },
+    "fiche_dialog.ajouter_info_erreur": {
+        "fr": "Impossible de récupérer ce lien : {erreur}",
+        "en": "Could not fetch that link: {erreur}",
+    },
 
     "moderation.historique_titre": {"fr": "Historique & modération", "en": "History & moderation"},
     "moderation.contributeurs_titre": {"fr": "Contributeurs de ce lieu", "en": "Contributors to this space"},
