@@ -1,10 +1,11 @@
-"""geocoder_lieu_admin (geocoding.py) : géocodage à la demande, depuis la
-fiche admin, d'un lieu sans coordonnées — y compris via le repli progressif
-de geocoder_adresse_avec_repli quand l'adresse complète (rue mal formée...)
-n'est pas reconnue mais que la commune seule l'est, et via `commune_connue`
-quand il n'y a même pas de réponse « adresse » du tout (lieu créé depuis un
-candidat d'extraction, voir extraction_lieux.creer_lieu_depuis_candidat).
-Sans réseau.
+"""geocoder_lieu_admin et enregistrer_adresse_admin (geocoding.py) :
+géocodage à la demande, depuis la fiche admin, d'un lieu sans coordonnées —
+y compris via le repli progressif de geocoder_adresse_avec_repli quand
+l'adresse complète (rue mal formée...) n'est pas reconnue mais que la
+commune seule l'est, via `commune_connue` quand il n'y a même pas de réponse
+« adresse » du tout (lieu créé depuis un candidat d'extraction, voir
+extraction_lieux.creer_lieu_depuis_candidat), et via la saisie directe d'une
+adresse par un admin quand ni l'un ni l'autre n'existe. Sans réseau.
 
 Usage : python3 -m tests.test_geocoder_lieu_admin
 """
@@ -17,7 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src import geocoding
-from src.geocoding import geocoder_lieu_admin
+from src.geocoding import enregistrer_adresse_admin, geocoder_lieu_admin
 from src.db.sqlite_store import SqliteStore
 
 
@@ -118,6 +119,34 @@ def main():
             resultat4 = geocoder_lieu_admin(store, lieu_confidentiel.id)
             check("adresse confidentielle : traitée comme absente (sans_adresse)",
                   resultat4 == {"statut": "sans_adresse"})
+
+            # --- un admin saisit directement une adresse (lieu sans rien du tout) ---
+            lieu_saisie = store.get_or_create_tiers_lieu("admin@x.org", "Lieu Saisi Par Admin")
+            geocoding.requests.get = faux_get_selectif({
+                "Rue de la Gare 1, 5030, Gembloux, Belgique": [{
+                    "lat": "50.56", "lon": "4.69",
+                    "address": {"municipality": "Gembloux", "postcode": "5030", "country_code": "be"},
+                }],
+            })
+            resultat_saisie = enregistrer_adresse_admin(
+                store, lieu_saisie.id, "admin@x.org", "Rue de la Gare 1, 5030, Gembloux", pays="Belgique")
+            check("adresse saisie par un admin : géocodée immédiatement",
+                  resultat_saisie == {"statut": "ok", "latitude": 50.56, "longitude": 4.69})
+            check("adresse bien enregistrée comme réponse publique (pas une simple note)",
+                  (store.get_public_answers_batch([lieu_saisie.id]).get(lieu_saisie.id) or {}).get("adresse")
+                  == "Rue de la Gare 1, 5030, Gembloux")
+
+            # --- adresse saisie par un admin mais introuvable : enregistrée
+            #     quand même, pour pouvoir la corriger ensuite ---
+            lieu_saisie_ratee = store.get_or_create_tiers_lieu("admin@x.org", "Lieu Saisi Introuvable")
+            geocoding.requests.get = faux_get([])
+            resultat_saisie_ratee = enregistrer_adresse_admin(
+                store, lieu_saisie_ratee.id, "admin@x.org", "Nulle part du tout")
+            check("adresse saisie introuvable par Nominatim : statut introuvable",
+                  resultat_saisie_ratee == {"statut": "introuvable"})
+            check("mais l'adresse reste enregistrée (corrigeable plus tard)",
+                  (store.get_public_answers_batch([lieu_saisie_ratee.id]).get(lieu_saisie_ratee.id) or {})
+                  .get("adresse") == "Nulle part du tout")
         print("Tous les tests passent.")
     finally:
         geocoding.requests.get = reel

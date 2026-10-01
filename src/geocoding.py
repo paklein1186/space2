@@ -181,3 +181,20 @@ def geocoder_lieu_admin(store, tiers_lieu_id: str, pays: Optional[str] = None,
     except Exception:
         pass
     return {"statut": "ok", "latitude": detail["latitude"], "longitude": detail["longitude"]}
+
+
+def enregistrer_adresse_admin(store, tiers_lieu_id: str, user_id: str, adresse: str,
+                              pays: Optional[str] = None) -> dict:
+    """Un admin saisit directement une adresse sur la fiche, pour un lieu qui
+    n'en a aucune (typiquement un lieu issu d'un candidat d'extraction — voir
+    `geocoder_lieu_admin`) et où personne n'a encore répondu à l'entretien.
+    Enregistrée comme une vraie réponse structurée « adresse » (pas une note
+    libre) : réutilisable comme n'importe quelle autre réponse publique, et
+    immédiatement géocodée. Renvoie le résultat de `geocoder_lieu_admin`
+    ({"statut": "ok", "latitude", "longitude"} | {"statut": "introuvable"} —
+    jamais "sans_adresse", puisqu'une adresse vient justement d'être posée)."""
+    from .questionnaire.schema import Role
+
+    contributeur = store.get_or_create_contributeur(user_id, tiers_lieu_id, Role.AUTRE.value)
+    store.save_answer(tiers_lieu_id, contributeur.id, "adresse", adresse.strip())
+    return geocoder_lieu_admin(store, tiers_lieu_id, pays)

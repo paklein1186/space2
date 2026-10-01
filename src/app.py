@@ -763,11 +763,25 @@ def _fiche_dialog(store, fiche, est_admin: bool, user_id: str):
     if est_admin and (lieu.latitude is None or lieu.longitude is None):
         # Le géocodage automatique à l'ouverture (ci-dessus) a déjà été tenté
         # pour cette fiche — s'il n'y a toujours pas de coordonnées à ce
-        # stade, soit le lieu n'a aucune adresse connue, soit Nominatim ne l'a
-        # pas reconnue même avec repli (voir geocoder_adresse_avec_repli) :
-        # dans les deux cas, rien d'autre à tenter automatiquement tant que
-        # personne ne complète ou corrige l'adresse.
+        # stade, soit le lieu n'a aucune adresse connue (cas le plus courant :
+        # un lieu créé depuis un candidat d'extraction n'a jamais de réponse
+        # « adresse », voir enregistrer_adresse_admin), soit Nominatim ne l'a
+        # pas reconnue même avec repli — dans les deux cas, rien d'autre à
+        # tenter automatiquement sans qu'un admin la saisisse ou la corrige.
         st.caption(t("fiche_dialog.pas_de_point_carto"))
+        adresse_connue = (store.get_public_answers_batch([lieu.id]).get(lieu.id) or {}).get("adresse") or ""
+        with st.form(f"adresse_{lieu.id}"):
+            nouvelle_adresse = st.text_input(t("fiche_dialog.adresse_input"), value=adresse_connue)
+            if st.form_submit_button(t("fiche_dialog.adresse_bouton")) and nouvelle_adresse.strip():
+                from src.geocoding import enregistrer_adresse_admin
+
+                with st.spinner(t("fiche_dialog.geocoder_analyse")):
+                    resultat_adresse = enregistrer_adresse_admin(
+                        store, lieu.id, user_id, nouvelle_adresse, pays=lieu.pays)
+                if resultat_adresse["statut"] == "ok":
+                    st.rerun()
+                else:
+                    st.info(t("fiche_dialog.adresse_introuvable"))
 
     if est_admin:
         with st.expander(t("fiche_dialog.ajouter_info_titre")):

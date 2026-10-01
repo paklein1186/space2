@@ -222,6 +222,13 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "fr": "Ce lieu n'a pas encore de point sur la carte (adresse absente ou non reconnue).",
         "en": "This space has no point on the map yet (no address on file, or not recognised).",
     },
+    "fiche_dialog.adresse_input": {"fr": "Adresse (ou juste la commune)", "en": "Address (or just the town)"},
+    "fiche_dialog.adresse_bouton": {"fr": "Enregistrer et géocoder", "en": "Save and geocode"},
+    "fiche_dialog.geocoder_analyse": {"fr": "Géocodage en cours...", "en": "Geocoding..."},
+    "fiche_dialog.adresse_introuvable": {
+        "fr": "Adresse enregistrée, mais introuvable par le service de géocodage — vérifie l'orthographe.",
+        "en": "Address saved, but not found by the geocoding service — check the spelling.",
+    },
 
     "moderation.historique_titre": {"fr": "Historique & modération", "en": "History & moderation"},
     "moderation.contributeurs_titre": {"fr": "Contributeurs de ce lieu", "en": "Contributors to this space"},
