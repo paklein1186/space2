@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import csv
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
@@ -40,6 +41,13 @@ from src.db.factory import get_admin_store
 from src.questionnaire.schema import Role
 
 OWNER_ID_LOCAL = "import-bdtfl-2026"
+
+# Petite pause entre chaque lieu réellement écrit (jamais sur les lignes déjà
+# traitées, voir import_fichier) — vécu : un run sans pause a saturé la même
+# base Supabase que le site en production pendant que quelqu'un l'utilisait
+# ("ConnectionTerminated" sur l'Annuaire). Un filet de sécurité simple plutôt
+# qu'un vrai débit maîtrisé, le volume ici ne justifie pas plus.
+PAUSE_S = 0.2
 
 # Colonnes d'identité déjà couvertes par import_bdtfl.py (fiche identité) —
 # jamais répétées dans une note thématique.
@@ -133,6 +141,7 @@ def import_fichier(store, owner_user_id: str, chemin: Path) -> int:
         store.save_free_text_note(tiers_lieu.id, contributeur.id, section_id, f"{titre} :\n{note}")
         deja_notes.add(tiers_lieu.id)
         traites += 1
+        time.sleep(PAUSE_S)
         if traites % 200 == 0:
             print(f"... {chemin.name} : {traites}/{len(rows)} lieux traités")
 

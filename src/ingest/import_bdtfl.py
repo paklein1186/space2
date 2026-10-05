@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import csv
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
@@ -30,6 +31,11 @@ from dotenv import load_dotenv
 
 from src.db.factory import get_admin_store
 from src.questionnaire.schema import Role
+
+# Même pause de courtoisie que import_bdtfl_themes.py — un run de ce script
+# a saturé la même base Supabase que le site en production pendant que
+# quelqu'un l'utilisait ("ConnectionTerminated" sur l'Annuaire).
+PAUSE_S = 0.2
 
 OWNER_ID_LOCAL = "import-bdtfl-2026"
 PAYS = "France"  # tout le fichier ne couvre que la France (+ DROM-COM)
@@ -147,6 +153,7 @@ def main():
             continue
         import_row(store, owner_user_id, row)
         traites += 1
+        time.sleep(PAUSE_S)
         if traites % 100 == 0:
             print(f"... {traites}/{len(rows)} lieux traités")
 
