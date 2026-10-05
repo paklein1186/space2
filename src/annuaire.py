@@ -294,6 +294,12 @@ def render_fiche_header(store: Store, lieu, derive, nombre_contributeurs: int | 
                 st.markdown(f"[{t('fiche.lien_externe')}]({derive.lien_externe})")
         else:
             st.info(t("fiche.pas_de_synthese"))
+        if lieu.ctg_entity_id:
+            # ctg_entity_id n'est posé que par POST /lieux/{id}/link (ctg
+            # associe lui-même son entité à ce lieu) : sa présence signifie
+            # déjà que la page existe et est accessible côté ctg, pas besoin
+            # d'une vérification réseau supplémentaire à chaque affichage.
+            st.markdown(f"[{t('fiche.lien_changethegame')}](https://changethegame.xyz/guilds/{lieu.ctg_entity_id})")
 
 
 def render_fiche_sections(store: Store, lieu, derive, montrer_sources: bool = True) -> None:

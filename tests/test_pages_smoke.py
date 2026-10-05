@@ -61,6 +61,7 @@ def main():
         prompt_version="test", model="test", source_hash="hash-test",
     ))
     store.update_portfolio_entry(lieu.id, True, "Campagne de test", "Objectif de test", "contact@test.org")
+    store.update_tiers_lieu(lieu.id, ctg_entity_id="guild_test123")
 
     for page in PAGES:
         at = AppTest.from_file(page, default_timeout=30)
@@ -68,6 +69,10 @@ def main():
             at.query_params["lieu"] = lieu.id
         at.run()
         check(f"{page} : pas d'exception (base peuplée)", not at.exception)
+        if page == "src/pages/3_Fiche.py":
+            rendu = " ".join(md.value for md in at.markdown)
+            check("fiche publique : lien Changethegame avec le bon ctg_entity_id",
+                  "https://changethegame.xyz/guilds/guild_test123" in rendu)
 
     Path(db_path).unlink(missing_ok=True)
     print("\nTous les tests sont passés.")

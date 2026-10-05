@@ -139,6 +139,7 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "en": "No synthesis generated for this space yet.",
     },
     "fiche.lien_externe": {"fr": "🔗 Fiche externe", "en": "🔗 External record"},
+    "fiche.lien_changethegame": {"fr": "🎮 Voir sur Changethegame", "en": "🎮 View on Changethegame"},
     "fiche.sources": {"fr": "Sources", "en": "Sources"},
     "fiche.traduction_en_cours": {"fr": "Traduction...", "en": "Translating..."},
     "fiche.note_libre": {"fr": "Note libre", "en": "Free-form note"},
