@@ -38,6 +38,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from dotenv import load_dotenv
 
 from src.db.factory import get_admin_store
+from src.ingest.import_bdtfl import nettoyer_nom
 from src.questionnaire.schema import Role
 
 OWNER_ID_LOCAL = "import-bdtfl-2026"
@@ -127,7 +128,11 @@ def import_fichier(store, owner_user_id: str, chemin: Path) -> int:
     colonnes = colonnes_significatives(rows, header)
     traites = ignores = 0
     for i, row in enumerate(rows, start=1):
-        nom = (row.get("NOM") or "").strip()
+        # Même nettoyage que import_bdtfl.py (nettoyer_nom) : sans ça, un nom
+        # encadré de guillemets ("Le 97") ne matcherait jamais le lieu déjà
+        # créé par la fiche identité (nom nettoyé là-bas), et créerait un
+        # doublon au lieu d'enrichir le bon lieu.
+        nom = nettoyer_nom(row.get("NOM"))
         if not nom:
             continue
         note = note_theme(row, colonnes)

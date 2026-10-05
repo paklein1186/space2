@@ -74,6 +74,21 @@ def _coordonnee(valeur: str) -> float | None:
         return None
 
 
+def nettoyer_nom(nom: str) -> str:
+    """Retire les guillemets qui encadrent tout le nom (vécu : une partie des
+    répondants a tapé son nom "comme un titre", ex. '"Le 97"' ou "'La
+    Vigie'") — seulement quand ils encadrent le nom ENTIER (même caractère au
+    début et à la fin), jamais une apostrophe faisant partie du nom (ex.
+    "Le Bivouak'") ni un guillemet n'entourant qu'un morceau du nom (ex.
+    "'La Place des Ami.e.s' Plazenn ar Vignoned", où l'apostrophe ne porte
+    que sur un surnom interne). Répété : certains noms sont doublement
+    encadrés (ex. '"Le 97"' après un premier strip() de l'espace)."""
+    nom = (nom or "").strip()
+    while len(nom) >= 2 and nom[0] == nom[-1] and nom[0] in "\"'":
+        nom = nom[1:-1].strip()
+    return nom
+
+
 def _note_complementaire(row: dict) -> str:
     lignes = []
     structure = (row.get("TYPE_STRUCTURE_GEST") or "").strip()
@@ -91,7 +106,7 @@ def _note_complementaire(row: dict) -> str:
 
 
 def import_row(store, owner_user_id: str, row: dict) -> str:
-    nom = row["NOM"].strip()
+    nom = nettoyer_nom(row["NOM"])
     tiers_lieu = store.get_or_create_tiers_lieu(owner_user_id, nom)
 
     region = (row.get("REGION_TL") or "").strip()

@@ -12,7 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.ingest.import_bdtfl import _coordonnee, import_row
+from src.ingest.import_bdtfl import _coordonnee, import_row, nettoyer_nom
 from src.db.sqlite_store import SqliteStore
 from src.questionnaire.schema import Role
 
@@ -37,6 +37,17 @@ def main():
     check("coordonnée '49,438538' -> 49.438538", _coordonnee("49,438538") == 49.438538)
     check("coordonnée vide -> None", _coordonnee("") is None)
     check("coordonnée illisible -> None, ne lève pas", _coordonnee("abc") is None)
+
+    # --- nettoyage des guillemets encadrant tout le nom ---
+    check("guillemets doubles encadrant tout le nom retirés", nettoyer_nom('"Le 97"') == "Le 97")
+    check("apostrophe en fin de nom (pas un guillemet encadrant) conservée",
+          nettoyer_nom("Le Bivouak'") == "Le Bivouak'")
+    check("guillemet n'encadrant qu'un morceau du nom conservé",
+          nettoyer_nom("'La Place des Ami.e.s' Plazenn ar Vignoned ") == "'La Place des Ami.e.s' Plazenn ar Vignoned")
+    check("double encadrement (apostrophes doublées) réduit en un seul passage",
+          nettoyer_nom("''Les Hauts Parleurs''") == "Les Hauts Parleurs")
+    check("nom vide ou None -> chaîne vide", nettoyer_nom("") == "" and nettoyer_nom(None) == "")
+    check("nom sans guillemets inchangé", nettoyer_nom("Le Moulin Vieux") == "Le Moulin Vieux")
 
     with tempfile.TemporaryDirectory() as tmp:
         store = SqliteStore(db_path=str(Path(tmp) / "bdtfl.sqlite3"))
