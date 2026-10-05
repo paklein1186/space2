@@ -129,11 +129,16 @@ class SupabaseStore(Store):
         self.client.table("tiers_lieux").update(fields).eq("id", tiers_lieu_id).execute()
 
     def list_tiers_lieux(self, owner_user_id: Optional[str] = None) -> list:
-        query = self.client.table("tiers_lieux").select("*")
-        if owner_user_id:
-            query = query.eq("owner_user_id", owner_user_id)
-        result = query.execute()
-        return [_to_dataclass(TiersLieu, row) for row in result.data]
+        # _lire_tout : sans pagination, PostgREST tronquait silencieusement à
+        # 1000 lignes (vécu : 3960 lieux réels en prod après l'import BDTFL,
+        # list_tiers_lieux() n'en renvoyait que 1000 partout — Annuaire,
+        # Observatoire, flux ctg — sans la moindre erreur pour le signaler).
+        def requete():
+            q = self.client.table("tiers_lieux").select("*")
+            if owner_user_id:
+                q = q.eq("owner_user_id", owner_user_id)
+            return q.order("id")
+        return [_to_dataclass(TiersLieu, row) for row in _lire_tout(requete)]
 
     def delete_tiers_lieu(self, tiers_lieu_id: str) -> None:
         # Toutes les tables qui référencent tiers_lieu_id sont en "on delete
@@ -398,16 +403,21 @@ class SupabaseStore(Store):
         return _to_dataclass(CandidatLieu, result.data[0])
 
     def list_candidats_lieux(self, statut: Optional[str] = None) -> list:
-        query = self.client.table("candidats_lieux").select("*").order("cree_le", desc=True)
-        if statut:
-            query = query.eq("statut", statut)
+        def requete():
+            # order() sur cree_le seul ne suffit pas à garantir un ordre
+            # stable d'une page à l'autre (deux candidats créés dans le même
+            # instant) — id en départage, comme les autres usages de
+            # _lire_tout dans ce fichier.
+            q = self.client.table("candidats_lieux").select("*").order("cree_le", desc=True).order("id")
+            return q.eq("statut", statut) if statut else q
+
         try:
-            result = query.execute()
+            lignes = _lire_tout(requete)
         except Exception:
             # Table absente avant migration : aucun candidat plutôt qu'un
             # plantage du panneau d'administration dès qu'on l'ouvre.
             return []
-        return [_to_dataclass(CandidatLieu, row) for row in result.data]
+        return [_to_dataclass(CandidatLieu, row) for row in lignes]
 
     def traiter_candidat_lieu(self, candidat_id: str, statut: str,
                                tiers_lieu_id: Optional[str], traite_par: str) -> None:
