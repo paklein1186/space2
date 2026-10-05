@@ -82,8 +82,15 @@ def main():
         traites = import_fichier(store, "import-bdtfl-2026", chemin_csv)
         check("2 lieux traités", traites == 2)
 
+        # --- idempotence : reprise après coupure (ex. httpx.ReadTimeout en
+        #     plein milieu du fichier, vécu en prod) ne doit jamais dupliquer
+        #     une note déjà posée pour ce thème ---
+        traites_reprise = import_fichier(store, "import-bdtfl-2026", chemin_csv)
+        check("relancer le même fichier : 0 nouvelle note (déjà toutes présentes)", traites_reprise == 0)
+
         lieu = store.get_or_create_tiers_lieu("import-bdtfl-2026", "FabLab Test")
         notes = store.get_free_text_notes(lieu.id)
+        check("toujours une seule note après la reprise, jamais de doublon", len(notes) == 1)
         check("une note ajoutée, section_id = import_bdtfl_foncier",
               len(notes) == 1 and notes[0]["section_id"] == "import_bdtfl_foncier")
         check("titre du thème en tête de note, puis le détail", notes[0]["texte"].startswith("Foncier (BDTFL) :\n"))

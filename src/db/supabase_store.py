@@ -447,11 +447,11 @@ class SupabaseStore(Store):
         return result.data
 
     def get_notes_by_section_id(self, section_id: str) -> list:
-        result = (
-            self.client.table("notes_libres").select("*")
-            .eq("section_id", section_id).order("id").execute()
-        )
-        return result.data
+        # _lire_tout : une section d'import en masse (ex. un thème BDTFL,
+        # un par lieu) peut dépasser 1000 lignes — même risque de troncature
+        # silencieuse que list_tiers_lieux.
+        return _lire_tout(lambda: (
+            self.client.table("notes_libres").select("*").eq("section_id", section_id).order("id")))
 
     def update_free_text_note(self, note_id: str, texte: str) -> None:
         self.client.table("notes_libres").update({"texte": texte}).eq("id", note_id).execute()

@@ -110,8 +110,14 @@ def import_fichier(store, owner_user_id: str, chemin: Path) -> int:
         header = reader.fieldnames or []
         rows = list(reader)
 
+    # Idempotent : un lieu qui a déjà une note pour ce thème (ex. reprise
+    # après une coupure réseau en cours de fichier — vécu, httpx.ReadTimeout
+    # après ~600/998 lignes) n'est jamais réécrit, pour ne jamais dupliquer
+    # une note déjà posée (save_free_text_note n'est pas un upsert).
+    deja_notes = {n["tiers_lieu_id"] for n in store.get_notes_by_section_id(section_id)}
+
     colonnes = colonnes_significatives(rows, header)
-    traites = 0
+    traites = ignores = 0
     for i, row in enumerate(rows, start=1):
         nom = (row.get("NOM") or "").strip()
         if not nom:
@@ -120,13 +126,17 @@ def import_fichier(store, owner_user_id: str, chemin: Path) -> int:
         if not note:
             continue
         tiers_lieu = store.get_or_create_tiers_lieu(owner_user_id, nom)
+        if tiers_lieu.id in deja_notes:
+            ignores += 1
+            continue
         contributeur = store.get_or_create_contributeur(owner_user_id, tiers_lieu.id, Role.AUTRE.value)
         store.save_free_text_note(tiers_lieu.id, contributeur.id, section_id, f"{titre} :\n{note}")
+        deja_notes.add(tiers_lieu.id)
         traites += 1
         if traites % 200 == 0:
             print(f"... {chemin.name} : {traites}/{len(rows)} lieux traités")
 
-    print(f"{chemin.name} ({titre}) : {traites} note(s) ajoutée(s).")
+    print(f"{chemin.name} ({titre}) : {traites} note(s) ajoutée(s), {ignores} déjà présente(s) (reprise).")
     return traites
 
 
