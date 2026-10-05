@@ -30,6 +30,19 @@ def _to_dataclass(cls, row: dict):
 
 PAGE = 1000  # plafond de lignes par requête PostgREST
 
+# Taille max d'une liste passée à .in_(...) : PostgREST sérialise le filtre
+# dans la query string de l'URL (?col=in.(id1,id2,...)) — au-delà d'environ
+# 200 UUID (~7 Ko), certains proxies/limites d'URL rejettent la requête.
+# Vécu : l'import du recensement national (4000+ lieux) a fait planter
+# l'Observatoire avec un postgrest.exceptions.APIError dès que la liste de
+# tiers_lieu_ids a dépassé ce qu'un seul .in_(...) pouvait porter.
+_IN_CHUNK = 200
+
+
+def _chunks(valeurs: list, taille: int = _IN_CHUNK):
+    for debut in range(0, len(valeurs), taille):
+        yield valeurs[debut:debut + taille]
+
 
 def creer_client(url: str, key: str) -> Client:
     """Client Supabase en HTTP/1.1 : le client par défaut multiplexe en HTTP/2
@@ -56,6 +69,28 @@ def _lire_tout(fabrique_requete) -> list:
         if len(page) < PAGE:
             return lignes
         debut += PAGE
+
+
+def _lire_tout_en_lots(ids: list, fabrique_requete_pour_lot) -> list:
+    """Comme _lire_tout, pour une requête filtrée par .in_(...) sur `ids` —
+    découpe `ids` en lots d'au plus _IN_CHUNK (sans quoi un seul .in_(...)
+    sur un millier d'ids dépasse ce que PostgREST accepte dans l'URL, voir
+    _IN_CHUNK), et pagine chaque lot normalement. `fabrique_requete_pour_lot
+    (lot)` doit renvoyer une requête NEUVE, triée, filtrée sur ce lot."""
+    lignes = []
+    for lot in _chunks(ids):
+        lignes.extend(_lire_tout(lambda lot=lot: fabrique_requete_pour_lot(lot)))
+    return lignes
+
+
+def _executer_par_lots(ids: list, fabrique_requete_pour_lot) -> list:
+    """Comme _lire_tout_en_lots, pour une requête dont on sait qu'un lot ne
+    renvoie jamais plus de PAGE lignes (pas besoin de paginer en plus de
+    découper) — juste découpée sur `ids` pour la même raison."""
+    lignes = []
+    for lot in _chunks(ids):
+        lignes.extend(fabrique_requete_pour_lot(lot).execute().data)
+    return lignes
 
 
 class SupabaseStore(Store):
@@ -231,12 +266,12 @@ class SupabaseStore(Store):
         if not tiers_lieu_ids:
             return {}
         try:
-            contributeurs_result = (
+            contributeurs_data = _executer_par_lots(tiers_lieu_ids, lambda lot: (
                 self.client.table("contributeurs").select("id,tiers_lieu_id")
-                .in_("tiers_lieu_id", tiers_lieu_ids).eq("bloque", True).execute()
-            )
+                .in_("tiers_lieu_id", lot).eq("bloque", True)
+            ))
             bloques_par_lieu: dict = {}
-            for c in contributeurs_result.data:
+            for c in contributeurs_data:
                 bloques_par_lieu.setdefault(c["tiers_lieu_id"], set()).add(c["id"])
         except Exception:
             # Colonne `bloque` absente avant migration : personne n'est
@@ -244,16 +279,16 @@ class SupabaseStore(Store):
             # voir _contributeurs_bloques).
             bloques_par_lieu = {}
 
-        def requete():
+        def requete_pour_lot(lot):
             q = (self.client.table("reponses")
                  .select("tiers_lieu_id,contributeur_id,champ_id,valeur")
-                 .in_("tiers_lieu_id", tiers_lieu_ids))
+                 .in_("tiers_lieu_id", lot))
             if exclure_confidentiel:
                 q = q.eq("confidentiel", False)
             return q.order("tiers_lieu_id").order("contributeur_id").order("champ_id")
 
         out: dict = {}
-        for r in _lire_tout(requete):
+        for r in _lire_tout_en_lots(tiers_lieu_ids, requete_pour_lot):
             bloques = bloques_par_lieu.get(r["tiers_lieu_id"], set())
             if r["contributeur_id"] in bloques:
                 continue
@@ -263,19 +298,19 @@ class SupabaseStore(Store):
     def get_lieux_avec_confidentiel(self, tiers_lieu_ids: list) -> set:
         if not tiers_lieu_ids:
             return set()
-        lignes = _lire_tout(lambda: (
+        lignes = _lire_tout_en_lots(tiers_lieu_ids, lambda lot: (
             self.client.table("reponses").select("tiers_lieu_id,contributeur_id,champ_id")
-            .in_("tiers_lieu_id", tiers_lieu_ids).eq("confidentiel", True)
+            .in_("tiers_lieu_id", lot).eq("confidentiel", True)
             .order("tiers_lieu_id").order("contributeur_id").order("champ_id")))
         return {r["tiers_lieu_id"] for r in lignes}
 
     def get_public_answers_batch(self, tiers_lieu_ids: list) -> dict:
         if not tiers_lieu_ids:
             return {}
-        lignes = _lire_tout(lambda: (
+        lignes = _lire_tout_en_lots(tiers_lieu_ids, lambda lot: (
             self.client.table("reponses")
             .select("tiers_lieu_id,contributeur_id,champ_id,valeur")
-            .in_("tiers_lieu_id", tiers_lieu_ids)
+            .in_("tiers_lieu_id", lot)
             .eq("confidentiel", False)
             .order("maj_le").order("tiers_lieu_id").order("contributeur_id").order("champ_id")))
         # Bloqués : même sémantique que get_answers (exclusion explicite
@@ -283,10 +318,10 @@ class SupabaseStore(Store):
         # masquer ses réponses, voir _contributeurs_bloques).
         bloques: dict = {}
         try:
-            for c in (
+            for c in _executer_par_lots(tiers_lieu_ids, lambda lot: (
                 self.client.table("contributeurs").select("id,tiers_lieu_id")
-                .in_("tiers_lieu_id", tiers_lieu_ids).eq("bloque", True).execute().data
-            ):
+                .in_("tiers_lieu_id", lot).eq("bloque", True)
+            )):
                 bloques.setdefault(c["tiers_lieu_id"], set()).add(c["id"])
         except Exception:
             bloques = {}
@@ -443,8 +478,9 @@ class SupabaseStore(Store):
     def get_lieu_derive_batch(self, tiers_lieu_ids: list) -> dict:
         if not tiers_lieu_ids:
             return {}
-        result = self.client.table("lieu_derive").select("*").in_("tiers_lieu_id", tiers_lieu_ids).execute()
-        return {row["tiers_lieu_id"]: _to_dataclass(LieuDerive, row) for row in result.data}
+        lignes = _executer_par_lots(tiers_lieu_ids, lambda lot: (
+            self.client.table("lieu_derive").select("*").in_("tiers_lieu_id", lot)))
+        return {row["tiers_lieu_id"]: _to_dataclass(LieuDerive, row) for row in lignes}
 
     def update_lieu_derive_liens(self, tiers_lieu_id: str, lien_externe: Optional[str],
                                   photo_url: Optional[str]) -> None:
@@ -534,8 +570,8 @@ class SupabaseStore(Store):
         ids = [r["tiers_lieu_id"] for r in derive_rows.data]
         if not ids:
             return []
-        result = self.client.table("tiers_lieux").select("*").in_("id", ids).execute()
-        return [_to_dataclass(TiersLieu, row) for row in result.data]
+        lignes = _executer_par_lots(ids, lambda lot: self.client.table("tiers_lieux").select("*").in_("id", lot))
+        return [_to_dataclass(TiersLieu, row) for row in lignes]
 
     def save_campagne_prioritaire(self, campagne: CampagnePrioritaire) -> None:
         payload = {
