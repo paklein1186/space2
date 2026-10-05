@@ -16,7 +16,17 @@ import pandas as pd
 
 from ..agent.objets_ctg import organisations_ctg_dataframe
 from ..db.store import Store
+from ..questionnaire.resolver import completion_stats, country_code_for
 from ..questionnaire.schema import champ_public, get_field  # noqa: F401 (champ_public ré-exporté)
+
+# Un lieu n'est exposé à Changethegame (flux_lieux) qu'à partir de ce seuil
+# de complétion du questionnaire (même mesure que la jauge de progression
+# côté entretien, voir resolver.completion_stats) — en-dessous, seul un
+# lieu "validé" par un vrai contributeur (voir ROLES_VALIDATION_HUMAINE)
+# passe quand même. Sans ce filtre, un import en masse de lieux à peine
+# renseignés (ex. recensement national BDTFL, nom/adresse seulement)
+# inonderait Changethegame de fiches creuses dès sa prochaine synchronisation.
+SEUIL_COMPLETION_CTG = 20
 
 TTL_SECONDES = 300
 
@@ -121,15 +131,35 @@ def construire_datasets(store: Store) -> dict:
 
 
 def flux_lieux(store: Store, updated_since: Optional[str] = None) -> list:
-    """Flux GET /lieux : TOUS les lieux (avec ou sans synthèse publique). Un
-    lieu sans date de mise à jour (pas encore de synthèse publique) est
-    toujours inclus, pour que ctg le crée dès sa première apparition."""
+    """Flux GET /lieux : un lieu jamais encore connu de ctg (pas de
+    ctg_entity_id) n'y entre qu'à partir de SEUIL_COMPLETION_CTG % de
+    complétion, ou s'il est validé par un vrai contributeur même en-dessous
+    (voir ROLES_VALIDATION_HUMAINE) — jamais la totalité brute d'un import
+    en masse à peine renseigné. Un lieu déjà lié à une entité ctg continue
+    toujours d'être tenu à jour quelle que soit sa complétion (le seuil
+    bloque la création, pas la mise à jour)."""
     lieux = store.list_tiers_lieux()
     ids = [lieu.id for lieu in lieux]
     derives = store.get_lieu_derive_batch(ids)
     adresses = store.get_public_answers_batch(ids)
-    profils = [profil_public(lieu, derives.get(lieu.id), (adresses.get(lieu.id) or {}).get("adresse"))
-               for lieu in lieux]
+    reponses_par_contributeur = store.get_all_answers_by_contributeur_batch(ids)
+    valides = store.get_lieux_valides_par_contributeur(ids)
+
+    profils = []
+    for lieu in lieux:
+        # Une entité ctg déjà créée pour ce lieu (ctg l'a lui-même poussé via
+        # PUT /ctg/objects, ou une synchronisation précédente l'a déjà créée)
+        # continue toujours d'être tenue à jour, quelle que soit sa
+        # complétion — le seuil ne bloque que la CRÉATION de nouvelles
+        # entités pour des lieux jamais encore connus de ctg.
+        if not lieu.ctg_entity_id and lieu.id not in valides:
+            reponses: dict = {}
+            for rep in (reponses_par_contributeur.get(lieu.id) or {}).values():
+                reponses.update(rep)
+            pourcentage = completion_stats(reponses, None, country_code_for(reponses.get("pays")))["pourcentage"]
+            if pourcentage < SEUIL_COMPLETION_CTG:
+                continue
+        profils.append(profil_public(lieu, derives.get(lieu.id), (adresses.get(lieu.id) or {}).get("adresse")))
     if updated_since:
         profils = [p for p in profils if not p["updated_at"] or str(p["updated_at"]) > updated_since]
     return profils

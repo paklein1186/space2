@@ -41,6 +41,13 @@ class Contributeur:
     bloque_par: Optional[str] = None
 
 
+# Rôles qui comptent comme une vraie personne ayant pris une fiche en main —
+# "autre" est le rôle utilisé par les imports en masse (CSV/CommunEcter/
+# BDTFL), jamais choisi par un vrai contributeur. Voir
+# Store.get_lieux_valides_par_contributeur.
+ROLES_VALIDATION_HUMAINE = ["fondateur", "equipe", "steward"]
+
+
 @dataclass
 class SessionEntretien:
     id: str
@@ -451,6 +458,18 @@ class Store(ABC):
     def list_contributeurs(self, tiers_lieu_id: str) -> list:
         """Tous les contributeurs (tous rôles) d'un lieu, avec leur statut de
         blocage — pour l'écran d'historique/modération d'un lieu."""
+        ...
+
+    @abstractmethod
+    def get_lieux_valides_par_contributeur(self, tiers_lieu_ids: list) -> set:
+        """tiers_lieu_id des lieux où au moins un contributeur réel (rôle
+        fondateur, équipe ou steward — jamais "autre", le rôle utilisé par
+        les imports en masse type CSV/CommunEcter/BDTFL) s'est déjà
+        manifesté : signal qu'une vraie personne a pris la fiche en main,
+        au-delà d'un import automatique. Utilisé pour décider quels lieux
+        sont assez avancés pour être exposés à Changethegame (voir
+        public_data.flux_lieux) — un lieu "validé" par un contributeur l'est
+        même sous le seuil de complétion."""
         ...
 
     @abstractmethod

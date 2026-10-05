@@ -49,6 +49,12 @@ def main():
         store = SqliteStore(db_path=str(Path(tmp) / "ctg.sqlite3"))
         lieu = store.get_or_create_tiers_lieu("u1", "Lieu Un")
         sans_synthese = store.get_or_create_tiers_lieu("u1", "Lieu Sans Synthèse")
+        # Pas encore de synthèse (donc pas de updated_at) mais un vrai steward
+        # s'en occupe déjà : passe le seuil de complétion via la validation
+        # humaine (voir ROLES_VALIDATION_HUMAINE), pas via le pourcentage —
+        # sans ça ce lieu, légitimement vide pour tester updated_since=None,
+        # serait aussi exclu du flux par le filtre anti-import-en-masse.
+        store.get_or_create_contributeur("c2", sans_synthese.id, "fondateur")
         store.save_lieu_derive(LieuDerive(
             tiers_lieu_id=lieu.id, donnees={"resume": "SECRET_INTERNE dans la synthèse interne"},
             profil_semantique_texte="p", prompt_version="v1", model="m", source_hash="h"))
@@ -84,7 +90,8 @@ def main():
         check("flux sans secret → 401", http.get("/lieux").status_code == 401)
         flux = http.get("/lieux", headers=h).json()["lieux"]
         par_nom = {p["tiers_lieu"]: p for p in flux}
-        check("flux : tous les lieux, même sans synthèse", set(par_nom) == {"Lieu Un", "Lieu Sans Synthèse"})
+        check("flux : les deux lieux validés par un vrai contributeur, même sans synthèse",
+              set(par_nom) == {"Lieu Un", "Lieu Sans Synthèse"})
         check("flux : synthèse publique", par_nom["Lieu Un"]["resume"] == "Résumé public.")
         check("flux : jamais la synthèse interne", "SECRET_INTERNE" not in str(flux))
         check("flux : campagne absente hors Portfolio", par_nom["Lieu Un"]["campagne"] is None)
@@ -95,6 +102,43 @@ def main():
         check("updated_since passé : les deux",
               len(http.get("/lieux", params={"updated_since": "2000-01-01"}, headers=h).json()["lieux"]) == 2)
         check("date de mise à jour renseignée", bool(recent))
+
+        # --- seuil de complétion anti-import-en-masse (voir SEUIL_COMPLETION_CTG) ---
+        importe_vide = store.get_or_create_tiers_lieu("import-service", "Lieu Importé Vide")
+        flux_sans_vide = {p["tiers_lieu"] for p in http.get("/lieux", headers=h).json()["lieux"]}
+        check("lieu tout juste importé, aucune réponse, jamais lié à ctg : absent du flux",
+              "Lieu Importé Vide" not in flux_sans_vide)
+
+        c_autre = store.get_or_create_contributeur("import-service", importe_vide.id, "autre")
+        quelques_champs = publics[:1] + [interne]
+        for f in quelques_champs:
+            store.save_answer(importe_vide.id, c_autre.id, f.id, "une valeur")
+        check("quelques réponses mais rôle 'autre' (import en masse), sous le seuil : toujours absent",
+              "Lieu Importé Vide" not in
+              {p["tiers_lieu"] for p in http.get("/lieux", headers=h).json()["lieux"]})
+
+        tous_les_champs = [f for f in champs if f.id not in {q.id for q in quelques_champs}]
+        for f in tous_les_champs:
+            valeur = ["x"] if f.type.value == "multi_choice" else True if f.type.value == "boolean" else "une valeur"
+            try:
+                store.save_answer(importe_vide.id, c_autre.id, f.id, valeur)
+            except Exception:
+                pass
+        check("quasi tous les champs répondus (≥ seuil), toujours rôle 'autre' : apparaît dans le flux",
+              "Lieu Importé Vide" in
+              {p["tiers_lieu"] for p in http.get("/lieux", headers=h).json()["lieux"]})
+
+        importe_valide = store.get_or_create_tiers_lieu("import-service", "Lieu Importé Mais Revendiqué")
+        store.get_or_create_contributeur("vrai-user", importe_valide.id, "steward")
+        check("aucune réponse mais revendiqué par un steward : apparaît quand même (validation humaine)",
+              "Lieu Importé Mais Revendiqué" in
+              {p["tiers_lieu"] for p in http.get("/lieux", headers=h).json()["lieux"]})
+
+        importe_lie_ctg = store.get_or_create_tiers_lieu("import-service", "Lieu Importé Déjà Lié Ctg")
+        store.update_tiers_lieu(importe_lie_ctg.id, ctg_entity_id="guild_deja_connu")
+        check("aucune réponse mais déjà lié à une entité ctg : continue d'être synchronisé",
+              "Lieu Importé Déjà Lié Ctg" in
+              {p["tiers_lieu"] for p in http.get("/lieux", headers=h).json()["lieux"]})
 
         # --- lien ---
         check("lien : lieu inconnu → 404",

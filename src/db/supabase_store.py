@@ -9,6 +9,7 @@ from typing import Optional
 from supabase import Client, create_client
 
 from .store import (
+    ROLES_VALIDATION_HUMAINE,
     CampagnePrioritaire,
     CandidatLieu,
     ConversationBibliotheque,
@@ -693,6 +694,15 @@ class SupabaseStore(Store):
     def list_contributeurs(self, tiers_lieu_id: str) -> list:
         result = self.client.table("contributeurs").select("*").eq("tiers_lieu_id", tiers_lieu_id).execute()
         return [_to_dataclass(Contributeur, row) for row in result.data]
+
+    def get_lieux_valides_par_contributeur(self, tiers_lieu_ids: list) -> set:
+        if not tiers_lieu_ids:
+            return set()
+        lignes = _executer_par_lots(tiers_lieu_ids, lambda lot: (
+            self.client.table("contributeurs").select("tiers_lieu_id")
+            .in_("tiers_lieu_id", lot).in_("role", ROLES_VALIDATION_HUMAINE)
+        ))
+        return {r["tiers_lieu_id"] for r in lignes}
 
     def set_contributeur_bloque(self, contributeur_id: str, bloque: bool,
                                  bloque_par: Optional[str] = None) -> None:

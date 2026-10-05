@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Optional
 
 from .store import (
+    ROLES_VALIDATION_HUMAINE,
     CampagnePrioritaire,
     CandidatLieu,
     ConversationBibliotheque,
@@ -784,6 +785,18 @@ class SqliteStore(Store):
             "select * from contributeurs where tiers_lieu_id = ?", (tiers_lieu_id,)
         ).fetchall()
         return [Contributeur(**{**dict(r), "bloque": bool(r["bloque"])}) for r in rows]
+
+    def get_lieux_valides_par_contributeur(self, tiers_lieu_ids: list) -> set:
+        if not tiers_lieu_ids:
+            return set()
+        placeholders = ",".join("?" * len(tiers_lieu_ids))
+        roles_placeholders = ",".join("?" * len(ROLES_VALIDATION_HUMAINE))
+        rows = self.conn.execute(
+            f"select distinct tiers_lieu_id from contributeurs "
+            f"where tiers_lieu_id in ({placeholders}) and role in ({roles_placeholders})",
+            [*tiers_lieu_ids, *ROLES_VALIDATION_HUMAINE],
+        ).fetchall()
+        return {r["tiers_lieu_id"] for r in rows}
 
     def set_contributeur_bloque(self, contributeur_id: str, bloque: bool,
                                  bloque_par: Optional[str] = None) -> None:
