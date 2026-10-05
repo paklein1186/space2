@@ -7,8 +7,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.agent.rag_tools import RagToolHandler
+from src.agent.rag_tools import RagToolHandler, lieux_enrichis_dataframe
 from src.db.sqlite_store import SqliteStore
+from src.db.store import LieuDerive
 from src.questionnaire.schema import Role
 
 
@@ -65,6 +66,21 @@ def main():
             "params": {"by": ["champ_id"], "target_column": "tiers_lieu"},
         })
         check("groupby_count renvoie un compte par champ", result_groupby["result"].get("milieu") == 3)
+
+        # --- space2_id/ctg_entity_id : pour que l'assistant RAG puisse lier
+        #     vers la fiche du lieu (/fiche?lieu=<space2_id>) plutôt que de
+        #     ne citer qu'un nom sans possibilité d'y accéder directement ---
+        store.save_lieu_derive(LieuDerive(
+            tiers_lieu_id=lieu1.id, donnees={"resume": "Un tiers-lieu rural."},
+            profil_semantique_texte="p", prompt_version="v", model="m", source_hash="h"))
+        store.update_tiers_lieu(lieu1.id, ctg_entity_id="guild_abc123")
+        enrichis = lieux_enrichis_dataframe(store).set_index("tiers_lieu")
+        check("space2_id présent et correct", enrichis.loc["Le Hangar", "space2_id"] == lieu1.id)
+        check("ctg_entity_id présent et correct", enrichis.loc["Le Hangar", "ctg_entity_id"] == "guild_abc123")
+
+        from src.agent.rag_agent import SYSTEM_PROMPT, URL_BASE_APP
+        check("consigne de lien cliquable vers la fiche, avec la vraie URL de base",
+              "space2_id" in SYSTEM_PROMPT and f"{URL_BASE_APP}/fiche?lieu=" in SYSTEM_PROMPT)
 
         print("\nTous les tests sont passés.")
 

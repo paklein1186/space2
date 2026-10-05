@@ -150,6 +150,11 @@ def lieux_enrichis_dataframe(store: Store) -> pd.DataFrame:
             "tiers_lieu": lieu.nom, "pays": lieu.pays, "region": lieu.region,
             "commune": lieu.commune, "code_postal": lieu.code_postal,
             "latitude": lieu.latitude, "longitude": lieu.longitude,
+            # space2_id : pour que l'assistant RAG puisse construire un lien
+            # cliquable vers la fiche du lieu (/fiche?lieu=<id>, déjà la page
+            # publique utilisée par le bouton "Partager") plutôt que de ne
+            # citer qu'un nom sans possibilité d'y accéder directement.
+            "space2_id": lieu.id, "ctg_entity_id": lieu.ctg_entity_id,
         }
         row.update(derive.donnees)
         rows.append(row)

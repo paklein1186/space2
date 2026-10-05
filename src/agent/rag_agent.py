@@ -6,6 +6,7 @@ les deux partagent le même store et donc les mêmes données collectées.
 from __future__ import annotations
 
 import json
+import os
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
@@ -14,6 +15,12 @@ from anthropic import Anthropic
 from .caching import apply_single_cache_breakpoint, cached_system, to_plain_content
 from .rag_tools import TOOL_DEFINITIONS, RagToolHandler
 from .usage import log_usage
+
+# Même constante que src/app.py (URL_BASE_APP) — dupliquée plutôt
+# qu'importée : app.py exécute st.set_page_config()/load_dotenv() à
+# l'import, donc rien dans src/app.py n'est importable ailleurs (voir la
+# même contrainte pour les fonctions testables de ce projet).
+URL_BASE_APP = os.environ.get("URL_BASE_APP", "https://space2.streamlit.app")
 
 SYSTEM_PROMPT = """Tu es l'assistant d'analyse de la plateforme "Lieux hybrides et territoires".
 Tu réponds en français à des questions sur les tiers-lieux recensés, en t'appuyant sur :
@@ -49,6 +56,13 @@ Cite systématiquement tes sources (nom du lieu, nom de fichier, ou "données co
 l'entretien") sous ta réponse. Si l'information demandée n'est vraiment pas trouvable après
 avoir réellement interrogé les tools (pas juste consulté leur description), dis-le
 clairement plutôt que de deviner.
+""" + f"""
+Quand tu cites un lieu précis par son nom (via `lieux_enrichis`, ou `reponses_tiers_lieux` en \
+retrouvant son `space2_id` dans `lieux_enrichis` par son nom), transforme TOUJOURS sa mention \
+en lien markdown cliquable vers sa fiche plutôt que du texte brut — \
+[Nom du lieu]({URL_BASE_APP}/fiche?lieu=<space2_id>) — pour que la personne puisse l'ouvrir en \
+un clic. Ne fais jamais ça pour un lieu dont tu n'as pas le space2_id exact (ne devine ni \
+n'invente jamais un id).
 """
 
 
