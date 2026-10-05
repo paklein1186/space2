@@ -191,8 +191,31 @@ Règles :
   avec une fenêtre de temps limitée) : explique en une phrase que le réseau
   mène une collecte ciblée en ce moment, puis traite ces questions avant de
   revenir au fil normal de l'entretien — sans que ça paraisse pour autant
-  plus formel que le reste de la conversation.
+  plus formel que le reste de la conversation. Le message de clôture envoyé
+  quand cette campagne est terminée (`cloture_campagne`) n'a jamais besoin
+  de ta part : il est restitué tel quel automatiquement, pas par toi.
 """
+
+
+def _message_cloture_depuis_resultats(raw_results: list) -> "str | None":
+    """Le message de clôture d'une campagne (voir CollecteToolHandler.
+    _section_cloture_campagne) est restitué tel quel, sans jamais dépendre de
+    ce que le modèle choisirait de dire ou d'omettre à ce tour-ci — vécu,
+    même avec une consigne système explicite référençant ces mêmes clés, le
+    modèle reformulait ou sautait carrément ce message pour enchaîner sur
+    autre chose (ex. une question sur le site web restée en suspens).
+    Cherche le marqueur au premier niveau de chaque résultat d'outil, ou
+    niché dans son "next_section" (cas de save_answer sur le dernier champ
+    d'une campagne, qui renvoie la clôture directement en next_section)."""
+    for result in raw_results:
+        if not isinstance(result, dict):
+            continue
+        if result.get("cloture_campagne"):
+            return result.get("a_dire_maintenant")
+        next_section = result.get("next_section")
+        if isinstance(next_section, dict) and next_section.get("cloture_campagne"):
+            return next_section.get("a_dire_maintenant")
+    return None
 
 
 class CollecteAgent:
@@ -248,10 +271,18 @@ class CollecteAgent:
                     yield "\n\n*(Message interrompu — trop long à générer d'un coup.)*"
                 return
 
-            self.messages.append({"role": "user", "content": self._executer_tool_uses(tool_uses)})
+            tool_results, raw_results = self._executer_tool_uses(tool_uses)
+            self.messages.append({"role": "user", "content": tool_results})
 
-    def _executer_tool_uses(self, tool_uses: list) -> list:
+            cloture = _message_cloture_depuis_resultats(raw_results)
+            if cloture is not None:
+                self.messages.append({"role": "assistant", "content": [{"type": "text", "text": cloture}]})
+                yield cloture
+                return
+
+    def _executer_tool_uses(self, tool_uses: list) -> tuple:
         tool_results = []
+        raw_results = []
         for tu in tool_uses:
             # Une exception non rattrapée ici laisse le message assistant
             # courant sans tool_result correspondant, ce qui corrompt
@@ -261,12 +292,13 @@ class CollecteAgent:
                 result = self.tool_handler.execute(tu.name, tu.input)
             except Exception as exc:
                 result = {"error": f"{type(exc).__name__}: {exc}"}
+            raw_results.append(result)
             tool_results.append({
                 "type": "tool_result",
                 "tool_use_id": tu.id,
                 "content": json.dumps(result, ensure_ascii=False, default=str),
             })
-        return tool_results
+        return tool_results, raw_results
 
     def _run_until_text(self) -> str:
         while True:
@@ -293,14 +325,24 @@ class CollecteAgent:
                     texte += "\n\n*(Message interrompu — trop long à générer d'un coup.)*"
                 return texte
 
-            self.messages.append({"role": "user", "content": self._executer_tool_uses(tool_uses)})
+            tool_results, raw_results = self._executer_tool_uses(tool_uses)
+            self.messages.append({"role": "user", "content": tool_results})
+
+            cloture = _message_cloture_depuis_resultats(raw_results)
+            if cloture is not None:
+                self.messages.append({"role": "assistant", "content": [{"type": "text", "text": cloture}]})
+                return cloture
 
 
 _INSTRUCTIONS_MODE = {
     "campagne": (
         " Le répondant a choisi de commencer par la campagne prioritaire en cours plutôt que "
         "par l'histoire complète du lieu — get_current_section te la proposera directement, "
-        "mentionne-le brièvement avant la première question de cette campagne."
+        "mentionne-le brièvement avant la première question de cette campagne. Si un site web est "
+        "déjà connu ou vient d'être transmis (analyser_lien), appuie-toi sur ce qu'il raconte pour "
+        "cadrer tes questions avec un angle plus spécifique plutôt que de les poser à froid, et "
+        "restitue brièvement ce que tu en retiens avant d'enchaîner — sinon, demande le lien tôt "
+        "dans l'échange pour pouvoir t'en servir."
     ),
     "besoins": (
         " Le répondant a choisi de commencer par exprimer les besoins actuels du lieu (pour les "

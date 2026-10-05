@@ -262,6 +262,11 @@ class CollecteToolHandler:
                            if f.id not in self._priority_field_ids]
             self._priority_field_ids = besoins_ids + self._priority_field_ids
         self._priority_active: bool = bool(self._priority_field_ids)
+        # Le message de clôture de campagne (voir _section_cloture_campagne)
+        # ne doit être montré qu'une seule fois par session, même si
+        # get_current_section est rappelé plusieurs fois après l'épuisement
+        # de la file prioritaire.
+        self._cloture_affichee: bool = False
         # Questions "libre::" (collées par un admin, hors schéma) répondues
         # pendant CETTE session — sans schéma derrière, get_answers() ne les
         # verra jamais (réponse capturée en note libre, pas en reponses
@@ -343,13 +348,51 @@ class CollecteToolHandler:
             return champ_id in self._libres_repondues
         return answers.get(champ_id) is not None
 
+    def _section_cloture_campagne(self) -> dict:
+        """Section synthétique à un seul passage (zéro champ), renvoyée une
+        fois quand une campagne prioritaire (mode "campagne" uniquement — pas
+        "besoins", qui réutilise le même mécanisme de file prioritaire sans
+        être une vraie campagne à clôturer) vient d'être entièrement
+        répondue. `intro` combine le message propre à la campagne (configuré
+        par l'admin) ou un repli générique, plus un rappel fixe toujours
+        ajouté : continuer à nourrir sa fiche aide à mieux cerner les
+        obstacles du lieu pour lui acheminer les bonnes ressources, et la
+        Bibliothèque peut inspirer par l'exemple."""
+        campagnes = [c for c in self.store.get_active_campagnes_prioritaires() if c.message_cloture]
+        message = campagnes[0].message_cloture if campagnes else (
+            "Merci, vous avez répondu à toutes les questions prioritaires de cette campagne."
+        )
+        coda = (" Vous pouvez aussi continuer à compléter votre fiche au-delà de ces questions — ça "
+                "nous aide à mieux cerner vos obstacles et défis, pour vous acheminer les ressources "
+                "pertinentes au plus vite. La Bibliothèque peut aussi être utile pour creuser le "
+                "secteur et découvrir des exemples inspirants.")
+        texte_cloture = message + coda
+        return {
+            "module_id": PRIORITY_MODULE_ID, "module_title": "Collecte prioritaire", "module_optional": False,
+            "section_id": PRIORITY_MODULE_ID, "section_title": "Campagne terminée",
+            "intro": texte_cloture, "fields": [],
+            # Marqueur dédié, distinct de "intro" (un champ que l'agent voit
+            # sur toute section, facilement traité comme un simple élément de
+            # contexte parmi d'autres) : un indicateur de haut niveau, plus
+            # difficile à manquer qu'une inférence sur fields vide + module_id
+            # — voir la consigne dédiée dans SYSTEM_PROMPT (vécu : sans ce
+            # marqueur explicite, l'agent passait régulièrement à autre chose,
+            # ex. une question en attente, sans jamais restituer ce message).
+            "cloture_campagne": True,
+            "a_dire_maintenant": texte_cloture,
+        }
+
     def _priority_section(self) -> Optional[dict]:
         """Section synthétique construite à la volée à partir des campagnes
         prioritaires actives — pas une modification du schéma statique."""
         answers = self._current_answers()
         restants = [cid for cid in self._priority_field_ids if not self._priority_field_done(cid, answers)]
         if not restants:
+            cloture = self._priority_active and self.mode_entretien == "campagne" and not self._cloture_affichee
             self._priority_active = False
+            if cloture:
+                self._cloture_affichee = True
+                return self._section_cloture_campagne()
             return None
         fields = []
         for champ_id in restants:
@@ -377,7 +420,15 @@ class CollecteToolHandler:
                 "required": f.required, "help_text": f.help_text, "max_choices": f.max_choices,
             })
         if not fields:
+            # Tout ce qui restait est devenu définitivement inactif (ex. une
+            # condition jamais satisfaite, comme "participants" si dispo =
+            # "Non") plutôt que répondu un par un — même traitement de
+            # clôture que l'épuisement normal ci-dessus.
+            cloture = self._priority_active and self.mode_entretien == "campagne" and not self._cloture_affichee
             self._priority_active = False
+            if cloture:
+                self._cloture_affichee = True
+                return self._section_cloture_campagne()
             return None
         return {
             "module_id": PRIORITY_MODULE_ID,
@@ -502,9 +553,19 @@ class CollecteToolHandler:
 
         if self._priority_active and champ_id in self._priority_field_ids:
             section = self._priority_section()
-            result = {"saved": True, "champ_id": champ_id, "section_complete": section is None}
+            # section peut être None (épuisement normal) OU la section de
+            # clôture à un seul passage (fields=[]) — dans les deux cas plus
+            # rien à demander côté priorité, mais la clôture doit être
+            # transmise telle quelle (elle porte le message) plutôt que
+            # resollicitée via get_current_section, qui la sauterait
+            # puisque _priority_active vient d'être mis à False par l'appel
+            # ci-dessus.
+            exhausted = section is None or not section["fields"]
+            result = {"saved": True, "champ_id": champ_id, "section_complete": exhausted}
             if section is None:
                 result["next_section"] = self.get_current_section({})
+            elif not section["fields"]:
+                result["next_section"] = section
             return result
 
         section = get_section(self._module_id, self._section_id)

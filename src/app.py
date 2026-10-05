@@ -1376,6 +1376,12 @@ def administration_tab(store, user_id: str) -> None:
                      "ponctuelle propre à cette campagne. L'agent les posera comme les autres, et "
                      "la réponse sera capturée en note libre pour le lieu concerné.",
             )
+            message_cloture = st.text_area(
+                "Message de clôture (optionnel)",
+                help="Affiché une seule fois par l'agent quand tous les champs de cette campagne sont "
+                     "répondus — avant d'enchaîner normalement sur le reste de l'entretien. Laissez "
+                     "vide pour un message générique.",
+            )
             col1, col2 = st.columns(2)
             with col1:
                 date_debut = st.date_input("Début")
@@ -1391,6 +1397,7 @@ def administration_tab(store, user_id: str) -> None:
                     admin_store.save_campagne_prioritaire(CampagnePrioritaire(
                         titre=titre, description=description or None, champ_ids=tous_champ_ids,
                         date_debut=date_debut.isoformat(), date_fin=date_fin.isoformat(), cree_par=user_id,
+                        message_cloture=message_cloture or None,
                     ))
                     st.success("Campagne créée.")
                     st.rerun()

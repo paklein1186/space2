@@ -97,6 +97,10 @@ class CampagnePrioritaire:
     description: Optional[str] = None
     cree_par: Optional[str] = None
     cree_le: Optional[str] = None
+    # Affiché une fois (voir CollecteToolHandler._priority_section) quand tous
+    # les champs de cette campagne sont répondus — None = message générique
+    # de repli, pas de texte propre à cette campagne.
+    message_cloture: Optional[str] = None
 
 
 @dataclass

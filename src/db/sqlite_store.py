@@ -105,7 +105,8 @@ create table if not exists campagnes_prioritaires (
     date_debut text not null,
     date_fin text not null,
     cree_par text,
-    cree_le text not null default (datetime('now'))
+    cree_le text not null default (datetime('now')),
+    message_cloture text
 );
 create table if not exists journal_modifications (
     id text primary key,
@@ -700,13 +701,14 @@ class SqliteStore(Store):
     def save_campagne_prioritaire(self, campagne: CampagnePrioritaire) -> None:
         self.conn.execute(
             "insert into campagnes_prioritaires (id, titre, description, champ_ids, date_debut, "
-            "date_fin, cree_par) values (?, ?, ?, ?, ?, ?, ?) "
+            "date_fin, cree_par, message_cloture) values (?, ?, ?, ?, ?, ?, ?, ?) "
             "on conflict(id) do update set titre = excluded.titre, description = excluded.description, "
-            "champ_ids = excluded.champ_ids, date_debut = excluded.date_debut, date_fin = excluded.date_fin",
+            "champ_ids = excluded.champ_ids, date_debut = excluded.date_debut, date_fin = excluded.date_fin, "
+            "message_cloture = excluded.message_cloture",
             (
                 campagne.id or str(uuid.uuid4()), campagne.titre, campagne.description,
                 json.dumps(campagne.champ_ids, ensure_ascii=False), campagne.date_debut,
-                campagne.date_fin, campagne.cree_par,
+                campagne.date_fin, campagne.cree_par, campagne.message_cloture,
             ),
         )
         self.conn.commit()
@@ -720,6 +722,7 @@ class SqliteStore(Store):
                 id=d["id"], titre=d["titre"], description=d["description"],
                 champ_ids=json.loads(d["champ_ids"]), date_debut=d["date_debut"],
                 date_fin=d["date_fin"], cree_par=d["cree_par"], cree_le=d["cree_le"],
+                message_cloture=d["message_cloture"],
             ))
         return result
 

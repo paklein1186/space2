@@ -51,7 +51,7 @@ class FieldType(str, Enum):
     SCALE_1_5 = "scale_1_5"
 
 
-Operator = str  # "eq" | "in" | "contains" | "truthy" | "ne"
+Operator = str  # "eq" | "in" | "contains" | "contains_any" | "truthy" | "ne"
 
 
 @dataclass(frozen=True)
@@ -77,6 +77,12 @@ class Condition:
         if self.operator == "contains":
             # `current` est une liste (multi_choice) qui doit contenir `value`
             return isinstance(current, (list, tuple, set)) and self.value in current
+        if self.operator == "contains_any":
+            # `current` (multi_choice) doit contenir au moins une des valeurs
+            # de `self.value` — ex. "fundraising" n'est posé que si
+            # `eco_coince` contient "Accès au financement" OU "Investissement
+            # / foncier", pas besoin des deux à la fois.
+            return isinstance(current, (list, tuple, set)) and bool(set(current) & set(self.value))
         raise ValueError(f"Opérateur de condition inconnu: {self.operator}")
 
 
@@ -249,10 +255,6 @@ BANDE_INTENSITE = [
     "Nul (0%)", "Limité (< 25%)", "Peu élevé (25 à 50%)", "Assez élevé (50 à 75%)", "Très élevé (> 75%)",
 ]
 
-# Réutilisée par diagnostic_besoins_futurs ET learning_expedition_europe (les
-# besoins associés à un futur axe de développement sont la même taxonomie
-# que les besoins d'accompagnement généraux — pas de raison d'avoir deux
-# listes différentes pour la même notion).
 OPTIONS_SOUTIEN_ACCOMPAGNEMENT = [
     "Plan financier et pérennisation", "Gouvernance / gestion de collectif", "Médiation de conflits",
     "Repenser l'organisationnel et les processus de décision", "Communication",
@@ -925,57 +927,43 @@ section_diagnostic_besoins_futurs = Section(
     ],
 )
 
-section_learning_expedition = Section(
-    id="learning_expedition_europe",
-    title="Programme — Learning Expedition Europe",
-    intro="Un appel à candidatures est en cours pour une learning expedition entre tiers-lieux à travers l'Europe.",
+section_expedition_ka122 = Section(
+    id="expedition_ka122",
+    title="Programme — Spaces for Life (KA122 Mobilité)",
+    intro="Un appel à candidatures est en cours pour une learning expedition de 4 jours entre tiers-lieux "
+          "à travers l'Europe, en Bourgogne (France) en mai 2027 (programme Erasmus+ KA122).",
     fields=[
-        Field("interet_learning_expedition",
-              "Seriez-vous intéressé·e à déposer un dossier de candidature pour participer à une "
-              "learning expedition entre tiers-lieux en Europe ?", FieldType.SINGLE_CHOICE,
-              options=["Oui, je souhaite déposer un dossier", "Pas pour l'instant", "Je ne sais pas encore"]),
-        Field("candidat_referent", "Qui serait la personne référente pour ce dossier (nom, fonction) ?",
-              FieldType.TEXT,
-              condition=Condition("interet_learning_expedition", "eq", "Oui, je souhaite déposer un dossier")),
-        Field("candidat_motivation",
-              "En quelques mots, qu'espérez-vous retirer de cette learning expedition pour votre lieu ?",
-              FieldType.TEXTAREA,
-              condition=Condition("interet_learning_expedition", "eq", "Oui, je souhaite déposer un dossier")),
-        Field("candidat_experience_internationale",
-              "Votre équipe a-t-elle déjà une expérience d'échange avec des tiers-lieux à l'étranger ?",
-              FieldType.BOOLEAN,
-              condition=Condition("interet_learning_expedition", "eq", "Oui, je souhaite déposer un dossier")),
-        Field("candidat_disponibilite",
-              "Sur quelle période votre équipe serait-elle disponible pour ce déplacement ?", FieldType.TEXT,
-              condition=Condition("interet_learning_expedition", "eq", "Oui, je souhaite déposer un dossier")),
-        # Deuxième palier, hiérarchisé sous les 4 questions ci-dessus (le
-        # dossier minimal) : approfondir n'est proposé qu'à qui le souhaite,
-        # plutôt que d'allonger le dossier de base pour tout le monde.
-        Field("candidat_approfondir_dossier",
-              "Souhaitez-vous dès à présent détailler davantage votre candidature (quelques questions "
-              "supplémentaires) ? Vous pourrez aussi le faire plus tard.", FieldType.BOOLEAN,
-              condition=Condition("interet_learning_expedition", "eq", "Oui, je souhaite déposer un dossier")),
-        Field("candidat_cooperations_actuelles",
-              "Décrivez brièvement vos coopérations territoriales actuelles : avec qui, sur quoi ?",
-              FieldType.TEXTAREA,
-              help_text="Complète ce qui est déjà connu via les partenariats déclarés (section "
-                        "Partenariats territoriaux) — inutile de tout relister, l'idée est de mettre en "
-                        "avant ce qui est le plus pertinent pour une learning expedition.",
-              condition=Condition("candidat_approfondir_dossier", "eq", True)),
-        Field("candidat_perennite",
-              "En quoi votre lieu est-il aujourd'hui pérenne, ou vise-t-il à le devenir ? Qu'est-ce qui "
-              "vous rend confiant·e (ou non) sur la durabilité du projet ?", FieldType.TEXTAREA,
-              help_text="Peut faire écho à ce qui a déjà été dit sur les difficultés financières ou la "
-                        "dépendance à un financeur unique (section Modèle économique).",
-              condition=Condition("candidat_approfondir_dossier", "eq", True)),
-        Field("candidat_angle_deploiement",
-              "Quel est le prochain axe de développement que vous envisagez pour le lieu ?", FieldType.TEXTAREA,
-              help_text="En lien avec la vision à 5 ans si elle a déjà été exprimée (module Diagnostic).",
-              condition=Condition("candidat_approfondir_dossier", "eq", True)),
-        Field("candidat_besoins_deploiement",
-              "Quels types de besoins sont associés à ce développement ?", FieldType.MULTI_CHOICE,
-              options=OPTIONS_SOUTIEN_ACCOMPAGNEMENT,
-              condition=Condition("candidat_approfondir_dossier", "eq", True)),
+        Field("pitch", "Décrivez votre lieu en 2-3 phrases", FieldType.TEXTAREA),
+        Field("resilience", "En quoi êtes-vous utile à la résilience de votre territoire ?", FieldType.TEXTAREA),
+        Field("revenus", "Sources de revenus 2026 (avec un ordre d'importance approximatif)",
+              FieldType.MULTI_CHOICE,
+              options=["Activités propres", "Subventions", "Mécénat / dons", "Location", "Prestations",
+                       "Cotisations", "Autre"],
+              help_text="Pas de structure pour des pourcentages précis par source ici — demande-les à "
+                        "l'oral si utile et capture-les dans la réponse."),
+        Field("autofin", "Part d'autofinancement", FieldType.SINGLE_CHOICE,
+              options=["< 25%", "25-50%", "50-75%", "> 75%"]),
+        Field("modele", "Votre modèle est :", FieldType.SINGLE_CHOICE,
+              options=["Viable", "En passe de l'être", "Fragile / en recherche"]),
+        Field("eco_coince", "Où « ça coince » économiquement ?", FieldType.MULTI_CHOICE,
+              options=["Trésorerie", "Diversification des revenus", "Accès au financement",
+                       "Investissement / foncier", "Tarification", "Coûts RH", "Autre"]),
+        Field("fundraising", "Projet d'investissement / levée de fonds (en cours ou à venir) ?", FieldType.TEXT,
+              condition=Condition("eco_coince", "contains_any", ["Accès au financement", "Investissement / foncier"])),
+        Field("impact", "Effets concrets déjà produits (social / écolo / éco)", FieldType.TEXTAREA),
+        Field("plan", "Où voulez-vous être dans 2-3 ans ?", FieldType.TEXTAREA),
+        Field("dispo", "Disponible pour l'expédition — 4 jours en France (Bourgogne), mai 2027 ?",
+              FieldType.SINGLE_CHOICE, options=["Oui", "À confirmer", "Non"]),
+        Field("participants",
+              "Qui participerait ? (porteur + nb de staff + rôles) · besoins d'accessibilité", FieldType.TEXT,
+              condition=Condition("dispo", "ne", "Non")),
+        Field("donner_recevoir",
+              "Donner & recevoir : ce que vous venez chercher (résultat utile, à découvrir) et ce que "
+              "VOUS pouvez partager", FieldType.TEXTAREA),
+        Field("contact", "Contact — nom · rôle · email · téléphone", FieldType.TEXT),
+        Field("langues", "Langue(s) de travail", FieldType.MULTI_CHOICE, options=["FR", "EN", "Autre"]),
+        Field("rgpd", "Consentement au traitement des données (RGPD)", FieldType.BOOLEAN),
+        Field("image", "Autorisation image / communication", FieldType.BOOLEAN),
     ],
 )
 
@@ -988,7 +976,7 @@ module_diagnostic = Module(
         section_diagnostic_gouvernance,
         section_diagnostic_swot,
         section_diagnostic_besoins_futurs,
-        section_learning_expedition,
+        section_expedition_ka122,
     ],
 )
 
