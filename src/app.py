@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 import os
+import time
 import sys
 from pathlib import Path
 from typing import Optional
@@ -37,6 +38,7 @@ from src.annuaire import (
 from src.auth_session import clear_session_cookie, read_session_cookie, save_session_cookie
 from src.db.factory import get_admin_store, get_store
 from src.db.store import Litige
+from src.donnees_observatoire import prechargement_observatoire
 from src.i18n import language_toggle, t, t_categorie
 from src.questionnaire.resolver import campagne_completion_stats, completion_stats, country_code_for
 from src.questionnaire.schema import QUESTIONNAIRE, CATEGORIES_POSSIBLES, Role, all_fields
@@ -55,6 +57,7 @@ load_dotenv()
 st.set_page_config(page_title="Lieux hybrides et territoires", layout="wide")
 apply_theme()
 language_toggle()
+prechargement_observatoire()
 
 # Contournement d'authentification STRICTEMENT réservé au développement local.
 # ⚠️ Ne JAMAIS définir LOCAL_DEV_AUTOLOGIN dans les secrets Streamlit Cloud (ou
@@ -147,6 +150,14 @@ def auth_screen() -> str | None:
                 st.rerun()
             else:
                 st.session_state["cookie_restore_failed"] = True
+        elif "cookie_probe_fait" not in st.session_state:
+            # Le composant cookie renvoie {} au tout premier affichage (il
+            # répond au rerun suivant) : sans ce second passage, une session
+            # déjà ouverte était envoyée au formulaire de connexion à chaque
+            # nouvel onglet ou relance du navigateur.
+            st.session_state["cookie_probe_fait"] = True
+            time.sleep(0.6)
+            st.rerun()
 
     st.title(t("auth.title"))
 
@@ -997,13 +1008,16 @@ def annuaire_tab(store, est_admin: bool, user_id: str):
             data=df_coords,
             id="lieux",
             get_position=["lon", "lat"],
-            get_fill_color=[74, 222, 128, 210],
-            get_radius=600,
+            # Teinte neutre et semi-transparente, petits points : avec ~4000
+            # lieux, des marqueurs vifs et gros se superposent en une masse
+            # verte illisible ; ainsi les zones denses se lisent comme telles.
+            get_fill_color=[71, 85, 105, 150],
+            get_radius=300,
             # Rayon plancher en pixels (indépendant du zoom) : à faible zoom,
-            # 600m à l'échelle réelle devient quelques pixels à peine, trop
+            # 300m à l'échelle réelle devient quelques pixels à peine, trop
             # petit pour être cliqué de façon fiable.
-            radius_min_pixels=6,
-            radius_max_pixels=24,
+            radius_min_pixels=4,
+            radius_max_pixels=10,
             pickable=True,
             auto_highlight=True,
         )

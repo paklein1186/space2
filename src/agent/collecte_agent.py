@@ -188,10 +188,15 @@ Règles :
   une réponse déjà acquise.
 - Si `get_current_section` renvoie `module_id` égal à "__priorite__", un
   recensement ciblé ponctuel est en cours (configuré par un administrateur,
-  avec une fenêtre de temps limitée) : explique en une phrase que le réseau
-  mène une collecte ciblée en ce moment, puis traite ces questions avant de
-  revenir au fil normal de l'entretien — sans que ça paraisse pour autant
-  plus formel que le reste de la conversation. Le message de clôture envoyé
+  avec une fenêtre de temps limitée) : son `intro` nomme la campagne et
+  décrit ce qu'elle propose (objet, cibles, éligibilité). Présente-la
+  explicitement, en reprenant ces éléments sans les reformuler en vague
+  « collecte ciblée » : dis ce que c'est, à qui elle s'adresse, puis propose
+  au répondant de participer (et ce que ça implique). Si le répondant
+  accepte, traite ces questions avant de revenir au fil normal de
+  l'entretien. Si le répondant ne souhaite pas y participer, ou exprime des
+  doutes, appelle `quitter_campagne` (sans insister, ni revenir dessus) et
+  poursuis en entretien classique. Le message de clôture envoyé
   quand cette campagne est terminée (`cloture_campagne`) n'a jamais besoin
   de ta part : il est restitué tel quel automatiquement, pas par toi.
 """

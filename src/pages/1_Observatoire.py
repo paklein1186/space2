@@ -21,8 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 import pandas as pd
 import streamlit as st
 
-from src.agent.rag_tools import lieux_enrichis_dataframe, reponses_long_dataframe
-from src.db.factory import get_admin_store, get_store
+from src.donnees_observatoire import donnees_observatoire
 from src.i18n import t, t_categorie
 from src.questionnaire.schema import BANDE_INTENSITE, CATEGORIES_POSSIBLES
 
@@ -60,39 +59,12 @@ def _graphique_barres(series: pd.Series) -> None:
     st.markdown(f'<div style="font-family:inherit;">{"".join(lignes)}</div>', unsafe_allow_html=True)
 
 
-def _store_pour_agregats():
-    """Statistiques publiques : utilise le store admin (service_role) plutôt
-    que le store public pour cette page. Raison — pas un choix de facilité :
-    reponses_long_dataframe() passe par get_all_answers_by_contributeur(),
-    qui filtre d'abord les contributeurs bloqués via une lecture de la table
-    `contributeurs` ; or RLS n'y autorise un utilisateur qu'à voir SES
-    PROPRES lignes (user_id = auth.uid()) — pour un visiteur anonyme,
-    auth.uid() est nul, cette lecture ne renvoie donc jamais aucune ligne, et
-    le filtre "contributeur actif" exclut alors TOUTES les réponses par
-    excès de prudence. Résultat concret constaté : les graphiques "Milieu",
-    "Statut juridique", "Année d'ouverture" restaient vides pour tout
-    visiteur non connecté, alors que `reponses` a bien une policy RLS
-    publique — seule la vérification de blocage, en amont, coupait tout.
-    Seuls des agrégats (comptages, distributions) quittent cette page,
-    jamais de donnée nominative, donc contourner RLS ici reste sûr. Repli
-    sur le store public si la clé service_role n'est pas configurée, pour ne
-    jamais faire planter une page publique pour cette seule raison."""
-    try:
-        return get_admin_store()
-    except RuntimeError:
-        return get_store()
-
-
-store = _store_pour_agregats()
 with st.spinner(t("observatoire.chargement")):
-    df_lieux = lieux_enrichis_dataframe(store)
+    df_lieux, df_reponses = donnees_observatoire()
 
 if df_lieux.empty:
     st.info(t("observatoire.aucun_lieu_enrichi"))
     st.stop()
-
-with st.spinner(t("observatoire.chargement")):
-    df_reponses = reponses_long_dataframe(store)
 # Une même question a pu être répondue par plusieurs contributeurs d'un même
 # lieu (parfois avec des valeurs différentes) : un lieu ne doit compter
 # qu'une fois par champ dans les agrégats, pas une fois par contributeur.
@@ -251,7 +223,7 @@ st.caption(t("observatoire.enjeux_besoins_caption"))
 if "categories" in df_lieux.columns:
     au_moins_une = False
     for cat in CATEGORIES_POSSIBLES:
-        sous_ensemble = df_lieux[df_lieux["categories"].apply(lambda cs: cat in (cs or []))]
+        sous_ensemble = df_lieux[df_lieux["categories"].apply(lambda cs: isinstance(cs, list) and cat in cs)]
         if sous_ensemble.empty:
             continue
         au_moins_une = True

@@ -208,6 +208,15 @@ TOOL_DEFINITIONS = [
         },
     },
     {
+        "name": "quitter_campagne",
+        "description": (
+            "À appeler si le répondant ne souhaite pas participer à la campagne "
+            "prioritaire en cours, ou exprime des doutes à ce sujet. Met fin à "
+            "la campagne pour cet entretien : la suite se fait en entretien classique."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
         "name": "skip_optional_module",
         "description": (
             "À appeler si le répondant décline explicitement de continuer avec "
@@ -436,10 +445,24 @@ class CollecteToolHandler:
             "module_optional": False,
             "section_id": PRIORITY_MODULE_ID,
             "section_title": "Informations prioritaires du moment",
-            "intro": ("Un recensement ciblé est en cours en ce moment : ces informations sont "
-                      "particulièrement utiles à collecter en priorité."),
+            "intro": self._intro_campagnes_actives(),
             "fields": fields,
         }
+
+    def _intro_campagnes_actives(self) -> str:
+        """Présentation explicite de la campagne (titre et description saisis
+        par l'admin : objet, cibles, éligibilité), pour que l'agent puisse
+        proposer clairement de participer — pas un simple « recensement ciblé »
+        sans nom."""
+        morceaux = []
+        for c in self.store.get_active_campagnes_prioritaires():
+            if c.champ_ids:
+                texte = f"{c.titre}. {c.description}" if c.description else c.titre
+                morceaux.append(texte.strip())
+        if not morceaux:
+            return ("Un recensement ciblé est en cours en ce moment : ces informations sont "
+                    "particulièrement utiles à collecter en priorité.")
+        return "Campagne en cours : " + " ".join(morceaux)
 
     def get_current_section(self, _input: dict) -> dict:
         if self._priority_active:
@@ -716,6 +739,11 @@ class CollecteToolHandler:
         from .web_crawl import rechercher_web as _rechercher_web
 
         return {"resultats": _rechercher_web(tool_input["requete"])}
+
+    def quitter_campagne(self, _tool_input: dict) -> dict:
+        self._priority_active = False
+        self._cloture_affichee = True
+        return {"ok": True, "suite": "entretien classique"}
 
     def skip_optional_module(self, tool_input: dict) -> dict:
         module_id = tool_input["module_id"]
