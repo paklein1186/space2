@@ -962,8 +962,6 @@ section_expedition_ka122 = Section(
               "VOUS pouvez partager", FieldType.TEXTAREA),
         Field("contact", "Contact — nom · rôle · email · téléphone", FieldType.TEXT),
         Field("langues", "Langue(s) de travail", FieldType.MULTI_CHOICE, options=["FR", "EN", "Autre"]),
-        Field("rgpd", "Consentement au traitement des données (RGPD)", FieldType.BOOLEAN),
-        Field("image", "Autorisation image / communication", FieldType.BOOLEAN),
     ],
 )
 
