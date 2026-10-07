@@ -116,6 +116,27 @@ def main():
               "next_section" not in r_besoins or r_besoins["next_section"]["section_id"] != PRIORITY_MODULE_ID
               or r_besoins["next_section"]["fields"] != [])
 
+        # --- un champ retiré du schéma PENDANT une conversation déjà ouverte
+        # (ex. rgpd/image retirés de KA122 en production) ne doit jamais
+        # faire croire à tort que la campagne est terminée s'il reste une
+        # vraie question active non répondue.
+        store4 = SqliteStore(db_path=str(Path(tmp) / "champ_retire.sqlite3"))
+        lieu4 = store4.get_or_create_tiers_lieu("user-1", "Lieu Champ Retire Test")
+        contributeur4 = store4.get_or_create_contributeur("user-1", lieu4.id, Role.AUTRE.value)
+        session4 = store4.get_or_start_session(lieu4.id, contributeur4.id)
+        handler4 = CollecteToolHandler(store4, lieu4.id, contributeur4.id, session4, Role.AUTRE,
+                                       mode_entretien="campagne")
+        # Simule un champ qui existait au démarrage de CETTE conversation
+        # mais a depuis été retiré du schéma (get_field() renvoie None).
+        handler4._priority_field_ids = ["champ_disparu_du_schema", "pays"]
+        handler4._priority_active = True
+        section4 = handler4.get_current_section({})
+        check("champ retiré du schéma : la vraie question restante est quand même proposée",
+              section4["section_id"] == PRIORITY_MODULE_ID
+              and any(f["id"] == "pays" for f in section4["fields"]))
+        check("champ retiré du schéma : purgé de la liste suivie, jamais reconsidéré",
+              "champ_disparu_du_schema" not in handler4._priority_field_ids)
+
     print("Tous les tests passent.")
 
 

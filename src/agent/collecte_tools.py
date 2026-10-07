@@ -415,6 +415,18 @@ class CollecteToolHandler:
     def _priority_section(self) -> Optional[dict]:
         """Section synthétique construite à la volée à partir des campagnes
         prioritaires actives — pas une modification du schéma statique."""
+        # Purge défensive : self._priority_field_ids est figé en mémoire pour
+        # toute la durée de CETTE conversation (voir __init__), donc un champ
+        # retiré du schéma PENDANT qu'une conversation est déjà ouverte (ex.
+        # rgpd/image retirés de KA122) resterait sinon dans la liste — sans
+        # cette purge, s'il se trouve être le seul restant à un instant donné,
+        # il ferait croire à tort que la campagne est terminée (get_field
+        # renvoie None, silencieusement ignoré plus bas, `fields` resterait
+        # vide alors que d'autres vraies questions pourraient suivre).
+        self._priority_field_ids = [
+            cid for cid in self._priority_field_ids
+            if cid.startswith("libre::") or get_field(cid) is not None
+        ]
         answers = self._current_answers()
         restants = [cid for cid in self._priority_field_ids if not self._priority_field_done(cid, answers)]
         if not restants:
