@@ -8,6 +8,7 @@ travailler sans compte Supabase.
 from __future__ import annotations
 
 import math
+import io
 import os
 import time
 import sys
@@ -1263,8 +1264,7 @@ def _tableau_repondants_campagne(admin_store, champ_ids: list) -> None:
 
     lignes = admin_store.get_reponses_pour_champs(champs_schema) if champs_schema else []
     if not lignes:
-        if not champs_libres:
-            st.caption("Aucune réponse pour l'instant.")
+        st.caption("Aucune réponse pour l'instant.")
         return
 
     # Regroupe par (lieu, contributeur) : plusieurs lignes brutes (une par
@@ -1273,6 +1273,27 @@ def _tableau_repondants_campagne(admin_store, champ_ids: list) -> None:
     for l in lignes:
         cle = (l["tiers_lieu_id"], l["contributeur_id"])
         par_repondant.setdefault(cle, {})[l["champ_id"]] = l["valeur"]
+
+    # Une campagne réutilise souvent des champs déjà répondus ailleurs (pays,
+    # region, adresse...) — un lieu importé en masse (BDTFL) les a donc déjà
+    # sans avoir jamais touché à cette campagne. Ne garder que les
+    # répondants réellement engagés : au moins 3 champs de LA campagne
+    # répondus, ou une réponse positive explicite (ex. "Oui" à la
+    # disponibilité) — vécu : ~3900 lieux importés polluaient sinon ce
+    # tableau avec 3 champs identiques et rien d'autre.
+    def _positive(valeur) -> bool:
+        if valeur is True:
+            return True
+        return isinstance(valeur, str) and valeur.strip().lower().startswith("oui")
+
+    par_repondant = {
+        cle: reponses for cle, reponses in par_repondant.items()
+        if len(reponses) >= 3 or any(_positive(v) for v in reponses.values())
+    }
+    if not par_repondant:
+        st.caption("Aucun répondant suffisamment engagé pour l'instant "
+                    "(réponses isolées à des champs partagés avec d'autres imports, écartées).")
+        return
 
     tiers_lieu_ids = {tlid for tlid, _ in par_repondant}
     noms_lieux = {l.id: l.nom for l in admin_store.list_tiers_lieux() if l.id in tiers_lieu_ids}
@@ -1298,7 +1319,17 @@ def _tableau_repondants_campagne(admin_store, champ_ids: list) -> None:
             ligne[field_label(champ_id)] = ", ".join(valeur) if isinstance(valeur, list) else (valeur or "—")
         lignes_tableau.append(ligne)
 
-    st.dataframe(pd.DataFrame(lignes_tableau), use_container_width=True, hide_index=True)
+    df_repondants = pd.DataFrame(lignes_tableau)
+    st.dataframe(df_repondants, use_container_width=True, hide_index=True)
+
+    tampon = io.BytesIO()
+    with pd.ExcelWriter(tampon, engine="openpyxl") as writer:
+        df_repondants.to_excel(writer, index=False, sheet_name="Répondants")
+    st.download_button(
+        "Exporter en .xlsx", data=tampon.getvalue(),
+        file_name="repondants_campagne.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
 
 
 def administration_tab(store, user_id: str) -> None:

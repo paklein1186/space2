@@ -383,15 +383,24 @@ class SupabaseStore(Store):
         return bool(result.data)
 
     def get_reponses_pour_champs(self, champ_ids: list) -> list:
+        # _lire_tout : sans pagination, PostgREST tronquait silencieusement à
+        # 1000 lignes — avec ~3900+ lieux et jusqu'à 26 champs pour une seule
+        # campagne (KA122), la table reponses dépasse largement ce seuil,
+        # faisant disparaître à tort une partie des répondants du tableau
+        # admin (constaté en production : un répondant qui avait bien
+        # répondu n'apparaissait pas, ou apparaissait avec des champs
+        # manquants selon l'ordre renvoyé par défaut).
         if not champ_ids:
             return []
-        result = (
-            self.client.table("reponses")
-            .select("tiers_lieu_id,contributeur_id,champ_id,valeur")
-            .in_("champ_id", champ_ids)
-            .execute()
-        )
-        return result.data
+
+        def requete():
+            return (
+                self.client.table("reponses")
+                .select("tiers_lieu_id,contributeur_id,champ_id,valeur")
+                .in_("champ_id", champ_ids)
+                .order("id")
+            )
+        return _lire_tout(requete)
 
     def save_candidat_lieu(self, candidat: CandidatLieu) -> CandidatLieu:
         payload = {
