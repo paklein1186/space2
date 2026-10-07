@@ -340,8 +340,14 @@ class CollecteToolHandler:
     def _current_answers(self) -> dict:
         return self.store.get_answers(self.tiers_lieu_id, self.contributeur_id)
 
-    def _country_code(self) -> Optional[str]:
-        answers = self._current_answers()
+    def _country_code(self, answers: Optional[dict] = None) -> Optional[str]:
+        """Accepte des réponses déjà chargées pour éviter une requête Supabase
+        par appel — vécu : dans `_priority_section`, un appel sans paramètre
+        par champ de campagne (jusqu'à 24) multipliait par 24 le nombre de
+        requêtes `get_answers` d'un seul `get_current_section`, mesuré à
+        plus de 3s pour une campagne KA122 (25 requêtes au lieu d'une)."""
+        if answers is None:
+            answers = self._current_answers()
         return country_code_for(answers.get("pays"))
 
     def _persist_progress(self, statut: str = "en_cours") -> None:
@@ -356,7 +362,7 @@ class CollecteToolHandler:
         self._module_id = module_id
         answers = self._current_answers()
         section = next_incomplete_section(
-            get_module(module_id), answers, self.role, self._country_code(), self._completed_section_ids,
+            get_module(module_id), answers, self.role, self._country_code(answers), self._completed_section_ids,
             seed=self.contributeur_id,
         )
         self._section_id = section.id if section else None
@@ -418,6 +424,7 @@ class CollecteToolHandler:
                 self._cloture_affichee = True
                 return self._section_cloture_campagne()
             return None
+        code_pays = self._country_code(answers)
         fields = []
         for champ_id in restants:
             if champ_id.startswith("libre::"):
@@ -440,7 +447,7 @@ class CollecteToolHandler:
                 continue
             fields.append({
                 "id": f.id, "label": f.label, "type": f.type.value,
-                "options": f.resolved_options(self._country_code()),
+                "options": f.resolved_options(code_pays),
                 "required": f.required, "help_text": f.help_text, "max_choices": f.max_choices,
             })
         if not fields:
@@ -489,18 +496,19 @@ class CollecteToolHandler:
         module = get_module(self._module_id)
         section = get_section(self._module_id, self._section_id)
         answers = self._current_answers()
-        resolved = resolve_section_fields(section, answers, self.role, self._country_code())
+        code_pays = self._country_code(answers)
+        resolved = resolve_section_fields(section, answers, self.role, code_pays)
         # Un champ déjà répondu (par ce contributeur, ou par un précédent —
         # `answers` fusionne les deux) ne doit jamais être reproposé : l'agent
         # ne voit ici que ce qui reste réellement à demander.
         a_demander = [rf for rf in resolved if answers.get(rf.id) is None]
-        if not a_demander and section_is_complete(section, answers, self.role, self._country_code()):
+        if not a_demander and section_is_complete(section, answers, self.role, code_pays):
             # Tout est déjà répondu (reprise après interruption, ou lieu déjà
             # documenté par quelqu'un d'autre) : on avance directement plutôt
             # que de renvoyer une section sans aucune question à poser.
             self._completed_section_ids.add(self._section_id)
             next_section = next_incomplete_section(
-                module, answers, self.role, self._country_code(), self._completed_section_ids,
+                module, answers, self.role, code_pays, self._completed_section_ids,
                 seed=self.contributeur_id,
             )
             if next_section:
@@ -608,12 +616,13 @@ class CollecteToolHandler:
 
         section = get_section(self._module_id, self._section_id)
         answers = self._current_answers()
-        complete = section_is_complete(section, answers, self.role, self._country_code())
+        code_pays = self._country_code(answers)
+        complete = section_is_complete(section, answers, self.role, code_pays)
         result = {"saved": True, "champ_id": champ_id, "section_complete": complete}
         if complete:
             self._completed_section_ids.add(self._section_id)
             next_section = next_incomplete_section(
-                get_module(self._module_id), answers, self.role, self._country_code(), self._completed_section_ids,
+                get_module(self._module_id), answers, self.role, code_pays, self._completed_section_ids,
                 seed=self.contributeur_id,
             )
             if next_section:
