@@ -48,3 +48,27 @@ def prechargement_observatoire() -> threading.Thread:
     fil = threading.Thread(target=donnees_observatoire, daemon=True)
     fil.start()
     return fil
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def donnees_annuaire():
+    """Grille de l'Annuaire (liste + synthèses) — sans ce cache, CHAQUE
+    interaction (recherche, filtre, ouverture d'une fiche) relisait les
+    ~4000 lieux et rejouait get_lieu_derive_batch, pas seulement un vrai
+    rechargement de page : mesuré à 10-15s par interaction en production.
+    TTL volontairement court (2 min, contre 10 pour l'Observatoire) : une
+    édition de lieu depuis l'admin ou une fiche n'invalide pas ce cache
+    explicitement, donc un délai plus long la rendrait trop longtemps
+    invisible dans la grille (la fiche individuelle rouverte, elle, relit
+    toujours en direct)."""
+    store = _store_pour_agregats()
+    lieux = sorted(store.list_tiers_lieux(), key=lambda l: l.nom.lower())
+    derive_par_lieu = store.get_lieu_derive_batch([l.id for l in lieux])
+    return lieux, derive_par_lieu
+
+
+@st.cache_resource(show_spinner=False)
+def prechargement_annuaire() -> threading.Thread:
+    fil = threading.Thread(target=donnees_annuaire, daemon=True)
+    fil.start()
+    return fil

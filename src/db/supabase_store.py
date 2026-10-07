@@ -714,6 +714,18 @@ class SupabaseStore(Store):
         result = self.client.table("contributeurs").select("*").eq("tiers_lieu_id", tiers_lieu_id).execute()
         return [_to_dataclass(Contributeur, row) for row in result.data]
 
+    def get_contributeurs_batch(self, tiers_lieu_ids: list) -> dict:
+        if not tiers_lieu_ids:
+            return {}
+        lignes = _lire_tout_en_lots(tiers_lieu_ids, lambda lot: (
+            self.client.table("contributeurs").select("*").in_("tiers_lieu_id", lot).order("id")
+        ))
+        out: dict = {}
+        for row in lignes:
+            c = _to_dataclass(Contributeur, row)
+            out.setdefault(c.tiers_lieu_id, []).append(c)
+        return out
+
     def get_lieux_valides_par_contributeur(self, tiers_lieu_ids: list) -> set:
         if not tiers_lieu_ids:
             return set()

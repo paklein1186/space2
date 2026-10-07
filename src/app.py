@@ -40,7 +40,7 @@ from src.annuaire import (
 from src.auth_session import clear_session_cookie, read_session_cookie, save_session_cookie
 from src.db.factory import get_admin_store, get_store
 from src.db.store import Litige
-from src.donnees_observatoire import prechargement_observatoire
+from src.donnees_observatoire import donnees_annuaire, prechargement_annuaire, prechargement_observatoire
 from src.i18n import language_toggle, t, t_categorie
 from src.questionnaire.resolver import campagne_completion_stats, completion_stats, country_code_for
 from src.questionnaire.schema import QUESTIONNAIRE, CATEGORIES_POSSIBLES, Role, all_fields
@@ -60,6 +60,7 @@ st.set_page_config(page_title="Lieux hybrides et territoires", layout="wide")
 apply_theme()
 language_toggle()
 prechargement_observatoire()
+prechargement_annuaire()
 
 # Contournement d'authentification STRICTEMENT réservé au développement local.
 # ⚠️ Ne JAMAIS définir LOCAL_DEV_AUTOLOGIN dans les secrets Streamlit Cloud (ou
@@ -959,21 +960,22 @@ def _historique_et_moderation(store, lieu, contributeurs_lieu: list, est_admin: 
 def annuaire_tab(store, est_admin: bool, user_id: str):
     st.title(t("lieux_hybrides.title"))
     st.caption(t("lieux_hybrides.caption"))
+    # Grille et carte : list_tiers_lieux + un batch de lieu_derive (2
+    # requêtes), PAS de build_annuaire/build_fiche_lieu (qui ajoutait 2
+    # requêtes par lieu, pour des réponses brutes/témoignages qui ne sont
+    # utiles que dans la fiche d'UN lieu ouvert — calculée séparément, plus
+    # bas, pour le lieu réellement ouvert dans le popup). Mis en cache 2 min
+    # via donnees_annuaire() (src/donnees_observatoire.py) : sans lui, CHAQUE
+    # interaction (recherche, filtre, ouverture de fiche) relançait ces deux
+    # requêtes, pas seulement un vrai rechargement de page — mesuré à
+    # 10-15s par clic en production une fois la base à ~4000 lieux.
     # Ordre alphabétique par défaut plutôt que l'ordre d'insertion en base,
     # peu significatif pour qui parcourt la liste.
-    lieux = sorted(store.list_tiers_lieux(), key=lambda l: l.nom.lower())
+    lieux, derive_par_lieu = donnees_annuaire()
+    lieux = sorted(lieux, key=lambda l: l.nom.lower())
     if not lieux:
         st.info(t("annuaire.aucun_lieu"))
         return
-
-    # La grille n'a besoin que de list_tiers_lieux + un batch de lieu_derive
-    # (2 requêtes au total) — PAS de build_annuaire/build_fiche_lieu (qui
-    # ajoutait 2 requêtes par lieu, pour des réponses brutes/témoignages qui
-    # ne sont utiles que dans la fiche d'UN lieu ouvert, jamais dans la
-    # grille). C'est cette fiche complète, calculée pour 24+ lieux à chaque
-    # affichage, qui rendait l'Annuaire lent — elle n'est désormais calculée
-    # que pour le lieu réellement ouvert dans le popup.
-    derive_par_lieu = store.get_lieu_derive_batch([l.id for l in lieux])
 
     # Recherche et filtres calculés AVANT la carte : elle doit refléter les
     # mêmes lieux que la grille affichée plus bas, pas systématiquement tous
@@ -1274,44 +1276,54 @@ def _tableau_repondants_campagne(admin_store, champ_ids: list) -> None:
         cle = (l["tiers_lieu_id"], l["contributeur_id"])
         par_repondant.setdefault(cle, {})[l["champ_id"]] = l["valeur"]
 
-    tiers_lieu_ids = {tlid for tlid, _ in par_repondant}
-    noms_lieux = {l.id: l.nom for l in admin_store.list_tiers_lieux() if l.id in tiers_lieu_ids}
-
-    contributeurs_par_lieu: dict = {}
-    for tlid in tiers_lieu_ids:
-        for c in admin_store.list_contributeurs(tlid):
-            contributeurs_par_lieu[c.id] = c
-
-    user_ids = {c.user_id for c in contributeurs_par_lieu.values()}
-    emails = admin_store.map_user_emails(list(user_ids))
-
     # Une campagne réutilise souvent des champs déjà répondus ailleurs (pays,
     # region, adresse, activités, surface...) — un lieu importé en masse
     # (BDTFL, CommunECter...) les a donc déjà sans avoir jamais touché à
-    # cette campagne. Deux filtres combinés pour ne garder que les vrais
-    # répondants : (1) jamais un compte de service d'import, reconnaissable
-    # à son domaine d'email fixe (voir get_or_create_service_user) — un
-    # import n'est pas "un répondant" ; (2) au moins 3 champs de LA campagne
-    # répondus, ou une réponse positive explicite (ex. "Oui" à la
-    # disponibilité), pour écarter aussi un vrai contributeur qui n'a que
-    # 1-2 champs en commun par coïncidence.
-    from src.db.migrate_sqlite_to_supabase import SERVICE_ACCOUNTS_EMAIL_DOMAIN
-
+    # cette campagne. Filtre d'engagement d'abord, SANS appel réseau (au
+    # moins 3 champs de LA campagne répondus, ou une réponse positive
+    # explicite comme "Oui" à la disponibilité) — vécu : résoudre les
+    # contributeurs de CHAQUE lieu apparaissant dans les réponses (y compris
+    # tout le bruit des imports en masse) avant de filtrer déclenchait des
+    # milliers d'appels individuels à list_contributeurs() et bloquait la
+    # page admin. Filtrer ici réduit drastiquement le nombre de lieux à
+    # résoudre ensuite (la plupart du bruit n'a qu'1-2 champs en commun).
     def _positive(valeur) -> bool:
         if valeur is True:
             return True
         return isinstance(valeur, str) and valeur.strip().lower().startswith("oui")
 
-    def _engage(email: str, reponses: dict) -> bool:
-        if email.endswith(f"@{SERVICE_ACCOUNTS_EMAIL_DOMAIN}"):
-            return False
-        return len(reponses) >= 3 or any(_positive(v) for v in reponses.values())
+    par_repondant = {
+        cle: reponses for cle, reponses in par_repondant.items()
+        if len(reponses) >= 3 or any(_positive(v) for v in reponses.values())
+    }
+    if not par_repondant:
+        st.caption("Aucun répondant suffisamment engagé pour l'instant "
+                    "(réponses isolées à des champs partagés avec d'autres imports, écartées).")
+        return
+
+    tiers_lieu_ids = list({tlid for tlid, _ in par_repondant})
+    noms_lieux = {l.id: l.nom for l in admin_store.list_tiers_lieux() if l.id in tiers_lieu_ids}
+
+    # Groupé (un aller-retour, pas un par lieu) — voir get_contributeurs_batch.
+    contributeurs_par_lieu: dict = {}
+    for liste in admin_store.get_contributeurs_batch(tiers_lieu_ids).values():
+        for c in liste:
+            contributeurs_par_lieu[c.id] = c
+
+    user_ids = {c.user_id for c in contributeurs_par_lieu.values()}
+    emails = admin_store.map_user_emails(list(user_ids))
+
+    # Dernier filtre, sur l'email cette fois : jamais un compte de service
+    # d'import, reconnaissable à son domaine fixe (voir
+    # get_or_create_service_user) — un import n'est pas "un répondant",
+    # même s'il franchit par coïncidence le seuil de 3 champs ci-dessus.
+    from src.db.migrate_sqlite_to_supabase import SERVICE_ACCOUNTS_EMAIL_DOMAIN
 
     lignes_tableau = []
     for (tlid, cid), reponses in par_repondant.items():
         contributeur = contributeurs_par_lieu.get(cid)
         email = emails.get(contributeur.user_id, "—") if contributeur else "—"
-        if not _engage(email, reponses):
+        if email.endswith(f"@{SERVICE_ACCOUNTS_EMAIL_DOMAIN}"):
             continue
         ligne = {
             "Lieu": noms_lieux.get(tlid, "—"),
@@ -1957,9 +1969,19 @@ def administration_tab(store, user_id: str) -> None:
             st.caption("Aucun lieu recensé pour l'instant.")
         else:
             toutes_campagnes = store.list_campagnes_prioritaires()
+            # Groupé (un aller-retour, pas un par lieu) — avec ~4000 lieux,
+            # un store.get_answers(lieu.id) par lieu dans la boucle (vécu)
+            # déclenchait ~4000 requêtes individuelles et bloquait la page
+            # admin entière. Même fusion que get_answers (toutes les réponses
+            # non bloquées d'un lieu, tous contributeurs confondus) à partir
+            # de get_all_answers_by_contributeur_batch, déjà groupé ailleurs.
+            reponses_par_lieu_brut = store.get_all_answers_by_contributeur_batch(
+                [l.id for l in tous_les_lieux_completion])
             lignes_completion = []
             for lieu in tous_les_lieux_completion:
-                answers = store.get_answers(lieu.id)
+                answers = {}
+                for reponses_contributeur in reponses_par_lieu_brut.get(lieu.id, {}).values():
+                    answers.update(reponses_contributeur)
                 country_code = country_code_for(answers.get("pays") or lieu.pays)
                 stats = completion_stats(answers, None, country_code)
                 badges_campagnes = []

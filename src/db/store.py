@@ -461,6 +461,15 @@ class Store(ABC):
         ...
 
     @abstractmethod
+    def get_contributeurs_batch(self, tiers_lieu_ids: list) -> dict:
+        """Comme list_contributeurs, mais pour plusieurs lieux en un seul
+        aller-retour (groupé par tiers_lieu_id) — un appel par lieu dans une
+        boucle (list_contributeurs répété) devient injouable au-delà de
+        quelques centaines de lieux (vécu : tableau admin des répondants
+        d'une campagne, des milliers d'appels individuels avant ce batch)."""
+        ...
+
+    @abstractmethod
     def get_lieux_valides_par_contributeur(self, tiers_lieu_ids: list) -> set:
         """tiers_lieu_id des lieux où au moins un contributeur réel (rôle
         fondateur, équipe ou steward — jamais "autre", le rôle utilisé par

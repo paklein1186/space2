@@ -786,6 +786,19 @@ class SqliteStore(Store):
         ).fetchall()
         return [Contributeur(**{**dict(r), "bloque": bool(r["bloque"])}) for r in rows]
 
+    def get_contributeurs_batch(self, tiers_lieu_ids: list) -> dict:
+        if not tiers_lieu_ids:
+            return {}
+        placeholders = ",".join("?" * len(tiers_lieu_ids))
+        rows = self.conn.execute(
+            f"select * from contributeurs where tiers_lieu_id in ({placeholders})", tiers_lieu_ids
+        ).fetchall()
+        out: dict = {}
+        for r in rows:
+            c = Contributeur(**{**dict(r), "bloque": bool(r["bloque"])})
+            out.setdefault(c.tiers_lieu_id, []).append(c)
+        return out
+
     def get_lieux_valides_par_contributeur(self, tiers_lieu_ids: list) -> set:
         if not tiers_lieu_ids:
             return set()
