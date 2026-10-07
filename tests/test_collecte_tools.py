@@ -102,6 +102,22 @@ def main():
         position_apres = (handler_repris._module_id, handler_repris._section_id, set(handler_repris._completed_section_ids))
         check("La session reprise repart exactement où elle s'est arrêtée", position_avant == position_apres)
 
+        # --- lire_notes_du_lieu : relit les notes déjà enregistrées sur CE lieu
+        # (imports, saisies admin...), jamais une recherche sur toute la plateforme.
+        check("Aucune note : extraits vide, pas une erreur",
+              handler.execute("lire_notes_du_lieu", {})["extraits"] == [])
+        store.save_free_text_note(lieu.id, contributeur.id, "import_bdtfl", "Structure gestionnaire : ASBL Le Hangar")
+        extraits = handler.execute("lire_notes_du_lieu", {})["extraits"]
+        check("Une note déjà enregistrée sur ce lieu est bien relue",
+              len(extraits) == 1 and "ASBL Le Hangar" in extraits[0]["extrait"])
+        check("La source de l'extrait reporte le section_id de la note",
+              extraits[0]["source"] == "import_bdtfl")
+        for i in range(10):
+            store.save_free_text_note(lieu.id, contributeur.id, f"theme_{i}", "x" * 600)
+        extraits_nombreux = handler.execute("lire_notes_du_lieu", {})["extraits"]
+        check("Budget de taille respecté même avec de nombreuses notes longues",
+              sum(len(e["extrait"]) for e in extraits_nombreux) <= 4000)
+
         print("\nTous les tests sont passés.")
 
 

@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import pandas as pd
 import pydeck as pdk
 import streamlit as st
+import streamlit.components.v1 as components
 from dotenv import load_dotenv
 
 from src.agent.collecte_agent import CollecteAgent, opening_message
@@ -465,6 +466,38 @@ def _panneau_choix_rapide(store, state: dict) -> None:
     _widget_reponse_rapide(store, state, champs[0])
 
 
+MODELES_CHAT = {
+    "rapide": ("Rapide (Haiku)", "claude-haiku-4-5-20251001"),
+    "equilibre": ("Équilibré (Sonnet)", "claude-sonnet-5"),
+    "approfondi": ("Approfondi (Opus)", "claude-opus-5-5"),
+}
+
+
+def _notifier_reponse_prete() -> None:
+    """Petit bip (Web Audio API, aucun fichier audio à charger) joué une
+    fois qu'une réponse de l'agent vient d'arriver — signalé confus par un
+    utilisateur : le texte grisé pendant le rerun Streamlit est le seul
+    signal natif que la page travaille, facile à rater. Rendu juste avant un
+    st.rerun() qui va de toute façon effacer ce composant au tour suivant :
+    le son se déclenche à l'exécution du script JS, pas à l'affichage
+    durable du composant, donc ça reste sans effet visuel résiduel."""
+    components.html(
+        """<script>
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.frequency.value = 880;
+            gain.gain.setValueAtTime(0.15, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+            osc.start(); osc.stop(ctx.currentTime + 0.25);
+        } catch (e) {}
+        </script>""",
+        height=0,
+    )
+
+
 def entretien_tab(store, user_id: str):
     st.title(t("entretien.title"))
     nom_lieu, role = contribution_selector(store, user_id)
@@ -658,9 +691,10 @@ def entretien_tab(store, user_id: str):
                 prochain_message = state["file_attente_messages"][0]
                 with st.chat_message("assistant"):
                     echec = {}
-                    reply = st.write_stream(
-                        _agent_stream_surveille(state["agent"], prochain_message, echec)
-                    )
+                    with st.spinner("L'agent réfléchit…"):
+                        reply = st.write_stream(
+                            _agent_stream_surveille(state["agent"], prochain_message, echec)
+                        )
                 if echec.get("echec"):
                     st.error(_MESSAGE_ERREUR_AGENT)
                     # Le message reste en tête de file (pas retiré) : le
@@ -669,6 +703,7 @@ def entretien_tab(store, user_id: str):
                     # accumulés derrière lui dans la file.
                     return
                 state["history"].append(("assistant", reply))
+                _notifier_reponse_prete()
                 _maj_completion(store, state)
                 state["file_attente_messages"].pop(0)
                 st.rerun()
@@ -2035,6 +2070,16 @@ def rag_tab(store, user_id: str):
                     store.delete_conversation_bibliotheque(conv.id)
                     st.rerun()
 
+    modele_rag = st.radio(
+        "Vitesse ou profondeur",
+        options=list(MODELES_CHAT),
+        format_func=lambda cle: MODELES_CHAT[cle][0],
+        horizontal=True,
+        key="modele_rag",
+        help="Rapide : réponses plus vite. Approfondi : réponses plus fouillées, plus lent.",
+    )
+    st.session_state["rag_agent"].model = MODELES_CHAT[modele_rag][1]
+
     question_suggeree = None
     if not st.session_state["rag_history"]:
         # Questions fréquentes en chips, seulement avant le premier message —
@@ -2089,14 +2134,16 @@ def rag_tab(store, user_id: str):
             prochaine_question = st.session_state["rag_file_attente_questions"][0]
             with st.chat_message("assistant"):
                 echec = {}
-                reply = st.write_stream(
-                    _agent_stream_surveille(st.session_state["rag_agent"], prochaine_question, echec)
-                )
+                with st.spinner("L'agent réfléchit…"):
+                    reply = st.write_stream(
+                        _agent_stream_surveille(st.session_state["rag_agent"], prochaine_question, echec)
+                    )
             if echec.get("echec"):
                 st.error(_MESSAGE_ERREUR_AGENT)
                 # Reste en tête de file : voir la même note dans entretien_tab.
                 return
             st.session_state["rag_history"].append(("assistant", reply))
+            _notifier_reponse_prete()
             st.session_state["rag_file_attente_questions"].pop(0)
             _sauvegarder_conversation_bibliotheque(store, user_id)
             st.rerun()

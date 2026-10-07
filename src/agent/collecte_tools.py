@@ -139,6 +139,21 @@ TOOL_DEFINITIONS = [
         },
     },
     {
+        "name": "lire_notes_du_lieu",
+        "description": (
+            "Relit ce qui est déjà enregistré sur CE lieu en dehors du questionnaire structuré "
+            "(imports CSV/CommunECter, saisies admin, pages web déjà scannées) — à appeler UNE FOIS, "
+            "tôt dans l'entretien. But : ne jamais reposer à froid une question dont la réponse "
+            "apparaît déjà dans ces notes, même si elle n'a pas encore été enregistrée comme réponse "
+            "structurée. Chaque extrait reste une SUGGESTION à faire confirmer, jamais un fait imposé "
+            "ni enregistré directement : présente-le comme \"Vous décriviez [X] — ça reste exact, ou "
+            "vous ajouteriez/changeriez quelque chose ?\" et enregistre avec save_answer ce que le "
+            "répondant confirme ou corrige, jamais la note telle quelle sans validation explicite. "
+            "Rien dans les notes ? Dis simplement que tu pars de zéro, sans insister."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
         "name": "rechercher_connaissances_existantes",
         "description": (
             "Cherche si quelque chose est déjà documenté sur CE lieu dans la base de connaissances "
@@ -658,6 +673,27 @@ class CollecteToolHandler:
         return {
             "champs": [{"id": f.id, "label": f.label} for _score, f in candidats[:5]],
         }
+
+    def lire_notes_du_lieu(self, _tool_input: dict) -> dict:
+        """Notes libres de CE lieu uniquement (pas de recherche sémantique,
+        pas d'appel réseau) — contrairement à rechercher_connaissances_existantes
+        qui interroge l'index vectoriel de toute la plateforme. Budget de
+        taille (LIMITE_CARACTERES) pour ne jamais faire exploser le contexte
+        d'un lieu aux dizaines de notes thématiques (import BDTFL : jusqu'à 11
+        notes par lieu)."""
+        LIMITE_CARACTERES = 4000
+        extraits = []
+        total = 0
+        for n in self.store.get_free_text_notes(self.tiers_lieu_id):
+            texte = (n.get("texte") or "").strip()
+            if not texte:
+                continue
+            morceau = texte[:600]
+            if total + len(morceau) > LIMITE_CARACTERES:
+                break
+            extraits.append({"source": n.get("section_id") or "conversationnel", "extrait": morceau})
+            total += len(morceau)
+        return {"extraits": extraits}
 
     def rechercher_connaissances_existantes(self, tool_input: dict) -> dict:
         """Recherche sémantique (Voyage + Chroma, même index que la
