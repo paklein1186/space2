@@ -1274,27 +1274,6 @@ def _tableau_repondants_campagne(admin_store, champ_ids: list) -> None:
         cle = (l["tiers_lieu_id"], l["contributeur_id"])
         par_repondant.setdefault(cle, {})[l["champ_id"]] = l["valeur"]
 
-    # Une campagne réutilise souvent des champs déjà répondus ailleurs (pays,
-    # region, adresse...) — un lieu importé en masse (BDTFL) les a donc déjà
-    # sans avoir jamais touché à cette campagne. Ne garder que les
-    # répondants réellement engagés : au moins 3 champs de LA campagne
-    # répondus, ou une réponse positive explicite (ex. "Oui" à la
-    # disponibilité) — vécu : ~3900 lieux importés polluaient sinon ce
-    # tableau avec 3 champs identiques et rien d'autre.
-    def _positive(valeur) -> bool:
-        if valeur is True:
-            return True
-        return isinstance(valeur, str) and valeur.strip().lower().startswith("oui")
-
-    par_repondant = {
-        cle: reponses for cle, reponses in par_repondant.items()
-        if len(reponses) >= 3 or any(_positive(v) for v in reponses.values())
-    }
-    if not par_repondant:
-        st.caption("Aucun répondant suffisamment engagé pour l'instant "
-                    "(réponses isolées à des champs partagés avec d'autres imports, écartées).")
-        return
-
     tiers_lieu_ids = {tlid for tlid, _ in par_repondant}
     noms_lieux = {l.id: l.nom for l in admin_store.list_tiers_lieux() if l.id in tiers_lieu_ids}
 
@@ -1306,18 +1285,48 @@ def _tableau_repondants_campagne(admin_store, champ_ids: list) -> None:
     user_ids = {c.user_id for c in contributeurs_par_lieu.values()}
     emails = admin_store.map_user_emails(list(user_ids))
 
+    # Une campagne réutilise souvent des champs déjà répondus ailleurs (pays,
+    # region, adresse, activités, surface...) — un lieu importé en masse
+    # (BDTFL, CommunECter...) les a donc déjà sans avoir jamais touché à
+    # cette campagne. Deux filtres combinés pour ne garder que les vrais
+    # répondants : (1) jamais un compte de service d'import, reconnaissable
+    # à son domaine d'email fixe (voir get_or_create_service_user) — un
+    # import n'est pas "un répondant" ; (2) au moins 3 champs de LA campagne
+    # répondus, ou une réponse positive explicite (ex. "Oui" à la
+    # disponibilité), pour écarter aussi un vrai contributeur qui n'a que
+    # 1-2 champs en commun par coïncidence.
+    from src.db.migrate_sqlite_to_supabase import SERVICE_ACCOUNTS_EMAIL_DOMAIN
+
+    def _positive(valeur) -> bool:
+        if valeur is True:
+            return True
+        return isinstance(valeur, str) and valeur.strip().lower().startswith("oui")
+
+    def _engage(email: str, reponses: dict) -> bool:
+        if email.endswith(f"@{SERVICE_ACCOUNTS_EMAIL_DOMAIN}"):
+            return False
+        return len(reponses) >= 3 or any(_positive(v) for v in reponses.values())
+
     lignes_tableau = []
     for (tlid, cid), reponses in par_repondant.items():
         contributeur = contributeurs_par_lieu.get(cid)
+        email = emails.get(contributeur.user_id, "—") if contributeur else "—"
+        if not _engage(email, reponses):
+            continue
         ligne = {
             "Lieu": noms_lieux.get(tlid, "—"),
             "Rôle": ROLE_LABELS.get(contributeur.role, contributeur.role) if contributeur else "—",
-            "Email": emails.get(contributeur.user_id, "—") if contributeur else "—",
+            "Email": email,
         }
         for champ_id in champs_schema:
             valeur = reponses.get(champ_id)
             ligne[field_label(champ_id)] = ", ".join(valeur) if isinstance(valeur, list) else (valeur or "—")
         lignes_tableau.append(ligne)
+
+    if not lignes_tableau:
+        st.caption("Aucun répondant suffisamment engagé pour l'instant "
+                    "(réponses isolées ou comptes d'import, écartés).")
+        return
 
     df_repondants = pd.DataFrame(lignes_tableau)
     st.dataframe(df_repondants, use_container_width=True, hide_index=True)
