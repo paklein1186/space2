@@ -48,7 +48,7 @@ from src.db.store import Litige
 from src.donnees_observatoire import donnees_annuaire, prechargement_annuaire, prechargement_observatoire
 from src.i18n import language_toggle, t, t_categorie
 from src.questionnaire.resolver import campagne_completion_stats, completion_stats, country_code_for
-from src.questionnaire.schema import QUESTIONNAIRE, CATEGORIES_POSSIBLES, Role, all_fields
+from src.questionnaire.schema import QUESTIONNAIRE, CATEGORIES_POSSIBLES, FieldType, Role, all_fields, get_field
 from src.theme import apply_theme
 from src.voice_input import bouton_dictee, consume_voice_transcript
 
@@ -1282,26 +1282,91 @@ def _condition_text(condition) -> str | None:
     return f"{condition.field_id} {label} {condition.value!r}"
 
 
-def _export_campagne_txt(campagne) -> str:
-    """Export texte d'une campagne prioritaire : intro et clôture EXACTEMENT
+def _options_question(champ_id: str) -> Optional[str]:
+    """Choix d'une question à choix unique/multiple, formatés pour l'export
+    — None pour tout autre type de champ (texte, nombre...) ou un champ
+    "libre::" (hors schéma, jamais de choix prédéfinis)."""
+    if champ_id.startswith("libre::"):
+        return None
+    f = get_field(champ_id)
+    if f is None or f.type not in (FieldType.SINGLE_CHOICE, FieldType.MULTI_CHOICE):
+        return None
+    options = f.resolved_options(None)
+    if not options:
+        return None
+    precision = "plusieurs réponses possibles" if f.type == FieldType.MULTI_CHOICE else "une seule réponse"
+    return f"Choix ({precision}) : " + " · ".join(options)
+
+
+def _export_campagne_pdf(campagne) -> bytes:
+    """Export PDF d'une campagne prioritaire : intro et clôture EXACTEMENT
     telles que l'agent les restitue (mêmes fonctions/constantes que
-    collecte_tools.py, jamais une reformulation), plus la liste ordonnée des
-    questions — utile pour relire/partager le contenu d'une campagne sans
-    ouvrir un entretien de bout en bout."""
-    lignes = [
-        campagne.titre, "=" * len(campagne.titre), "",
-        f"Fenêtre : {campagne.date_debut[:10]} → {campagne.date_fin[:10]}", "",
-        "--- Introduction (telle que transmise à l'agent) ---",
-        "Campagne en cours : " + texte_intro_campagne(campagne), "",
-        "--- Questions ---",
+    collecte_tools.py, jamais une reformulation), la liste ordonnée des
+    questions avec leurs choix quand il y en a — utile pour relire/partager
+    le contenu d'une campagne sans ouvrir un entretien de bout en bout.
+    reportlab plutôt que weasyprint : pur Python, sans dépendance système
+    (libpango/cairo) que Streamlit Cloud n'a pas forcément."""
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.units import cm
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+    # Même palette que le thème clair de l'app (voir src/theme.py), pour que
+    # l'export ne jure pas visuellement avec le reste du produit.
+    ENCRE = colors.HexColor("#122016")
+    ATTENUE = colors.HexColor("#4B5D50")
+    ACCENT = colors.HexColor("#1FA555")
+    FOND_CLOTURE = colors.HexColor("#EAF0E4")
+
+    style_titre = ParagraphStyle("titre", fontName="Helvetica-Bold", fontSize=20, leading=24,
+                                  textColor=ENCRE, spaceAfter=4)
+    style_fenetre = ParagraphStyle("fenetre", fontName="Helvetica", fontSize=9.5, leading=13,
+                                    textColor=ATTENUE, spaceAfter=14)
+    style_eyebrow = ParagraphStyle("eyebrow", fontName="Helvetica-Bold", fontSize=9.5, leading=12,
+                                    textColor=ACCENT, spaceBefore=16, spaceAfter=6)
+    style_corps = ParagraphStyle("corps", fontName="Helvetica", fontSize=10.5, leading=15.5, textColor=ENCRE)
+    style_question = ParagraphStyle("question", fontName="Helvetica-Bold", fontSize=11, leading=15,
+                                     textColor=ENCRE, spaceBefore=9)
+    style_choix = ParagraphStyle("choix", fontName="Helvetica-Oblique", fontSize=9, leading=13,
+                                  textColor=ATTENUE, leftIndent=14, spaceAfter=2)
+    style_cloture = ParagraphStyle("cloture", fontName="Helvetica", fontSize=10.5, leading=15.5, textColor=ENCRE)
+
+    elements = [
+        Paragraph(campagne.titre, style_titre),
+        Paragraph(f"Fenêtre : {campagne.date_debut[:10]} → {campagne.date_fin[:10]}", style_fenetre),
+        Table([[""]], colWidths=[17 * cm], rowHeights=[2],
+              style=TableStyle([("BACKGROUND", (0, 0), (-1, -1), ACCENT)])),
+        Paragraph("INTRODUCTION", style_eyebrow),
+        Paragraph("Campagne en cours : " + texte_intro_campagne(campagne), style_corps),
+        Paragraph("QUESTIONS", style_eyebrow),
     ]
     for i, cid in enumerate(campagne.champ_ids, start=1):
-        lignes.append(f"{i}. {field_label(cid)}")
-    lignes += [
-        "", "--- Clôture (après la dernière question répondue) ---",
-        (campagne.message_cloture or MESSAGE_CLOTURE_GENERIQUE) + CODA_CLOTURE_CAMPAGNE,
+        elements.append(Paragraph(f"{i}. {field_label(cid)}", style_question))
+        options = _options_question(cid)
+        if options:
+            elements.append(Paragraph(options, style_choix))
+    elements += [
+        Paragraph("CLÔTURE", style_eyebrow),
+        Table(
+            [[Paragraph((campagne.message_cloture or MESSAGE_CLOTURE_GENERIQUE) + CODA_CLOTURE_CAMPAGNE,
+                        style_cloture)]],
+            colWidths=[17 * cm],
+            style=TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), FOND_CLOTURE),
+                ("LEFTPADDING", (0, 0), (-1, -1), 12), ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+                ("TOPPADDING", (0, 0), (-1, -1), 10), ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+            ]),
+        ),
     ]
-    return "\n".join(lignes)
+
+    tampon = io.BytesIO()
+    SimpleDocTemplate(
+        tampon, pagesize=A4,
+        leftMargin=2 * cm, rightMargin=2 * cm, topMargin=2 * cm, bottomMargin=2 * cm,
+        title=campagne.titre,
+    ).build(elements)
+    return tampon.getvalue()
 
 
 def _tableau_repondants_campagne(admin_store, champ_ids: list) -> None:
@@ -1514,8 +1579,8 @@ def administration_tab(store, user_id: str) -> None:
                         admin_store.delete_campagne_prioritaire(c.id)
                         st.rerun()
                     st.download_button(
-                        "Exporter les questions", data=_export_campagne_txt(c),
-                        file_name=f"campagne_{c.id}.txt", mime="text/plain",
+                        "Exporter les questions (PDF)", data=_export_campagne_pdf(c),
+                        file_name=f"campagne_{c.id}.pdf", mime="application/pdf",
                         key=f"export_campagne_{c.id}",
                     )
                 with st.expander(f"Voir les répondants — {c.titre}"):
