@@ -533,6 +533,16 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
     "observatoire.aucun_besoin_sphere": {
         "fr": "Aucun besoin déclaré dans cette sphère pour l'instant.", "en": "No need declared in this sphere yet.",
     },
+    "observatoire.sources_externes_titre": {
+        "fr": "Pour aller plus loin", "en": "To go further",
+    },
+    "observatoire.sources_externes_texte": {
+        "fr": "Ces données portent sur le réseau recensé dans Space2. Pour une vue d'ensemble au niveau "
+              "national, voir aussi les travaux de France Tiers-Lieux — également indexés dans la "
+              "Bibliothèque, interrogeables par l'assistant.",
+        "en": "This data covers the network recorded in Space2. For a nationwide view, see also France "
+              "Tiers-Lieux's own work — also indexed in the Library, searchable through the assistant.",
+    },
 
     "accueil.hero_titre": {
         "fr": "Le réseau des lieux hybrides et de leurs territoires",

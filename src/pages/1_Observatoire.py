@@ -324,3 +324,12 @@ else:
             for besoin, lieux_concernes in par_besoin:
                 with st.expander(f"{besoin} ({len(lieux_concernes)})"):
                     st.caption(", ".join(lieux_concernes))
+
+st.divider()
+st.markdown(f"**{t('observatoire.sources_externes_titre')}**")
+st.caption(t("observatoire.sources_externes_texte"))
+st.markdown(
+    "- [France Tiers-Lieux — Recensement national 2026](https://observatoire.francetierslieux.fr/recensement-2026/)\n"
+    "- [France Tiers-Lieux — Panorama 2026 (tableau de bord)]"
+    "(https://metabase.tiers-lieux.fr/public/dashboard/a23a64b3-9e7c-4eda-a4be-0e3a0a8053be)"
+)
