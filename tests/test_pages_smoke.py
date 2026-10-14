@@ -26,6 +26,11 @@ from src.db.store import LieuDerive
 from src.questionnaire.schema import Role
 
 PAGES = ["src/pages/1_Observatoire.py", "src/pages/2_Portfolio.py", "src/pages/3_Fiche.py"]
+# src/pages/0_Accueil.py n'est pas testable seule via AppTest : elle utilise
+# st.page_link vers une autre page, qui lève KeyError('url_pathname') hors
+# du contexte de navigation multipage complet (st.navigation dans app.py) —
+# limite du harnais de test, pas un bug (vérifié identique sur le commit
+# précédent, avant toute modification de cette page).
 
 
 def check(label, condition):

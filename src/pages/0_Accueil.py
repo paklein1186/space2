@@ -20,21 +20,25 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import streamlit as st
 
-from src.db.factory import get_store
+from src.donnees_observatoire import donnees_annuaire
 from src.i18n import t
 
 
 def _stats_publiques() -> tuple[int, int, int]:
     """Compteurs légers pour la bannière d'accueil — mêmes données déjà
     publiques que l'Annuaire/l'Observatoire (tiers_lieux, lieu_derive),
-    jamais de donnée nominative. Ne doit jamais faire planter la page
+    jamais de donnée nominative. Réutilise donnees_annuaire() (mis en cache
+    2 min, préchargé au démarrage du serveur) plutôt que de relire
+    list_tiers_lieux()/get_lieu_derive_batch() en direct : sans ça, la page
+    d'accueil — souvent le tout premier contact avec le site — relisait les
+    ~4000 lieux à CHAQUE visite, pas seulement un vrai rechargement de page,
+    la rendant visiblement lente (même cause que l'Annuaire/l'Observatoire
+    avant leur mise en cache). Ne doit jamais faire planter la page
     d'accueil : un échec de connexion renvoie des compteurs à zéro plutôt
     qu'une erreur, cette page devant rester la plus robuste du site."""
     try:
-        store = get_store()
-        lieux = store.list_tiers_lieux()
+        lieux, derive_par_lieu = donnees_annuaire()
         nb_pays = len({l.pays for l in lieux if l.pays})
-        derive_par_lieu = store.get_lieu_derive_batch([l.id for l in lieux])
         nb_besoins = sum(
             len(d.besoins_mis_en_avant or []) for d in derive_par_lieu.values()
         )
