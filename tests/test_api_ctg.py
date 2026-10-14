@@ -140,6 +140,33 @@ def main():
               "Lieu Importé Déjà Lié Ctg" in
               {p["tiers_lieu"] for p in http.get("/lieux", headers=h).json()["lieux"]})
 
+        # --- campagne prioritaire entièrement répondue : contourne aussi le seuil ---
+        from datetime import datetime, timedelta, timezone
+
+        from src.db.store import CampagnePrioritaire
+
+        maintenant = datetime.now(timezone.utc)
+        champs_campagne = [f.id for f in publics[:2]]
+        store.save_campagne_prioritaire(CampagnePrioritaire(
+            titre="Campagne Test Ctg", champ_ids=champs_campagne,
+            date_debut=(maintenant - timedelta(days=1)).isoformat(),
+            date_fin=(maintenant + timedelta(days=30)).isoformat(),
+        ))
+        lieu_campagne = store.get_or_create_tiers_lieu("import-service", "Lieu Campagne Terminée")
+        c_campagne = store.get_or_create_contributeur("import-service", lieu_campagne.id, "autre")
+        for cid in champs_campagne:
+            store.save_answer(lieu_campagne.id, c_campagne.id, cid, "une valeur")
+        check("sous le seuil général mais campagne prioritaire 100% répondue : apparaît dans le flux",
+              "Lieu Campagne Terminée" in
+              {p["tiers_lieu"] for p in http.get("/lieux", headers=h).json()["lieux"]})
+
+        # --- accord explicite donné en entretien (ctg_opt_in) : contourne aussi le seuil ---
+        lieu_opt_in = store.get_or_create_tiers_lieu("import-service", "Lieu Opt-in Ctg")
+        store.update_tiers_lieu(lieu_opt_in.id, ctg_opt_in=True)
+        check("aucune réponse mais ctg_opt_in=True (accepté en entretien) : apparaît dans le flux",
+              "Lieu Opt-in Ctg" in
+              {p["tiers_lieu"] for p in http.get("/lieux", headers=h).json()["lieux"]})
+
         # --- lien ---
         check("lien : lieu inconnu → 404",
               http.post("/lieux/nope/link", json={"ctg_entity_id": "E1"}, headers=h).status_code == 404)

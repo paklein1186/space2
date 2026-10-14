@@ -24,7 +24,12 @@ import streamlit.components.v1 as components
 from dotenv import load_dotenv
 
 from src.agent.collecte_agent import CollecteAgent, opening_message
-from src.agent.collecte_tools import CollecteToolHandler
+from src.agent.collecte_tools import (
+    CODA_CLOTURE_CAMPAGNE,
+    MESSAGE_CLOTURE_GENERIQUE,
+    CollecteToolHandler,
+    texte_intro_campagne,
+)
 from src.annuaire import (
     besoins_chips_html,
     build_fiche_lieu,
@@ -1041,6 +1046,32 @@ def annuaire_tab(store, est_admin: bool, user_id: str):
         )
         zoom = max(3.0, min(math.log2(757 / etendue), 14.0))
 
+        # Couche de densité sous les points cliquables : deck.gl n'a pas de
+        # vrai "cluster à bulles numérotées" dans son catalogue standard, et
+        # lire le niveau de zoom en direct depuis Python demanderait un
+        # composant bidirectionnel custom (pas dispo avec pydeck). ScreenGridLayer
+        # est la seule couche d'agrégation dont la taille de cellule est en
+        # PIXELS (cell_size_pixels) plutôt qu'en mètres réels (HexagonLayer/
+        # GridLayer) : la taille à l'écran reste donc fixe, mais la zone
+        # géographique couverte par cellule rétrécit au zoom — la densité se
+        # déclusterise donc naturellement à mesure qu'on zoome, sans rerun
+        # Streamlit. Rendue SOUS la couche de points (ordre du tableau
+        # `layers`), qui reste seule cliquable pour ouvrir une fiche.
+        couche_densite = pdk.Layer(
+            "ScreenGridLayer",
+            data=df_coords,
+            get_position=["lon", "lat"],
+            cell_size_pixels=40,
+            opacity=0.45,
+            color_range=[
+                [241, 245, 249, 0],
+                [203, 213, 225, 60],
+                [148, 163, 184, 110],
+                [100, 116, 139, 160],
+                [71, 85, 105, 210],
+                [51, 65, 85, 255],
+            ],
+        )
         couche_lieux = pdk.Layer(
             "ScatterplotLayer",
             data=df_coords,
@@ -1249,6 +1280,28 @@ def _condition_text(condition) -> str | None:
     if condition.operator == "truthy":
         return f"{condition.field_id} {label}"
     return f"{condition.field_id} {label} {condition.value!r}"
+
+
+def _export_campagne_txt(campagne) -> str:
+    """Export texte d'une campagne prioritaire : intro et clôture EXACTEMENT
+    telles que l'agent les restitue (mêmes fonctions/constantes que
+    collecte_tools.py, jamais une reformulation), plus la liste ordonnée des
+    questions — utile pour relire/partager le contenu d'une campagne sans
+    ouvrir un entretien de bout en bout."""
+    lignes = [
+        campagne.titre, "=" * len(campagne.titre), "",
+        f"Fenêtre : {campagne.date_debut[:10]} → {campagne.date_fin[:10]}", "",
+        "--- Introduction (telle que transmise à l'agent) ---",
+        "Campagne en cours : " + texte_intro_campagne(campagne), "",
+        "--- Questions ---",
+    ]
+    for i, cid in enumerate(campagne.champ_ids, start=1):
+        lignes.append(f"{i}. {field_label(cid)}")
+    lignes += [
+        "", "--- Clôture (après la dernière question répondue) ---",
+        (campagne.message_cloture or MESSAGE_CLOTURE_GENERIQUE) + CODA_CLOTURE_CAMPAGNE,
+    ]
+    return "\n".join(lignes)
 
 
 def _tableau_repondants_campagne(admin_store, champ_ids: list) -> None:
@@ -1460,6 +1513,11 @@ def administration_tab(store, user_id: str) -> None:
                     if st.button("Supprimer", key=f"del_campagne_{c.id}"):
                         admin_store.delete_campagne_prioritaire(c.id)
                         st.rerun()
+                    st.download_button(
+                        "Exporter les questions", data=_export_campagne_txt(c),
+                        file_name=f"campagne_{c.id}.txt", mime="text/plain",
+                        key=f"export_campagne_{c.id}",
+                    )
                 with st.expander(f"Voir les répondants — {c.titre}"):
                     _tableau_repondants_campagne(admin_store, c.champ_ids)
         else:

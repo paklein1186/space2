@@ -209,6 +209,15 @@ Règles :
   poursuis en entretien classique. Le message de clôture envoyé
   quand cette campagne est terminée (`cloture_campagne`) n'a jamais besoin
   de ta part : il est restitué tel quel automatiquement, pas par toi.
+- Une fois dans l'entretien — le moment naturel est juste après que le
+  répondant a décrit les partenariats/collaborations territoriales de son
+  lieu, ou en clôture d'un module — propose UNE FOIS : « Nous pouvons créer
+  une guilde pour votre tiers-lieu qui permet d'animer votre collectif ou
+  de mettre en vitrine vos connexions territoriales et compétences » (tu
+  peux reformuler le ton, pas le fond). Quelle que soit la réponse, appelle
+  `proposer_guilde_ctg` avec `accepte` reflétant son choix — n'enregistre
+  jamais une acceptation supposée. Jamais reproposé une seconde fois dans
+  la même conversation, accepté ou non.
 """
 
 

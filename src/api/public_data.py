@@ -16,7 +16,7 @@ import pandas as pd
 
 from ..agent.objets_ctg import organisations_ctg_dataframe
 from ..db.store import Store
-from ..questionnaire.resolver import completion_stats, country_code_for
+from ..questionnaire.resolver import campagne_completion_stats, completion_stats, country_code_for
 from ..questionnaire.schema import champ_public, get_field  # noqa: F401 (champ_public ré-exporté)
 
 # Un lieu n'est exposé à Changethegame (flux_lieux) qu'à partir de ce seuil
@@ -133,17 +133,25 @@ def construire_datasets(store: Store) -> dict:
 def flux_lieux(store: Store, updated_since: Optional[str] = None) -> list:
     """Flux GET /lieux : un lieu jamais encore connu de ctg (pas de
     ctg_entity_id) n'y entre qu'à partir de SEUIL_COMPLETION_CTG % de
-    complétion, ou s'il est validé par un vrai contributeur même en-dessous
-    (voir ROLES_VALIDATION_HUMAINE) — jamais la totalité brute d'un import
-    en masse à peine renseigné. Un lieu déjà lié à une entité ctg continue
-    toujours d'être tenu à jour quelle que soit sa complétion (le seuil
-    bloque la création, pas la mise à jour)."""
+    complétion, sauf s'il contourne ce seuil par l'un de ces trois accès —
+    jamais la totalité brute d'un import en masse à peine renseigné :
+    - validé par un vrai contributeur (voir ROLES_VALIDATION_HUMAINE) ;
+    - une campagne prioritaire (ex. KA122) entièrement répondue pour ce
+      lieu — la personne a investi le temps de tout remplir, la publication
+      ne doit pas en plus dépendre du hasard de sa complétion GÉNÉRALE ;
+    - un accord explicite donné en entretien (voir le tool
+      proposer_guilde_ctg, `ctg_opt_in`) — la personne a dit oui, inutile
+      d'attendre un seuil.
+    Un lieu déjà lié à une entité ctg continue toujours d'être tenu à jour
+    quelle que soit sa complétion (le seuil bloque la création, pas la
+    mise à jour)."""
     lieux = store.list_tiers_lieux()
     ids = [lieu.id for lieu in lieux]
     derives = store.get_lieu_derive_batch(ids)
     adresses = store.get_public_answers_batch(ids)
     reponses_par_contributeur = store.get_all_answers_by_contributeur_batch(ids)
     valides = store.get_lieux_valides_par_contributeur(ids)
+    toutes_campagnes = store.list_campagnes_prioritaires()
 
     profils = []
     for lieu in lieux:
@@ -152,13 +160,18 @@ def flux_lieux(store: Store, updated_since: Optional[str] = None) -> list:
         # continue toujours d'être tenue à jour, quelle que soit sa
         # complétion — le seuil ne bloque que la CRÉATION de nouvelles
         # entités pour des lieux jamais encore connus de ctg.
-        if not lieu.ctg_entity_id and lieu.id not in valides:
+        if not lieu.ctg_entity_id and lieu.id not in valides and not lieu.ctg_opt_in:
             reponses: dict = {}
             for rep in (reponses_par_contributeur.get(lieu.id) or {}).values():
                 reponses.update(rep)
-            pourcentage = completion_stats(reponses, None, country_code_for(reponses.get("pays")))["pourcentage"]
-            if pourcentage < SEUIL_COMPLETION_CTG:
-                continue
+            campagne_terminee = any(
+                (stats := campagne_completion_stats(reponses, c.champ_ids)) and stats["pourcentage"] == 100
+                for c in toutes_campagnes
+            )
+            if not campagne_terminee:
+                pourcentage = completion_stats(reponses, None, country_code_for(reponses.get("pays")))["pourcentage"]
+                if pourcentage < SEUIL_COMPLETION_CTG:
+                    continue
         profils.append(profil_public(lieu, derives.get(lieu.id), (adresses.get(lieu.id) or {}).get("adresse")))
     if updated_since:
         profils = [p for p in profils if not p["updated_at"] or str(p["updated_at"]) > updated_since]

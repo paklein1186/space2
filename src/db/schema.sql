@@ -15,6 +15,7 @@ create table if not exists tiers_lieux (
     ctg_entity_id text,             -- entité Changethegame liée (migration_009)
     commune text,                   -- issus du géocodage de l'adresse (migration_010)
     code_postal text,
+    ctg_opt_in boolean not null default false,  -- accord donné en entretien (migration_015)
     cree_le timestamptz not null default now()
 );
 
@@ -311,6 +312,7 @@ create table if not exists tiers_lieux (
     ctg_entity_id text,             -- entité Changethegame liée (migration_009)
     commune text,                   -- issus du géocodage de l'adresse (migration_010)
     code_postal text,
+    ctg_opt_in boolean not null default false,  -- accord donné en entretien (migration_015)
     cree_le timestamptz not null default now()
 );
 

@@ -65,6 +65,20 @@ with st.spinner(t("observatoire.chargement")):
 if df_lieux.empty:
     st.info(t("observatoire.aucun_lieu_enrichi"))
     st.stop()
+
+# Filtre pays : appliqué aux deux tables (lieux + réponses), chacune porte
+# déjà sa propre colonne "pays" — pas besoin de jointure. Par défaut aucune
+# sélection = tout affiché, comme le filtre équivalent de l'Annuaire.
+options_pays = sorted(df_lieux["pays"].dropna().unique()) if "pays" in df_lieux else []
+filtre_pays = st.multiselect(t("observatoire.filtre_pays"), options=options_pays)
+if filtre_pays:
+    df_lieux = df_lieux[df_lieux["pays"].isin(filtre_pays)]
+    if not df_reponses.empty and "pays" in df_reponses:
+        df_reponses = df_reponses[df_reponses["pays"].isin(filtre_pays)]
+    if df_lieux.empty:
+        st.info(t("observatoire.aucun_lieu_enrichi"))
+        st.stop()
+
 # Une même question a pu être répondue par plusieurs contributeurs d'un même
 # lieu (parfois avec des valeurs différentes) : un lieu ne doit compter
 # qu'une fois par champ dans les agrégats, pas une fois par contributeur.

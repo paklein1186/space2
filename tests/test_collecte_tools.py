@@ -118,6 +118,19 @@ def main():
         check("Budget de taille respecté même avec de nombreuses notes longues",
               sum(len(e["extrait"]) for e in extraits_nombreux) <= 4000)
 
+        # --- proposer_guilde_ctg : enregistre l'accord (ou non) donné en entretien
+        # à la création d'une guilde Changethegame pour ce lieu.
+        check("Avant tout appel : ctg_opt_in reste False",
+              store.get_or_create_tiers_lieu("user-1", "Le Hangar Test").ctg_opt_in is False)
+        resultat_refus = handler.execute("proposer_guilde_ctg", {"accepte": False})
+        check("Refus enregistré : réponse ok, enregistre=False", resultat_refus == {"ok": True, "enregistre": False})
+        check("Un refus ne pose jamais ctg_opt_in",
+              store.get_or_create_tiers_lieu("user-1", "Le Hangar Test").ctg_opt_in is False)
+        resultat_accord = handler.execute("proposer_guilde_ctg", {"accepte": True})
+        check("Accord enregistré : réponse ok, enregistre=True", resultat_accord == {"ok": True, "enregistre": True})
+        check("Un accord pose bien ctg_opt_in sur le lieu",
+              store.get_or_create_tiers_lieu("user-1", "Le Hangar Test").ctg_opt_in is True)
+
         print("\nTous les tests sont passés.")
 
 

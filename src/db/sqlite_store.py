@@ -35,7 +35,8 @@ create table if not exists tiers_lieux (
     statut_progression text default 'en_cours',
     ctg_entity_id text,
     commune text,
-    code_postal text
+    code_postal text,
+    ctg_opt_in integer not null default 0
 );
 create table if not exists contributeurs (
     id text primary key,
@@ -217,6 +218,13 @@ class SqliteStore(Store):
             existantes = {r["name"] for r in self.conn.execute(f"pragma table_info({table})")}
             if column not in existantes:
                 self.conn.execute(f"alter table {table} add column {column} text")
+        # Colonne séparée (pas dans la boucle ci-dessus) : affinité "integer"
+        # requise, pas "text" — sans quoi SQLite convertirait les 0/1 insérés
+        # en chaînes "0"/"1", et bool("0") vaut True en Python (chaîne non
+        # vide), faussant silencieusement toute lecture de ctg_opt_in.
+        existantes_tl = {r["name"] for r in self.conn.execute("pragma table_info(tiers_lieux)")}
+        if "ctg_opt_in" not in existantes_tl:
+            self.conn.execute("alter table tiers_lieux add column ctg_opt_in integer not null default 0")
         self.conn.commit()
 
     # -- tiers_lieux --------------------------------------------------
@@ -232,7 +240,7 @@ class SqliteStore(Store):
             "select * from tiers_lieux where trim(lower(nom)) = trim(lower(?))", (nom_normalise,)
         ).fetchone()
         if row:
-            return TiersLieu(**dict(row))
+            return TiersLieu(**{**dict(row), "ctg_opt_in": bool(row["ctg_opt_in"])})
         new_id = str(uuid.uuid4())
         self.conn.execute(
             "insert into tiers_lieux (id, owner_user_id, nom) values (?, ?, ?)",
@@ -256,7 +264,7 @@ class SqliteStore(Store):
             ).fetchall()
         else:
             rows = self.conn.execute("select * from tiers_lieux").fetchall()
-        return [TiersLieu(**dict(r)) for r in rows]
+        return [TiersLieu(**{**dict(r), "ctg_opt_in": bool(r["ctg_opt_in"])}) for r in rows]
 
     def delete_tiers_lieu(self, tiers_lieu_id: str) -> None:
         # Pas de ON DELETE CASCADE dans ce schéma SQLite (contrairement à

@@ -28,6 +28,12 @@ class TiersLieu:
     # Issus du géocodage (Nominatim) de la réponse « adresse » — exposés à ctg.
     commune: Optional[str] = None
     code_postal: Optional[str] = None
+    # Accord explicite donné pendant l'entretien (voir le tool
+    # proposer_guilde_ctg) à ce qu'une guilde Changethegame soit créée pour ce
+    # lieu — contourne le seuil de complétion de flux_lieux() au même titre
+    # qu'une validation humaine ou une campagne prioritaire terminée : la
+    # personne a explicitement dit oui, pas besoin d'attendre un seuil.
+    ctg_opt_in: bool = False
 
 
 @dataclass

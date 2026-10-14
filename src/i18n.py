@@ -404,6 +404,7 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
 
     "observatoire.aucune_donnee": {"fr": "Aucune donnée pour l'instant.", "en": "No data yet."},
     "observatoire.chargement": {"fr": "Chargement des données...", "en": "Loading data..."},
+    "observatoire.filtre_pays": {"fr": "Pays", "en": "Country"},
     "observatoire.aucun_lieu_enrichi": {
         "fr": "Aucun lieu enrichi pour l'instant — revenez une fois que des synthèses auront été générées.",
         "en": "No enriched space yet — come back once syntheses have been generated.",

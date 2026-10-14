@@ -26,6 +26,27 @@ from ..questionnaire.schema import QUESTIONNAIRE, Role, all_fields, get_field, g
 
 PRIORITY_MODULE_ID = "__priorite__"
 
+# Repli générique (campagne sans message_cloture propre) et rappel fixe
+# toujours ajouté après — constantes plutôt qu'en dur dans
+# _section_cloture_campagne : réutilisées telles quelles par l'export admin
+# des campagnes (voir app.py), pour que l'export montre le texte EXACT que
+# l'agent restituerait, jamais une approximation qui pourrait diverger.
+MESSAGE_CLOTURE_GENERIQUE = "Merci, vous avez répondu à toutes les questions prioritaires de cette campagne."
+CODA_CLOTURE_CAMPAGNE = (
+    " Vous pouvez aussi continuer à compléter votre fiche au-delà de ces questions — ça "
+    "nous aide à mieux cerner vos obstacles et défis, pour vous acheminer les ressources "
+    "pertinentes au plus vite. La Bibliothèque peut aussi être utile pour creuser le "
+    "secteur et découvrir des exemples inspirants."
+)
+
+
+def texte_intro_campagne(campagne) -> str:
+    """Titre + description d'UNE campagne, tels qu'injectés dans l'intro que
+    l'agent reçoit (voir CollecteToolHandler._intro_campagnes_actives) —
+    fonction pure pour être réutilisable par l'export admin des campagnes
+    sans construire un handler complet."""
+    return f"{campagne.titre}. {campagne.description}" if campagne.description else campagne.titre
+
 # Sigles/abréviations du jargon tiers-lieux fréquemment employés à l'oral
 # mais absents tels quels des libellés du schéma (qui les épellent en
 # toutes lettres) — sans ça, un recouvrement de mots simple ne peut jamais
@@ -232,6 +253,22 @@ TOOL_DEFINITIONS = [
         "input_schema": {"type": "object", "properties": {}},
     },
     {
+        "name": "proposer_guilde_ctg",
+        "description": (
+            "Enregistre la réponse du répondant à la proposition de créer une guilde "
+            "Changethegame pour ce lieu (animer son collectif, mettre en vitrine ses "
+            "connexions territoriales et compétences) — appelle ce tool UNE FOIS avec "
+            "`accepte=true` si le répondant dit oui, `accepte=false` s'il décline ou "
+            "hésite. N'appelle ce tool qu'après avoir explicitement posé la question, "
+            "jamais pour supposer une réponse."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {"accepte": {"type": "boolean"}},
+            "required": ["accepte"],
+        },
+    },
+    {
         "name": "skip_optional_module",
         "description": (
             "À appeler si le répondant décline explicitement de continuer avec "
@@ -389,14 +426,8 @@ class CollecteToolHandler:
         obstacles du lieu pour lui acheminer les bonnes ressources, et la
         Bibliothèque peut inspirer par l'exemple."""
         campagnes = [c for c in self.store.get_active_campagnes_prioritaires() if c.message_cloture]
-        message = campagnes[0].message_cloture if campagnes else (
-            "Merci, vous avez répondu à toutes les questions prioritaires de cette campagne."
-        )
-        coda = (" Vous pouvez aussi continuer à compléter votre fiche au-delà de ces questions — ça "
-                "nous aide à mieux cerner vos obstacles et défis, pour vous acheminer les ressources "
-                "pertinentes au plus vite. La Bibliothèque peut aussi être utile pour creuser le "
-                "secteur et découvrir des exemples inspirants.")
-        texte_cloture = message + coda
+        message = campagnes[0].message_cloture if campagnes else MESSAGE_CLOTURE_GENERIQUE
+        texte_cloture = message + CODA_CLOTURE_CAMPAGNE
         return {
             "module_id": PRIORITY_MODULE_ID, "module_title": "Collecte prioritaire", "module_optional": False,
             "section_id": PRIORITY_MODULE_ID, "section_title": "Campagne terminée",
@@ -488,11 +519,7 @@ class CollecteToolHandler:
         par l'admin : objet, cibles, éligibilité), pour que l'agent puisse
         proposer clairement de participer — pas un simple « recensement ciblé »
         sans nom."""
-        morceaux = []
-        for c in self.store.get_active_campagnes_prioritaires():
-            if c.champ_ids:
-                texte = f"{c.titre}. {c.description}" if c.description else c.titre
-                morceaux.append(texte.strip())
+        morceaux = [texte_intro_campagne(c) for c in self.store.get_active_campagnes_prioritaires() if c.champ_ids]
         if not morceaux:
             return ("Un recensement ciblé est en cours en ce moment : ces informations sont "
                     "particulièrement utiles à collecter en priorité.")
@@ -801,6 +828,12 @@ class CollecteToolHandler:
         self._priority_active = False
         self._cloture_affichee = True
         return {"ok": True, "suite": "entretien classique"}
+
+    def proposer_guilde_ctg(self, tool_input: dict) -> dict:
+        accepte = bool(tool_input["accepte"])
+        if accepte:
+            self.store.update_tiers_lieu(self.tiers_lieu_id, ctg_opt_in=True)
+        return {"ok": True, "enregistre": accepte}
 
     def skip_optional_module(self, tool_input: dict) -> dict:
         module_id = tool_input["module_id"]
