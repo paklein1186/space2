@@ -1059,11 +1059,31 @@ def annuaire_tab(store, est_admin: bool, user_id: str):
         # appelant l'URL de tuile brute hors de toute app) — OSM reste le
         # seul fond gratuit sans clé parmi les choix standards de folium.
         carte = folium.Map(location=[lat_centre, lon_centre], zoom_start=zoom, tiles="OpenStreetMap")
-        cluster = MarkerCluster(options={"maxClusterRadius": 60}).add_to(carte)
+        # Rose-mauve plutôt que l'accent vert habituel de l'app : sur un fond
+        # de carte OSM lui-même très vert (espaces naturels, parcs), des
+        # marqueurs verts se fondaient dans le décor (signalé peu lisible).
+        # icon_create_function personnalise aussi les bulles de cluster —
+        # sans lui, Leaflet.markercluster les affiche dans son dégradé vert
+        # par défaut, même incohérence.
+        TEINTE_CARTE = "#B83280"
+        cluster = MarkerCluster(
+            options={"maxClusterRadius": 60},
+            icon_create_function=f"""
+            function(cluster) {{
+                return L.divIcon({{
+                    html: '<div style="background-color:{TEINTE_CARTE}; opacity:0.88; border-radius:50%; '
+                        + 'width:36px; height:36px; display:flex; align-items:center; justify-content:center; '
+                        + 'color:#fff; font-weight:600; font-family:inherit;">' + cluster.getChildCount() + '</div>',
+                    className: 'marker-cluster-space2',
+                    iconSize: L.point(36, 36),
+                }});
+            }}
+            """,
+        ).add_to(carte)
         for c in coords:
             folium.CircleMarker(
                 location=[c["lat"], c["lon"]], radius=6,
-                color="#1FA555", weight=1, fill=True, fill_color="#1FA555", fill_opacity=0.85,
+                color=TEINTE_CARTE, weight=1, fill=True, fill_color=TEINTE_CARTE, fill_opacity=0.85,
                 tooltip=c["nom"],
             ).add_to(cluster)
 
