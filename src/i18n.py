@@ -533,6 +533,27 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
     "observatoire.aucun_besoin_sphere": {
         "fr": "Aucun besoin déclaré dans cette sphère pour l'instant.", "en": "No need declared in this sphere yet.",
     },
+    "observatoire.portrait_national_titre": {
+        "fr": "Portrait du réseau national", "en": "National network portrait",
+    },
+    "observatoire.portrait_national_texte": {
+        "fr": "Instantané du recensement national BDTFL 2026 ({n} répondants, extrait le {date}) — figé à cette "
+              "date, distinct des données Space2 ci-dessus qui évoluent avec les entretiens.",
+        "en": "Snapshot of the 2026 national BDTFL census ({n} respondents, extracted on {date}) — frozen at "
+              "that date, distinct from the Space2 data above which evolves with interviews.",
+    },
+    "observatoire.portrait_vue_ensemble": {"fr": "Vue d'ensemble", "en": "Overview"},
+    "observatoire.portrait_familles_activites": {"fr": "Familles et activités", "en": "Families and activities"},
+    "observatoire.portrait_equipements_publics": {"fr": "Équipements et publics", "en": "Equipment and audiences"},
+    "observatoire.portrait_foncier": {"fr": "Foncier", "en": "Property"},
+    "observatoire.portrait_reseaux_partenariats": {
+        "fr": "Réseaux et partenariats", "en": "Networks and partnerships",
+    },
+    "observatoire.portrait_emplois_benevolat": {"fr": "Emplois et bénévolat", "en": "Jobs and volunteering"},
+    "observatoire.portrait_perspectives": {"fr": "Perspectives et besoins", "en": "Outlook and needs"},
+    "observatoire.portrait_source": {
+        "fr": "Source : {source}.", "en": "Source: {source}.",
+    },
     "observatoire.sources_externes_titre": {
         "fr": "Pour aller plus loin", "en": "To go further",
     },

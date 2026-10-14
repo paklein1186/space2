@@ -1,0 +1,937 @@
+{
+  "source": "Recensement national des tiers-lieux 2026 (France Tiers-Lieux, data.gouv.fr)",
+  "echantillon": 998,
+  "date_extraction": "2026-10-14",
+  "repartitions": {
+    "statut_lieu": {
+      "titre": "Statut du lieu",
+      "repondants": 998,
+      "valeurs": [
+        {
+          "label": "en activité",
+          "n": 972,
+          "pct": 97.4
+        },
+        {
+          "label": "en projet (pas encore ouvert)",
+          "n": 24,
+          "pct": 2.4
+        },
+        {
+          "label": "en cours de fermeture ou fermé en 2025",
+          "n": 1,
+          "pct": 0.1
+        },
+        {
+          "label": "fermé depuis plus d'1 an",
+          "n": 1,
+          "pct": 0.1
+        }
+      ]
+    },
+    "initiative_origine": {
+      "titre": "Qui est à l'initiative de la création",
+      "repondants": 915,
+      "valeurs": [
+        {
+          "label": "une association déjà existante ou un collectif d’associations",
+          "n": 311,
+          "pct": 34.0
+        },
+        {
+          "label": "une initiative citoyenne (collectif d'habitants)",
+          "n": 265,
+          "pct": 29.0
+        },
+        {
+          "label": "un entrepreneur individuel, une entreprise, un collectif d'artisans ou d'entreprises",
+          "n": 160,
+          "pct": 17.5
+        },
+        {
+          "label": "une Commune",
+          "n": 81,
+          "pct": 8.9
+        },
+        {
+          "label": "une Intercommunalité (communauté de communes, communauté urbaine, communauté d’agglomération, métropole, etc.)",
+          "n": 61,
+          "pct": 6.7
+        },
+        {
+          "label": "une université ou un établissement d’enseignement supérieur",
+          "n": 11,
+          "pct": 1.2
+        },
+        {
+          "label": "je ne sais pas répondre à cette question",
+          "n": 10,
+          "pct": 1.1
+        },
+        {
+          "label": "les services de l'état",
+          "n": 6,
+          "pct": 0.7
+        },
+        {
+          "label": "une structure culturelle (scène nationale, bibliothèque, etc.)",
+          "n": 3,
+          "pct": 0.3
+        },
+        {
+          "label": "un Département",
+          "n": 3,
+          "pct": 0.3
+        },
+        {
+          "label": "une Région",
+          "n": 1,
+          "pct": 0.1
+        },
+        {
+          "label": "un Parc Naturel Régional",
+          "n": 1,
+          "pct": 0.1
+        },
+        {
+          "label": "un PETR / Pays",
+          "n": 1,
+          "pct": 0.1
+        },
+        {
+          "label": "un établissement scolaire",
+          "n": 1,
+          "pct": 0.1
+        }
+      ]
+    },
+    "familles_tiers_lieux": {
+      "titre": "Familles de tiers-lieux",
+      "repondants": 952,
+      "valeurs": [
+        {
+          "label": "Tiers-lieux culturels / Lieux intermédiaires et indépendants",
+          "n": 431,
+          "pct": 45.3
+        },
+        {
+          "label": "Bureaux partagés / Coworking",
+          "n": 365,
+          "pct": 38.3
+        },
+        {
+          "label": "Espaces d'éducation populaire",
+          "n": 344,
+          "pct": 36.1
+        },
+        {
+          "label": "Tiers-lieux solidaires",
+          "n": 325,
+          "pct": 34.1
+        },
+        {
+          "label": "Fablabs / Makerspaces / Hackerspaces / Espaces du Faire / Ateliers artisanaux partagés",
+          "n": 268,
+          "pct": 28.2
+        },
+        {
+          "label": "Cafés associatifs",
+          "n": 246,
+          "pct": 25.8
+        },
+        {
+          "label": "Tiers-lieux de formation",
+          "n": 205,
+          "pct": 21.5
+        },
+        {
+          "label": "Tiers-lieux nourriciers (terres agricoles partagées / cuisine partagée / laboratoire de transformation alimentaire / FoodLabs / etc.)",
+          "n": 143,
+          "pct": 15.0
+        },
+        {
+          "label": "Ressourceries / Recycleries / Repair'Cafés",
+          "n": 136,
+          "pct": 14.3
+        },
+        {
+          "label": "Living Labs / Laboratoire d'innovation sociale",
+          "n": 103,
+          "pct": 10.8
+        },
+        {
+          "label": "Écolieux",
+          "n": 77,
+          "pct": 8.1
+        },
+        {
+          "label": "Tiers-lieux de recherche",
+          "n": 65,
+          "pct": 6.8
+        },
+        {
+          "label": "Tiers-lieux de santé",
+          "n": 50,
+          "pct": 5.3
+        }
+      ]
+    },
+    "activites_principales": {
+      "titre": "Activités principales",
+      "repondants": 975,
+      "valeurs": [
+        {
+          "label": "Activités culturelles et/ou artistiques",
+          "n": 450,
+          "pct": 46.2
+        },
+        {
+          "label": "Bureau / Coworking",
+          "n": 383,
+          "pct": 39.3
+        },
+        {
+          "label": "Activités et animations socio-culturelles (conférences / jeux de société / etc.)",
+          "n": 346,
+          "pct": 35.5
+        },
+        {
+          "label": "Activités d'éducation populaire / Transfert de savoir-faire",
+          "n": 343,
+          "pct": 35.2
+        },
+        {
+          "label": "Evènementiel",
+          "n": 306,
+          "pct": 31.4
+        },
+        {
+          "label": "Atelier de fabrication / espace de production",
+          "n": 261,
+          "pct": 26.8
+        },
+        {
+          "label": "Bar / café",
+          "n": 253,
+          "pct": 25.9
+        },
+        {
+          "label": "Médiation numérique / inclusion numérique",
+          "n": 171,
+          "pct": 17.5
+        },
+        {
+          "label": "Formation professionnelle / Insertion",
+          "n": 161,
+          "pct": 16.5
+        },
+        {
+          "label": "Cantine / restaurant",
+          "n": 126,
+          "pct": 12.9
+        },
+        {
+          "label": "Accueil d'élèves et/ou de classes",
+          "n": 117,
+          "pct": 12.0
+        },
+        {
+          "label": "Espaces ouverts / d'expression libre et de débat d'idées",
+          "n": 106,
+          "pct": 10.9
+        },
+        {
+          "label": "Point d'appui à la vie associative / vie étudiante / de quartier / etc",
+          "n": 99,
+          "pct": 10.2
+        },
+        {
+          "label": "Boutique / Épicerie / Marché",
+          "n": 91,
+          "pct": 9.3
+        }
+      ]
+    },
+    "types_equipements": {
+      "titre": "Équipements proposés",
+      "repondants": 945,
+      "valeurs": [
+        {
+          "label": "Salle(s) de travail / bureaux et open spaces (postes de travail / salle de réunion / espaces de séminaires / etc.)",
+          "n": 656,
+          "pct": 69.4
+        },
+        {
+          "label": "Bureautiques (ordinateurs / écran d'ordinateur / projection / imprimantes / accès numérique par la fibre / photocopieuse / wifi / infrastructure informatique / etc.)",
+          "n": 566,
+          "pct": 59.9
+        },
+        {
+          "label": "Pratique artistique / diffusion / production (local de répétition / atelier pour la pratique artistique / salle d'exposition / de spectacle / galerie / studio photo / vidéo / musique / etc.)",
+          "n": 420,
+          "pct": 44.4
+        },
+        {
+          "label": "Évènements grand public (bar / chapiteau / espaces extérieurs / scènes / salle de concert / cuisine professionnelle / four à pain/pizza / etc.)",
+          "n": 409,
+          "pct": 43.3
+        },
+        {
+          "label": "Jardinage et bricolage (atelier / établi / stockage / outils / aire de compostage / etc.)",
+          "n": 308,
+          "pct": 32.6
+        },
+        {
+          "label": "Formation (Plateaux techniques de formation / jardins et espaces pédagogiques / matériel de facilitation / etc.)",
+          "n": 303,
+          "pct": 32.1
+        },
+        {
+          "label": "Production artisanale (ateliers / établis / stockage / sérigraphies / presse / four à céramique / couture / plateforme de montage / menuiserie / poterie...etc.)",
+          "n": 279,
+          "pct": 29.5
+        },
+        {
+          "label": "Numériques (brodeuse numérique / découpe laser / fraiseuse numérique / imprimante 3D / traceuse / etc.)",
+          "n": 264,
+          "pct": 27.9
+        },
+        {
+          "label": "Production alimentaire (four / séchoir / fumoir / cave de stockage / congélateurs / frigos / serres / potager / verger / champs agricoles / autoclave / etc.)",
+          "n": 185,
+          "pct": 19.6
+        },
+        {
+          "label": "Enfance (casiers / crèches / jouets / cabanes / etc.)",
+          "n": 131,
+          "pct": 13.9
+        },
+        {
+          "label": "Sportifs (salles de pratiques sportives / terrains de sport / paniers de basket / tables de ping-pong / etc.)",
+          "n": 75,
+          "pct": 7.9
+        },
+        {
+          "label": "Habitats légers et hébergements (yourte / tiny house / caravane / douches / sanitaires / lits / etc.)",
+          "n": 56,
+          "pct": 5.9
+        }
+      ]
+    },
+    "publics_types": {
+      "titre": "Publics accueillis",
+      "repondants": 828,
+      "valeurs": [
+        {
+          "label": "Salariés",
+          "n": 667,
+          "pct": 80.6
+        },
+        {
+          "label": "Travailleurs indépendants",
+          "n": 606,
+          "pct": 73.2
+        },
+        {
+          "label": "Demandeurs d'emploi",
+          "n": 507,
+          "pct": 61.2
+        },
+        {
+          "label": "Personnes en reconversion professionnelle",
+          "n": 423,
+          "pct": 51.1
+        },
+        {
+          "label": "Adultes peu ou pas qualifiés",
+          "n": 412,
+          "pct": 49.8
+        },
+        {
+          "label": "Bénéficiaires de minima sociaux",
+          "n": 386,
+          "pct": 46.6
+        },
+        {
+          "label": "Étudiants",
+          "n": 384,
+          "pct": 46.4
+        },
+        {
+          "label": "Jeunes peu ou pas qualifiés",
+          "n": 381,
+          "pct": 46.0
+        },
+        {
+          "label": "Chefs d'entreprises",
+          "n": 377,
+          "pct": 45.5
+        },
+        {
+          "label": "Personnes en insertion professionnelle",
+          "n": 348,
+          "pct": 42.0
+        },
+        {
+          "label": "Personnes en situation de handicap",
+          "n": 308,
+          "pct": 37.2
+        },
+        {
+          "label": "Bénéficiaires du CADA (accueil réfugiés)",
+          "n": 119,
+          "pct": 14.4
+        }
+      ]
+    },
+    "statut_foncier": {
+      "titre": "Situation foncière",
+      "repondants": 909,
+      "valeurs": [
+        {
+          "label": "Locataire du bâtiment à prix modéré",
+          "n": 239,
+          "pct": 26.3
+        },
+        {
+          "label": "Occupant du bâtiment à titre gracieux",
+          "n": 237,
+          "pct": 26.1
+        },
+        {
+          "label": "Locataire du bâtiment au prix du marché",
+          "n": 219,
+          "pct": 24.1
+        },
+        {
+          "label": "Propriétaire du bâtiment (seul ou en collectif)",
+          "n": 209,
+          "pct": 23.0
+        },
+        {
+          "label": "Occupant sans droit ni titre",
+          "n": 5,
+          "pct": 0.6
+        }
+      ]
+    },
+    "type_proprietaire": {
+      "titre": "Type de propriétaire (en location)",
+      "repondants": 685,
+      "valeurs": [
+        {
+          "label": "Commune",
+          "n": 248,
+          "pct": 36.2
+        },
+        {
+          "label": "Propriétaire privé particulier",
+          "n": 242,
+          "pct": 35.3
+        },
+        {
+          "label": "Intercommunalité",
+          "n": 74,
+          "pct": 10.8
+        },
+        {
+          "label": "Bailleur social",
+          "n": 42,
+          "pct": 6.1
+        },
+        {
+          "label": "SEM",
+          "n": 14,
+          "pct": 2.0
+        },
+        {
+          "label": "Promoteur immobilier",
+          "n": 13,
+          "pct": 1.9
+        },
+        {
+          "label": "Propriétaire privé institutionnel",
+          "n": 12,
+          "pct": 1.8
+        },
+        {
+          "label": "Opérateur public",
+          "n": 11,
+          "pct": 1.6
+        },
+        {
+          "label": "Aménageur",
+          "n": 8,
+          "pct": 1.2
+        },
+        {
+          "label": "Région",
+          "n": 8,
+          "pct": 1.2
+        },
+        {
+          "label": "Département",
+          "n": 7,
+          "pct": 1.0
+        },
+        {
+          "label": "État",
+          "n": 6,
+          "pct": 0.9
+        }
+      ]
+    },
+    "duree_bail": {
+      "titre": "Durée du bail",
+      "repondants": 748,
+      "valeurs": [
+        {
+          "label": "Entre 3 et 9 ans",
+          "n": 273,
+          "pct": 36.5
+        },
+        {
+          "label": "Entre 1 et 3 ans",
+          "n": 247,
+          "pct": 33.0
+        },
+        {
+          "label": "Plus de 9 ans",
+          "n": 186,
+          "pct": 24.9
+        },
+        {
+          "label": "Moins d'1 an",
+          "n": 42,
+          "pct": 5.6
+        }
+      ]
+    },
+    "reseaux_regionaux": {
+      "titre": "Réseaux régionaux",
+      "repondants": 759,
+      "valeurs": [
+        {
+          "label": "La Coopérative Tiers-Lieux (Nouvelle-Aquitaine)",
+          "n": 115,
+          "pct": 15.2
+        },
+        {
+          "label": "Bretagne Tiers-Lieux",
+          "n": 79,
+          "pct": 10.4
+        },
+        {
+          "label": "Tiers-Lieux Grand Est",
+          "n": 77,
+          "pct": 10.1
+        },
+        {
+          "label": "RELIEF (Auvergne Rhône-Alpes)",
+          "n": 74,
+          "pct": 9.7
+        },
+        {
+          "label": "La Compagnie des Tiers-Lieux (Hauts-de-France)",
+          "n": 71,
+          "pct": 9.4
+        },
+        {
+          "label": "La Rosêe (Occitanie)",
+          "n": 64,
+          "pct": 8.4
+        },
+        {
+          "label": "Tiers-lieux BFC (Bourgogne Franche Comté)",
+          "n": 45,
+          "pct": 5.9
+        },
+        {
+          "label": "Sud Tiers-Lieux (Provence Alpes Côte d'Azur)",
+          "n": 35,
+          "pct": 4.6
+        },
+        {
+          "label": "TILINO (Normandie)",
+          "n": 34,
+          "pct": 4.5
+        },
+        {
+          "label": "CAP Tiers-Lieux (Pays de la Loire)",
+          "n": 34,
+          "pct": 4.5
+        },
+        {
+          "label": "A+ c'est mieux ! (Ile-de-France)",
+          "n": 34,
+          "pct": 4.5
+        },
+        {
+          "label": "Territoire des Communs (Centre-Val de Loire)",
+          "n": 25,
+          "pct": 3.3
+        },
+        {
+          "label": "Cédille Pro (AURA)",
+          "n": 24,
+          "pct": 3.2
+        },
+        {
+          "label": "Da Locu (Corse)",
+          "n": 19,
+          "pct": 2.5
+        }
+      ]
+    },
+    "reseaux_nationaux": {
+      "titre": "Réseaux thématiques nationaux",
+      "repondants": 155,
+      "valeurs": [
+        {
+          "label": "Réseau Français des Fablabs / Espaces et Communautés du Faire (RFFLabs)",
+          "n": 83,
+          "pct": 53.5
+        },
+        {
+          "label": "Réseau des Cafés Culturels et Cantines Associatifs (RECCCA)",
+          "n": 22,
+          "pct": 14.2
+        },
+        {
+          "label": "Les tiers-lieuses (réseau des tiers-lieux à but non lucratif et non spéculatif)",
+          "n": 19,
+          "pct": 12.3
+        },
+        {
+          "label": "Coordination Nationale des Lieux Intermédiaires et Indépendants (CNLII)",
+          "n": 18,
+          "pct": 11.6
+        },
+        {
+          "label": "Réseau National des Ressourceries et Recycleries",
+          "n": 15,
+          "pct": 9.7
+        },
+        {
+          "label": "Réseau Tiers-Lieux Libres et Open Source (TiLiOS)",
+          "n": 10,
+          "pct": 6.5
+        },
+        {
+          "label": "Réseau des CREFAD",
+          "n": 5,
+          "pct": 3.2
+        },
+        {
+          "label": "Réseau Cocagne",
+          "n": 4,
+          "pct": 2.6
+        },
+        {
+          "label": "Tiers-Lieux Edu",
+          "n": 4,
+          "pct": 2.6
+        }
+      ]
+    },
+    "partenariats_collectivites": {
+      "titre": "Partenariats avec des collectivités",
+      "repondants": 964,
+      "valeurs": [
+        {
+          "label": "Commune",
+          "n": 753,
+          "pct": 78.1
+        },
+        {
+          "label": "Intercommunalité (Communauté de Communes / Communauté d'Agglomération / Métropole)",
+          "n": 678,
+          "pct": 70.3
+        },
+        {
+          "label": "La Région",
+          "n": 523,
+          "pct": 54.3
+        },
+        {
+          "label": "Le Département",
+          "n": 481,
+          "pct": 49.9
+        },
+        {
+          "label": "L'État et services déconcentrés : Préfecture (région ou département) / DRAAF / DRAC / DREETS (ex Direccte et DRJSCS)",
+          "n": 411,
+          "pct": 42.6
+        },
+        {
+          "label": "La CAF",
+          "n": 266,
+          "pct": 27.6
+        },
+        {
+          "label": "France Travail",
+          "n": 225,
+          "pct": 23.3
+        },
+        {
+          "label": "L'Europe",
+          "n": 183,
+          "pct": 19.0
+        },
+        {
+          "label": "Le Pays / Pôle d'Équilibre Territorial et Rural",
+          "n": 98,
+          "pct": 10.2
+        },
+        {
+          "label": "Le Parc Naturel Régional",
+          "n": 91,
+          "pct": 9.4
+        },
+        {
+          "label": "Le rectorat",
+          "n": 74,
+          "pct": 7.7
+        },
+        {
+          "label": "Pas encore de lien avec les institution publiques",
+          "n": 51,
+          "pct": 5.3
+        },
+        {
+          "label": "Le CROUS",
+          "n": 20,
+          "pct": 2.1
+        },
+        {
+          "label": "Volontairement aucun lien avec les institutions publiques",
+          "n": 17,
+          "pct": 1.8
+        }
+      ]
+    },
+    "perspectives": {
+      "titre": "Perspectives de développement",
+      "repondants": 954,
+      "valeurs": [
+        {
+          "label": "Animer une dynamique territoriale",
+          "n": 509,
+          "pct": 53.4
+        },
+        {
+          "label": "Continuer comme ça !",
+          "n": 406,
+          "pct": 42.6
+        },
+        {
+          "label": "Développer la gouvernance partagée au sein du tiers-lieu",
+          "n": 401,
+          "pct": 42.0
+        },
+        {
+          "label": "Développer une nouvelle activité économique (ex : café / boutique / prestations...)",
+          "n": 380,
+          "pct": 39.8
+        },
+        {
+          "label": "Développer une nouvelle activité d'intérêt collectif",
+          "n": 315,
+          "pct": 33.0
+        },
+        {
+          "label": "Développer un axe culturel ou artistique dans le projet du tiers-lieu",
+          "n": 246,
+          "pct": 25.8
+        },
+        {
+          "label": "Agrandir votre espace",
+          "n": 238,
+          "pct": 24.9
+        },
+        {
+          "label": "Développer des compétences de gestion au sein du collectif du tiers-lieu",
+          "n": 232,
+          "pct": 24.3
+        },
+        {
+          "label": "Développer des actions de résilience territoriale à travers l'agriculture locale / l'économie circulaire / ou autres.",
+          "n": 227,
+          "pct": 23.8
+        },
+        {
+          "label": "Développer le volet recherche-action dans le tiers-lieu",
+          "n": 169,
+          "pct": 17.7
+        },
+        {
+          "label": "Développer un axe réemploi (ressourcerie / recyclerie et/ou matériauthèque)",
+          "n": 157,
+          "pct": 16.5
+        },
+        {
+          "label": "Déménager",
+          "n": 82,
+          "pct": 8.6
+        },
+        {
+          "label": "Acheter le bâtiment",
+          "n": 72,
+          "pct": 7.5
+        },
+        {
+          "label": "Malheureusement la perspective est de fermer le lieu",
+          "n": 16,
+          "pct": 1.7
+        }
+      ]
+    },
+    "risques": {
+      "titre": "Principaux risques identifiés (12 prochains mois)",
+      "repondants": 798,
+      "valeurs": [
+        {
+          "label": "Baisse accentuée du soutien des partenaires publics",
+          "n": 407,
+          "pct": 51.0
+        },
+        {
+          "label": "Épuisement ou démotivation des équipes",
+          "n": 399,
+          "pct": 50.0
+        },
+        {
+          "label": "Non développement d'une activité ou d'un projet",
+          "n": 381,
+          "pct": 47.7
+        },
+        {
+          "label": "Arrêt d'une activité ou d'un projet",
+          "n": 248,
+          "pct": 31.1
+        },
+        {
+          "label": "Arbitrage en faveur de projets plus rentables financièrement",
+          "n": 229,
+          "pct": 28.7
+        },
+        {
+          "label": "Diminution de la qualité des services / activités menées avec les publics",
+          "n": 125,
+          "pct": 15.7
+        },
+        {
+          "label": "Fermeture",
+          "n": 78,
+          "pct": 9.8
+        },
+        {
+          "label": "Redressement judiciaire",
+          "n": 35,
+          "pct": 4.4
+        }
+      ]
+    },
+    "besoins_accompagnement": {
+      "titre": "Besoins d'accompagnement",
+      "repondants": 787,
+      "valeurs": [
+        {
+          "label": "Sensibilisation de votre collectivité",
+          "n": 364,
+          "pct": 46.3
+        },
+        {
+          "label": "Conseils en développement",
+          "n": 349,
+          "pct": 44.3
+        },
+        {
+          "label": "Mise en lien avec d'autres tiers-lieux ou réseaux",
+          "n": 303,
+          "pct": 38.5
+        },
+        {
+          "label": "Ressources pratiques et inspirantes (modèles de conventions / exemple de budget prévisionnel...)",
+          "n": 298,
+          "pct": 37.9
+        },
+        {
+          "label": "Montée en compétences des ressources humaines du TL (formation pro / incubation / etc)",
+          "n": 253,
+          "pct": 32.1
+        },
+        {
+          "label": "Accompagnement individualisé",
+          "n": 207,
+          "pct": 26.3
+        },
+        {
+          "label": "Collaboration avec votre réseau régional autour d’un évènement",
+          "n": 175,
+          "pct": 22.2
+        },
+        {
+          "label": "Médiation et gestion des conflits internes",
+          "n": 63,
+          "pct": 8.0
+        }
+      ]
+    }
+  },
+  "chiffres": {
+    "etp_salaries": {
+      "titre": "ETP salariés",
+      "unite": "",
+      "total": 3024,
+      "base": 998
+    },
+    "etp_benevoles": {
+      "titre": "ETP bénévoles",
+      "unite": "",
+      "total": 4840,
+      "base": 998
+    },
+    "adherents": {
+      "titre": "Adhérents en 2025",
+      "unite": "",
+      "total": 222002,
+      "base": 991
+    },
+    "benevoles_tres_actifs": {
+      "titre": "Bénévoles très actifs",
+      "unite": "",
+      "total": 5419,
+      "base": 998
+    },
+    "benevoles_actifs": {
+      "titre": "Bénévoles actifs",
+      "unite": "",
+      "total": 12997,
+      "base": 998
+    },
+    "benevoles_ponctuels": {
+      "titre": "Bénévoles ponctuels",
+      "unite": "",
+      "total": 22148,
+      "base": 998
+    }
+  },
+  "booleens": {
+    "volontaires_compagnonnage": {
+      "titre": "Volontaires pour compagnonner d'autres lieux",
+      "pct": 67.2,
+      "base": 998
+    },
+    "heberge_service_public": {
+      "titre": "Hébergent directement un service public",
+      "pct": 12.0,
+      "base": 998
+    },
+    "labellises_qualiopi": {
+      "titre": "Labellisés Qualiopi",
+      "pct": 6.7,
+      "base": 998
+    }
+  }
+}

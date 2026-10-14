@@ -12,6 +12,7 @@ fois par run)."""
 from __future__ import annotations
 
 import html
+import json
 import re
 import sys
 from pathlib import Path
@@ -324,6 +325,102 @@ else:
             for besoin, lieux_concernes in par_besoin:
                 with st.expander(f"{besoin} ({len(lieux_concernes)})"):
                     st.caption(", ".join(lieux_concernes))
+
+st.divider()
+
+
+def _repartition_bdtfl(repartition: dict) -> None:
+    st.markdown(f"**{repartition['titre']}**")
+    if not repartition["valeurs"]:
+        st.caption(t("observatoire.aucune_donnee"))
+        return
+    serie = pd.Series(
+        {v["label"]: v["n"] for v in repartition["valeurs"]},
+    )
+    _graphique_barres(serie)
+    st.caption(t("observatoire.n_lieux", n=repartition["repondants"]))
+
+
+try:
+    _portrait = json.loads(
+        (Path(__file__).resolve().parent.parent / "data" / "bdtfl_observatoire_2026.json").read_text(encoding="utf-8")
+    )
+except (FileNotFoundError, json.JSONDecodeError):
+    _portrait = None
+
+if _portrait:
+    st.subheader(t("observatoire.portrait_national_titre"))
+    st.caption(t("observatoire.portrait_national_texte", n=_portrait["echantillon"], date=_portrait["date_extraction"]))
+
+    with st.expander(t("observatoire.portrait_vue_ensemble"), expanded=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            _repartition_bdtfl(_portrait["repartitions"]["statut_lieu"])
+        with col2:
+            _repartition_bdtfl(_portrait["repartitions"]["initiative_origine"])
+
+    with st.expander(t("observatoire.portrait_familles_activites")):
+        col1, col2 = st.columns(2)
+        with col1:
+            _repartition_bdtfl(_portrait["repartitions"]["familles_tiers_lieux"])
+        with col2:
+            _repartition_bdtfl(_portrait["repartitions"]["activites_principales"])
+
+    with st.expander(t("observatoire.portrait_equipements_publics")):
+        col1, col2 = st.columns(2)
+        with col1:
+            _repartition_bdtfl(_portrait["repartitions"]["types_equipements"])
+        with col2:
+            _repartition_bdtfl(_portrait["repartitions"]["publics_types"])
+
+    with st.expander(t("observatoire.portrait_foncier")):
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            _repartition_bdtfl(_portrait["repartitions"]["statut_foncier"])
+        with col2:
+            _repartition_bdtfl(_portrait["repartitions"]["type_proprietaire"])
+        with col3:
+            _repartition_bdtfl(_portrait["repartitions"]["duree_bail"])
+
+    with st.expander(t("observatoire.portrait_reseaux_partenariats")):
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            _repartition_bdtfl(_portrait["repartitions"]["reseaux_regionaux"])
+        with col2:
+            _repartition_bdtfl(_portrait["repartitions"]["reseaux_nationaux"])
+        with col3:
+            _repartition_bdtfl(_portrait["repartitions"]["partenariats_collectivites"])
+
+    with st.expander(t("observatoire.portrait_emplois_benevolat")):
+        chiffres = _portrait["chiffres"]
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric(chiffres["etp_salaries"]["titre"], f"{chiffres['etp_salaries']['total']:,}".replace(",", " "))
+            st.caption(t("observatoire.n_lieux", n=chiffres["etp_salaries"]["base"]))
+        with col2:
+            st.metric(chiffres["etp_benevoles"]["titre"], f"{chiffres['etp_benevoles']['total']:,}".replace(",", " "))
+            st.caption(t("observatoire.n_lieux", n=chiffres["etp_benevoles"]["base"]))
+        with col3:
+            st.metric(chiffres["adherents"]["titre"], f"{chiffres['adherents']['total']:,}".replace(",", " "))
+            st.caption(t("observatoire.n_lieux", n=chiffres["adherents"]["base"]))
+        booleens = _portrait["booleens"]
+        col4, col5, col6 = st.columns(3)
+        for col, cle in zip((col4, col5, col6), ("volontaires_compagnonnage", "heberge_service_public", "labellises_qualiopi")):
+            with col:
+                b = booleens[cle]
+                st.metric(b["titre"], f"{b['pct']}%" if b["pct"] is not None else "—")
+                st.caption(t("observatoire.n_lieux", n=b["base"]))
+
+    with st.expander(t("observatoire.portrait_perspectives")):
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            _repartition_bdtfl(_portrait["repartitions"]["perspectives"])
+        with col2:
+            _repartition_bdtfl(_portrait["repartitions"]["risques"])
+        with col3:
+            _repartition_bdtfl(_portrait["repartitions"]["besoins_accompagnement"])
+
+    st.caption(t("observatoire.portrait_source", source=_portrait["source"]))
 
 st.divider()
 st.markdown(f"**{t('observatoire.sources_externes_titre')}**")
