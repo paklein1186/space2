@@ -60,8 +60,18 @@ def _graphique_barres(series: pd.Series) -> None:
     st.markdown(f'<div style="font-family:inherit;">{"".join(lignes)}</div>', unsafe_allow_html=True)
 
 
-with st.spinner(t("observatoire.chargement")):
+# st.empty() comme emplacement stable plutôt qu'un st.spinner() nu : le
+# composant cookie (thème/langue, voir apply_theme()) répond de façon
+# asynchrone sur CHAQUE page, ce qui déclenche automatiquement un second
+# passage du script juste après le premier (comportement propre à tout
+# composant Streamlit bidirectionnel, pas quelque chose qu'on contrôle
+# depuis ici) — sans emplacement stable, le spinner du premier passage
+# pouvait rester visible en grisé pendant que celui du second s'affichait
+# juste en dessous (signalé comme "deux trucs redondants" en production).
+_zone_chargement = st.empty()
+with _zone_chargement, st.spinner(t("observatoire.chargement")):
     df_lieux, df_reponses = donnees_observatoire()
+_zone_chargement.empty()
 
 if df_lieux.empty:
     st.info(t("observatoire.aucun_lieu_enrichi"))
