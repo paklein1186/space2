@@ -18,7 +18,9 @@ from typing import Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pandas as pd
-import pydeck as pdk
+import folium
+from folium.plugins import MarkerCluster
+from streamlit_folium import st_folium
 import streamlit as st
 import streamlit.components.v1 as components
 from dotenv import load_dotenv
@@ -1032,100 +1034,69 @@ def annuaire_tab(store, est_admin: bool, user_id: str):
 
     coords = lieux_avec_coordonnees(lieux_affiches)
     if coords:
-        df_coords = pd.DataFrame(coords)
-        lat_centre = df_coords["lat"].mean()
-        lon_centre = df_coords["lon"].mean()
+        lats = [c["lat"] for c in coords]
+        lons = [c["lon"] for c in coords]
+        lat_centre = sum(lats) / len(lats)
+        lon_centre = sum(lons) / len(lons)
         # Zoom calé sur l'étendue réelle des lieux plutôt qu'une valeur fixe
         # (vue par défaut trop large ou trop resserrée selon les données) :
         # formule standard "fit bounds" (256px = 360° au niveau 0), avec une
         # marge de 30% pour ne pas coller les points au bord de la carte.
-        etendue = max(
-            df_coords["lat"].max() - df_coords["lat"].min(),
-            df_coords["lon"].max() - df_coords["lon"].min(),
-            0.02,
-        )
-        zoom = max(3.0, min(math.log2(757 / etendue), 14.0))
+        etendue = max(max(lats) - min(lats), max(lons) - min(lons), 0.02)
+        zoom = max(3, min(round(math.log2(757 / etendue)), 14))
 
-        # Couche de densité sous les points cliquables : deck.gl n'a pas de
-        # vrai "cluster à bulles numérotées" dans son catalogue standard, et
-        # lire le niveau de zoom en direct depuis Python demanderait un
-        # composant bidirectionnel custom (pas dispo avec pydeck). ScreenGridLayer
-        # est la seule couche d'agrégation dont la taille de cellule est en
-        # PIXELS (cell_size_pixels) plutôt qu'en mètres réels (HexagonLayer/
-        # GridLayer) : la taille à l'écran reste donc fixe, mais la zone
-        # géographique couverte par cellule rétrécit au zoom — la densité se
-        # déclusterise donc naturellement à mesure qu'on zoome, sans rerun
-        # Streamlit. Rendue SOUS la couche de points (ordre du tableau
-        # `layers`), qui reste seule cliquable pour ouvrir une fiche.
-        couche_densite = pdk.Layer(
-            "ScreenGridLayer",
-            data=df_coords,
-            get_position=["lon", "lat"],
-            cell_size_pixels=40,
-            opacity=0.45,
-            color_range=[
-                [241, 245, 249, 0],
-                [203, 213, 225, 60],
-                [148, 163, 184, 110],
-                [100, 116, 139, 160],
-                [71, 85, 105, 210],
-                [51, 65, 85, 255],
-            ],
-        )
-        couche_lieux = pdk.Layer(
-            "ScatterplotLayer",
-            data=df_coords,
-            id="lieux",
-            get_position=["lon", "lat"],
-            # Teinte neutre et semi-transparente, petits points : avec ~4000
-            # lieux, des marqueurs vifs et gros se superposent en une masse
-            # verte illisible ; ainsi les zones denses se lisent comme telles.
-            get_fill_color=[71, 85, 105, 150],
-            get_radius=300,
-            # Rayon plancher en pixels (indépendant du zoom) : à faible zoom,
-            # 300m à l'échelle réelle devient quelques pixels à peine, trop
-            # petit pour être cliqué de façon fiable.
-            radius_min_pixels=4,
-            radius_max_pixels=10,
-            pickable=True,
-            auto_highlight=True,
-        )
-        vue = pdk.ViewState(latitude=lat_centre, longitude=lon_centre, zoom=zoom)
-        # map_provider="carto" : fond de carte par défaut de pydeck, sans
-        # jeton Mapbox à configurer (contrairement à map_style="mapbox://...").
-        deck = pdk.Deck(
-            layers=[couche_lieux], initial_view_state=vue,
-            map_provider="carto", map_style="light",
-            tooltip={"text": "{nom}"},
-        )
-        # on_select="rerun" + id sur la couche : un clic renvoie le lieu
-        # sélectionné, réutilisé pour ouvrir la même fiche que le clic sur
-        # une carte de la grille (annuaire_open_lieu_id), sans dupliquer le
-        # popup dans un second mécanisme d'affichage.
-        #
-        # Clé versionnée (incrémentée à chaque sélection consommée) plutôt
-        # qu'une clé fixe : la sélection du widget carte reste posée côté
-        # deck.gl d'un rerun à l'autre (pas un événement ponctuel comme un
-        # clic de bouton) — avec une clé fixe, fermer la fiche puis recliquer
-        # EXACTEMENT le même point ne rouvrait plus rien (même id renvoyé
-        # que la dernière fois, donc traité comme "déjà vu" et ignoré,
-        # observé sur "Bigre test" : premier clic OK, mais plus rien au clic
-        # suivant sur le même marqueur). Changer la clé force le composant à
-        # se remonter sans sélection résiduelle, donc toujours prêt pour un
-        # nouveau clic — seul effet de bord : le pan/zoom manuel de la carte
-        # repart de la vue calée sur les lieux affichés à chaque ouverture de
-        # fiche, jugé largement préférable à une carte qui ne répond plus.
+        # Folium + Leaflet.markercluster plutôt que pydeck/deck.gl : un vrai
+        # cluster à bulle (compteur, se décompose en points individuels au
+        # zoom, clic sur une bulle = zoom automatique dessus) n'existe pas
+        # dans le catalogue standard de deck.gl — la couche de densité
+        # tentée avant (ScreenGridLayer) ne donnait qu'un effet de chaleur,
+        # jamais de vrais clusters cliquables. Leaflet.markercluster fait
+        # exactement ça nativement, recalculé côté navigateur à chaque pan/
+        # zoom, sans aller-retour Streamlit.
+        # "OpenStreetMap" (fond par défaut de folium) plutôt que CARTO
+        # Positron : CARTO exige désormais une clé API sur toutes ses tuiles
+        # (watermark "API KEY REQUIRED" constaté à l'essai, y compris en
+        # appelant l'URL de tuile brute hors de toute app) — OSM reste le
+        # seul fond gratuit sans clé parmi les choix standards de folium.
+        carte = folium.Map(location=[lat_centre, lon_centre], zoom_start=zoom, tiles="OpenStreetMap")
+        cluster = MarkerCluster(options={"maxClusterRadius": 60}).add_to(carte)
+        for c in coords:
+            folium.CircleMarker(
+                location=[c["lat"], c["lon"]], radius=6,
+                color="#1FA555", weight=1, fill=True, fill_color="#1FA555", fill_opacity=0.85,
+                tooltip=c["nom"],
+            ).add_to(cluster)
+
+        # Même logique de clé versionnée que l'ancienne carte pydeck :
+        # reconstruire le composant après chaque clic consommé, sinon
+        # recliquer EXACTEMENT le même point ne rouvre plus rien (déjà vécu
+        # avec pydeck, voir l'historique de ce fichier) — la cause (un
+        # composant qui garde la sélection d'un rerun à l'autre) est
+        # générique à ce genre de composant interactif, pas spécifique à
+        # pydeck.
         carte_version = st.session_state.get("annuaire_carte_version", 0)
-        evenement = st.pydeck_chart(
-            deck, on_select="rerun", selection_mode="single-object",
+        evenement = st_folium(
+            carte, height=520, use_container_width=True,
+            returned_objects=["last_object_clicked"],
             key=f"annuaire_map_{carte_version}",
         )
-        objets_selectionnes = evenement.selection.get("objects", {}).get("lieux", [])
-        if objets_selectionnes:
-            lieu_selectionne_id = objets_selectionnes[0]["id"]
-            st.session_state["annuaire_carte_version"] = carte_version + 1
-            st.session_state["annuaire_open_lieu_id"] = lieu_selectionne_id
-            st.rerun()
+        clic = evenement.get("last_object_clicked")
+        if clic:
+            # Identifie le lieu cliqué par ses coordonnées plutôt que par un
+            # id direct : Leaflet ne renvoie que lat/lng au clic, jamais les
+            # métadonnées du marqueur. Égalité approchée (6 décimales,
+            # ~10cm) pour absorber un éventuel arrondi JS ; au pire le
+            # premier lieu trouvé à cette position gagne (coordonnées
+            # strictement identiques entre deux lieux : jamais observé).
+            lieu_selectionne = next(
+                (c for c in coords if round(c["lat"], 6) == round(clic["lat"], 6)
+                 and round(c["lon"], 6) == round(clic["lng"], 6)),
+                None,
+            )
+            if lieu_selectionne:
+                st.session_state["annuaire_carte_version"] = carte_version + 1
+                st.session_state["annuaire_open_lieu_id"] = lieu_selectionne["id"]
+                st.rerun()
 
     if "annuaire_open_lieu_id" in st.session_state:
         lieu_id = st.session_state.pop("annuaire_open_lieu_id")
