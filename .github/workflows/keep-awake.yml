@@ -1,0 +1,27 @@
+name: Garder Space2 éveillé
+
+# Streamlit Community Cloud (palier gratuit) met l'app en veille après une
+# période d'inactivité — la visite suivante affiche alors "Your app is
+# waking up!" le temps d'un redémarrage à froid. Ce ping régulier simule une
+# visite pour que l'app ne retombe jamais en veille.
+#
+# Ne résout que le délai de réveil à froid, pas la lenteur de calcul en
+# fonctionnement normal (ressources mutualisées du palier gratuit) — pour
+# ça, voir les options d'hébergement alternatif évoquées en conversation.
+#
+# GitHub désactive automatiquement un workflow planifié après 60 jours sans
+# la moindre activité sur le dépôt (commit/push) — sans rapport avec ce que
+# fait ce workflow lui-même, juste une limite de GitHub Actions à garder en
+# tête si le dépôt venait à rester longtemps inactif.
+
+on:
+  schedule:
+    - cron: "*/20 * * * *"  # toutes les 20 minutes
+  workflow_dispatch: {}  # déclenchement manuel depuis l'onglet Actions
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Visiter Space2
+        run: curl -fsS --max-time 30 "https://space2.streamlit.app/" -o /dev/null
