@@ -964,6 +964,58 @@ def _historique_et_moderation(store, lieu, contributeurs_lieu: list, est_admin: 
             st.caption(f"{h.get('cree_le', '')} — {role}{statut_contrib} — {champ} : {h.get('valeur')}")
 
 
+@st.cache_resource(show_spinner=False)
+def _construire_carte_annuaire(signature_coords: tuple, lat_centre: float, lon_centre: float, zoom: int):
+    """Construit la carte Folium + le cluster de marqueurs. Mis en cache
+    (clé = signature des points affichés + centre/zoom) pour ne pas
+    reconstruire ~N marqueurs et resérialiser le HTML/JS à chaque rerun
+    Streamlit quand les lieux affichés n'ont pas changé — voir le
+    commentaire d'appel dans annuaire_tab."""
+    # Folium + Leaflet.markercluster plutôt que pydeck/deck.gl : un vrai
+    # cluster à bulle (compteur, se décompose en points individuels au
+    # zoom, clic sur une bulle = zoom automatique dessus) n'existe pas
+    # dans le catalogue standard de deck.gl — la couche de densité
+    # tentée avant (ScreenGridLayer) ne donnait qu'un effet de chaleur,
+    # jamais de vrais clusters cliquables. Leaflet.markercluster fait
+    # exactement ça nativement, recalculé côté navigateur à chaque pan/
+    # zoom, sans aller-retour Streamlit.
+    # "OpenStreetMap" (fond par défaut de folium) plutôt que CARTO
+    # Positron : CARTO exige désormais une clé API sur toutes ses tuiles
+    # (watermark "API KEY REQUIRED" constaté à l'essai, y compris en
+    # appelant l'URL de tuile brute hors de toute app) — OSM reste le
+    # seul fond gratuit sans clé parmi les choix standards de folium.
+    carte = folium.Map(location=[lat_centre, lon_centre], zoom_start=zoom, tiles="OpenStreetMap")
+    # Rose-mauve plutôt que l'accent vert habituel de l'app : sur un fond
+    # de carte OSM lui-même très vert (espaces naturels, parcs), des
+    # marqueurs verts se fondaient dans le décor (signalé peu lisible).
+    # icon_create_function personnalise aussi les bulles de cluster —
+    # sans lui, Leaflet.markercluster les affiche dans son dégradé vert
+    # par défaut, même incohérence.
+    TEINTE_CARTE = "#B83280"
+    cluster = MarkerCluster(
+        options={"maxClusterRadius": 60},
+        icon_create_function=f"""
+        function(cluster) {{
+            return L.divIcon({{
+                html: '<div style="background-color:{TEINTE_CARTE}; opacity:0.88; border-radius:50%; '
+                    + 'width:36px; height:36px; display:flex; align-items:center; justify-content:center; '
+                    + 'color:#fff; font-weight:600; font-family:inherit;">' + cluster.getChildCount() + '</div>',
+                className: 'marker-cluster-space2',
+                iconSize: L.point(36, 36),
+            }});
+        }}
+        """,
+    ).add_to(carte)
+    for lieu_id, lat, lon, nom in signature_coords:
+        folium.CircleMarker(
+            location=[lat, lon],
+            radius=6,
+            color=TEINTE_CARTE, weight=1, fill=True, fill_color=TEINTE_CARTE, fill_opacity=0.85,
+            tooltip=nom,
+        ).add_to(cluster)
+    return carte
+
+
 def annuaire_tab(store, est_admin: bool, user_id: str):
     st.title(t("lieux_hybrides.title"))
     st.caption(t("lieux_hybrides.caption"))
@@ -1045,47 +1097,16 @@ def annuaire_tab(store, est_admin: bool, user_id: str):
         etendue = max(max(lats) - min(lats), max(lons) - min(lons), 0.02)
         zoom = max(3, min(round(math.log2(757 / etendue)), 14))
 
-        # Folium + Leaflet.markercluster plutôt que pydeck/deck.gl : un vrai
-        # cluster à bulle (compteur, se décompose en points individuels au
-        # zoom, clic sur une bulle = zoom automatique dessus) n'existe pas
-        # dans le catalogue standard de deck.gl — la couche de densité
-        # tentée avant (ScreenGridLayer) ne donnait qu'un effet de chaleur,
-        # jamais de vrais clusters cliquables. Leaflet.markercluster fait
-        # exactement ça nativement, recalculé côté navigateur à chaque pan/
-        # zoom, sans aller-retour Streamlit.
-        # "OpenStreetMap" (fond par défaut de folium) plutôt que CARTO
-        # Positron : CARTO exige désormais une clé API sur toutes ses tuiles
-        # (watermark "API KEY REQUIRED" constaté à l'essai, y compris en
-        # appelant l'URL de tuile brute hors de toute app) — OSM reste le
-        # seul fond gratuit sans clé parmi les choix standards de folium.
-        carte = folium.Map(location=[lat_centre, lon_centre], zoom_start=zoom, tiles="OpenStreetMap")
-        # Rose-mauve plutôt que l'accent vert habituel de l'app : sur un fond
-        # de carte OSM lui-même très vert (espaces naturels, parcs), des
-        # marqueurs verts se fondaient dans le décor (signalé peu lisible).
-        # icon_create_function personnalise aussi les bulles de cluster —
-        # sans lui, Leaflet.markercluster les affiche dans son dégradé vert
-        # par défaut, même incohérence.
-        TEINTE_CARTE = "#B83280"
-        cluster = MarkerCluster(
-            options={"maxClusterRadius": 60},
-            icon_create_function=f"""
-            function(cluster) {{
-                return L.divIcon({{
-                    html: '<div style="background-color:{TEINTE_CARTE}; opacity:0.88; border-radius:50%; '
-                        + 'width:36px; height:36px; display:flex; align-items:center; justify-content:center; '
-                        + 'color:#fff; font-weight:600; font-family:inherit;">' + cluster.getChildCount() + '</div>',
-                    className: 'marker-cluster-space2',
-                    iconSize: L.point(36, 36),
-                }});
-            }}
-            """,
-        ).add_to(carte)
-        for c in coords:
-            folium.CircleMarker(
-                location=[c["lat"], c["lon"]], radius=6,
-                color=TEINTE_CARTE, weight=1, fill=True, fill_color=TEINTE_CARTE, fill_opacity=0.85,
-                tooltip=c["nom"],
-            ).add_to(cluster)
+        # Construction + sérialisation HTML/JS de la carte (folium.Map +
+        # ~N CircleMarker + MarkerCluster) mise en cache : sans ça, ce bloc
+        # entier se reconstruisait à CHAQUE rerun Streamlit (n'importe quel
+        # widget touché ailleurs sur la page), pas seulement quand les
+        # lieux affichés changent réellement — mesuré comme le vrai goulot
+        # à ~4000-6000 points, bien avant la question de l'hébergement
+        # (CPU partagé vs dédié ne fait qu'atténuer un travail qui, ici,
+        # n'avait pas besoin d'être refait du tout la plupart du temps).
+        signature_coords = tuple((c["id"], c["lat"], c["lon"], c["nom"]) for c in coords)
+        carte = _construire_carte_annuaire(signature_coords, lat_centre, lon_centre, zoom)
 
         # Même logique de clé versionnée que l'ancienne carte pydeck :
         # reconstruire le composant après chaque clic consommé, sinon
