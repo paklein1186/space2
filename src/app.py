@@ -964,13 +964,21 @@ def _historique_et_moderation(store, lieu, contributeurs_lieu: list, est_admin: 
             st.caption(f"{h.get('cree_le', '')} — {role}{statut_contrib} — {champ} : {h.get('valeur')}")
 
 
-@st.cache_resource(show_spinner=False)
-def _construire_carte_annuaire(signature_coords: tuple, lat_centre: float, lon_centre: float, zoom: int):
-    """Construit la carte Folium + le cluster de marqueurs. Mis en cache
-    (clé = signature des points affichés + centre/zoom) pour ne pas
-    reconstruire ~N marqueurs et resérialiser le HTML/JS à chaque rerun
-    Streamlit quand les lieux affichés n'ont pas changé — voir le
-    commentaire d'appel dans annuaire_tab."""
+def _construire_carte_annuaire(coords: list, lat_centre: float, lon_centre: float, zoom: int):
+    """Construit la carte Folium + le cluster de marqueurs — reconstruite à
+    CHAQUE appel, délibérément NON mise en cache malgré le coût (~N
+    marqueurs + sérialisation HTML/JS à chaque rerun Streamlit). Un essai de
+    cache (@st.cache_resource sur l'objet folium.Map, dans un commit
+    précédent) a cassé la carte en production : streamlit_folium mute
+    l'objet folium à chaque appel de st_folium() (_get_map_string le dit
+    explicitement — "alters the folium structure"), donc réutiliser le MÊME
+    objet entre deux appels (y compris avec render=False) produit un JS
+    corrompu — vécu en direct : "marker_cluster_xxx is not defined" + "Map
+    container is already initialized", page grisée et carte inutilisable au
+    moindre rerun (pan, zoom, clic ailleurs sur la page). Un objet frais à
+    chaque appel est la seule version qui fonctionne correctement avec cette
+    bibliothèque — ne pas réintroduire de cache ici sans un moyen fiable de
+    rejouer un rendu déjà sérialisé sans retoucher l'objet folium source."""
     # Folium + Leaflet.markercluster plutôt que pydeck/deck.gl : un vrai
     # cluster à bulle (compteur, se décompose en points individuels au
     # zoom, clic sur une bulle = zoom automatique dessus) n'existe pas
@@ -1006,12 +1014,12 @@ def _construire_carte_annuaire(signature_coords: tuple, lat_centre: float, lon_c
         }}
         """,
     ).add_to(carte)
-    for lieu_id, lat, lon, nom in signature_coords:
+    for c in coords:
         folium.CircleMarker(
-            location=[lat, lon],
+            location=[c["lat"], c["lon"]],
             radius=6,
             color=TEINTE_CARTE, weight=1, fill=True, fill_color=TEINTE_CARTE, fill_opacity=0.85,
-            tooltip=nom,
+            tooltip=c["nom"],
         ).add_to(cluster)
     return carte
 
@@ -1064,6 +1072,20 @@ def annuaire_tab(store, est_admin: bool, user_id: str):
         filtre_categories = st.multiselect(t("annuaire.filtre_categorie"), options=CATEGORIES_POSSIBLES,
                                             format_func=t_categorie)
 
+    # Sélectionner un nom EXACT dans le menu (plutôt que taper un texte libre
+    # qui ne correspond à aucune suggestion) ouvre directement sa fiche —
+    # jusqu'ici le champ ne faisait que filtrer la grille/la carte, il
+    # fallait ensuite cliquer le lieu une seconde fois. Garde-fou sur
+    # "annuaire_derniere_recherche_ouverte" : sans lui, la fiche se
+    # rouvrirait à CHAQUE rerun tant que ce nom reste sélectionné dans le
+    # champ (impossible de la refermer).
+    if recherche.strip() and st.session_state.get("annuaire_derniere_recherche_ouverte") != recherche:
+        lieu_exact = next((l for l in lieux if l.nom == recherche), None)
+        if lieu_exact:
+            st.session_state["annuaire_derniere_recherche_ouverte"] = recherche
+            st.session_state["annuaire_open_lieu_id"] = lieu_exact.id
+            st.rerun()
+
     lieux_affiches = lieux
     if recherche.strip():
         q = recherche.strip().lower()
@@ -1086,8 +1108,24 @@ def annuaire_tab(store, est_admin: bool, user_id: str):
 
     coords = lieux_avec_coordonnees(lieux_affiches)
     if coords:
-        lats = [c["lat"] for c in coords]
-        lons = [c["lon"] for c in coords]
+        # Centre/zoom calculés sur le sous-ensemble France/Belgique/Suisse
+        # plutôt que sur TOUS les points affichés : avec quelques lieux hors
+        # de cette zone (un lieu isolé en Scandinavie ou dans les Balkans
+        # suffit), la vue par défaut dézoomait sur toute l'Europe au lieu de
+        # rester centrée sur le cœur réel du réseau — repéré sur capture
+        # d'écran (bulle à l'échelle de l'Europe entière). Ces lieux hors
+        # zone restent affichés sur la carte, juste exclus du calcul du
+        # cadrage par défaut. Repli sur tous les points si le filtre actif
+        # ne laisse justement aucun lieu dans cette zone (ex. filtre pays
+        # explicite sur un autre pays).
+        BOITE_FR_BE_CH = {"lat_min": 41.2, "lat_max": 51.6, "lon_min": -5.3, "lon_max": 10.6}
+        coords_cadrage = [
+            c for c in coords
+            if BOITE_FR_BE_CH["lat_min"] <= c["lat"] <= BOITE_FR_BE_CH["lat_max"]
+            and BOITE_FR_BE_CH["lon_min"] <= c["lon"] <= BOITE_FR_BE_CH["lon_max"]
+        ] or coords
+        lats = [c["lat"] for c in coords_cadrage]
+        lons = [c["lon"] for c in coords_cadrage]
         lat_centre = sum(lats) / len(lats)
         lon_centre = sum(lons) / len(lons)
         # Zoom calé sur l'étendue réelle des lieux plutôt qu'une valeur fixe
@@ -1097,16 +1135,7 @@ def annuaire_tab(store, est_admin: bool, user_id: str):
         etendue = max(max(lats) - min(lats), max(lons) - min(lons), 0.02)
         zoom = max(3, min(round(math.log2(757 / etendue)), 14))
 
-        # Construction + sérialisation HTML/JS de la carte (folium.Map +
-        # ~N CircleMarker + MarkerCluster) mise en cache : sans ça, ce bloc
-        # entier se reconstruisait à CHAQUE rerun Streamlit (n'importe quel
-        # widget touché ailleurs sur la page), pas seulement quand les
-        # lieux affichés changent réellement — mesuré comme le vrai goulot
-        # à ~4000-6000 points, bien avant la question de l'hébergement
-        # (CPU partagé vs dédié ne fait qu'atténuer un travail qui, ici,
-        # n'avait pas besoin d'être refait du tout la plupart du temps).
-        signature_coords = tuple((c["id"], c["lat"], c["lon"], c["nom"]) for c in coords)
-        carte = _construire_carte_annuaire(signature_coords, lat_centre, lon_centre, zoom)
+        carte = _construire_carte_annuaire(coords, lat_centre, lon_centre, zoom)
 
         # Même logique de clé versionnée que l'ancienne carte pydeck :
         # reconstruire le composant après chaque clic consommé, sinon
