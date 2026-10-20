@@ -9,6 +9,17 @@ name: Garder Space2 éveillé
 # fonctionnement normal (ressources mutualisées du palier gratuit) — pour
 # ça, voir les options d'hébergement alternatif évoquées en conversation.
 #
+# Espacé à toutes les 6h (plutôt que 20 min à l'origine) : Streamlit ne met
+# l'app en veille qu'après 12h D'INACTIVITÉ, donc 6h garde une marge de
+# sécurité x2 tout en divisant le nombre de pings/jour par ~18 (72 -> 4).
+# Chaque ping déclenche un vrai rechargement de la page d'accueil, qui lit
+# ~4000 lieux + leurs synthèses depuis Supabase (donnees_annuaire(),
+# src/donnees_observatoire.py) — à 20 min d'intervalle, le cache (TTL 2 min)
+# était systématiquement expiré à chaque ping, donc CHAQUE ping relisait
+# toute la base. Mesuré en direct : Egress Supabase passé de 7,29 à 12,29 Go
+# en 5 jours (quota gratuit : 5 Go), uniquement entre deux visites humaines
+# quasi nulles (2 MAU) — ce ping, pas le trafic réel, en était la cause.
+#
 # GitHub désactive automatiquement un workflow planifié après 60 jours sans
 # la moindre activité sur le dépôt (commit/push) — sans rapport avec ce que
 # fait ce workflow lui-même, juste une limite de GitHub Actions à garder en
@@ -16,7 +27,7 @@ name: Garder Space2 éveillé
 
 on:
   schedule:
-    - cron: "*/20 * * * *"  # toutes les 20 minutes
+    - cron: "0 */6 * * *"  # toutes les 6 heures
   workflow_dispatch: {}  # déclenchement manuel depuis l'onglet Actions
 
 jobs:

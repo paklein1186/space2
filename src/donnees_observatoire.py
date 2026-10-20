@@ -50,17 +50,22 @@ def prechargement_observatoire() -> threading.Thread:
     return fil
 
 
-@st.cache_data(ttl=120, show_spinner=False)
+@st.cache_data(ttl=1800, show_spinner=False)
 def donnees_annuaire():
     """Grille de l'Annuaire (liste + synthèses) — sans ce cache, CHAQUE
     interaction (recherche, filtre, ouverture d'une fiche) relisait les
     ~4000 lieux et rejouait get_lieu_derive_batch, pas seulement un vrai
     rechargement de page : mesuré à 10-15s par interaction en production.
-    TTL volontairement court (2 min, contre 10 pour l'Observatoire) : une
-    édition de lieu depuis l'admin ou une fiche n'invalide pas ce cache
-    explicitement, donc un délai plus long la rendrait trop longtemps
-    invisible dans la grille (la fiche individuelle rouverte, elle, relit
-    toujours en direct)."""
+    TTL remonté à 30 min (contre 2 min à l'origine) : avec le ping
+    keep-awake (.github/workflows/keep-awake.yml), un TTL plus court que
+    l'intervalle entre deux pings garantit un cache systématiquement expiré
+    à chaque ping, donc une relecture complète des ~4000 lieux à CHAQUE
+    ping — mesuré responsable de l'essentiel de l'Egress Supabase (7,29 ->
+    12,29 Go en 5 jours sur un palier gratuit à 5 Go, pour seulement 2 MAU
+    réels). Contrepartie acceptée : une édition de lieu depuis l'admin ou
+    une fiche peut mettre jusqu'à 30 min à apparaître dans la grille/les
+    stats publiques (la fiche individuelle rouverte, elle, relit toujours
+    en direct — jamais affectée par ce TTL)."""
     store = _store_pour_agregats()
     lieux = sorted(store.list_tiers_lieux(), key=lambda l: l.nom.lower())
     derive_par_lieu = store.get_lieu_derive_batch([l.id for l in lieux])
