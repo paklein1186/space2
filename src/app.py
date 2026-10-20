@@ -1024,6 +1024,82 @@ def _construire_carte_annuaire(coords: list, lat_centre: float, lon_centre: floa
     return carte
 
 
+def _ouvrir_fiche_si_demandee(store, lieux, est_admin: bool, user_id: str) -> None:
+    """Ouvre la fiche d'un lieu si annuaire_open_lieu_id est posé en session
+    (clic sur la carte, sur une carte de la grille, ou sélection exacte dans
+    la recherche) — factorisé pour être appelé à la fois depuis le fragment
+    de la carte (rerun scopé, carte cliquée) et depuis le corps principal de
+    la page (rerun complet, grille/recherche)."""
+    lieu_id = st.session_state.pop("annuaire_open_lieu_id")
+    lieu_ouvert = next((l for l in lieux if l.id == lieu_id), None)
+    if lieu_ouvert:
+        # Une vraie (ré)ouverture de fiche doit toujours revérifier la
+        # synthèse (enrich_lieu compare un hash, donc peu coûteux si rien
+        # n'a changé) — vécu : un lieu déjà ouvert une fois dans la
+        # session restait figé sur son ancienne synthèse même après un
+        # nouvel apport (entretien, document transmis) entre-temps, car
+        # _fiche_dialog ne revérifiait plus jamais ce lieu une fois
+        # marqué "déjà enrichi" pour toute la session.
+        st.session_state.pop("fiche_enrichie_lieu_id", None)
+        with st.spinner(t("annuaire.chargement_fiche")):
+            fiche = build_fiche_lieu(store, lieu_ouvert)
+        _fiche_dialog(store, fiche, est_admin, user_id)
+
+
+@st.fragment
+def _carte_et_fiche_annuaire(store, coords: list, lat_centre: float, lon_centre: float, zoom: int,
+                              lieux: list, est_admin: bool, user_id: str) -> None:
+    """Carte + ouverture de fiche au clic, dans un st.fragment : sans lui, le
+    clic sur un marqueur déclenchait un rerun COMPLET de la page — sur le
+    CPU partagé du palier gratuit Streamlit Cloud, ce rerun devait aussi
+    reconstruire toute la grille en dessous (jusqu'à ~4000 cartes), rendant
+    visible plusieurs secondes durant le voile grisé "app en cours
+    d'exécution" de Streamlit sur TOUTE la page à chaque interaction avec la
+    carte (signalé : "à chaque mouvement sur la cartographie, tout se
+    grise"). st.rerun() appelé ICI (dans un fragment) ne rejoue QUE ce
+    fragment par défaut — la grille, les filtres, le titre ne sont plus
+    recalculés pour un simple clic sur la carte."""
+    carte = _construire_carte_annuaire(coords, lat_centre, lon_centre, zoom)
+
+    # Même logique de clé versionnée que l'ancienne carte pydeck :
+    # reconstruire le composant après chaque clic consommé, sinon
+    # recliquer EXACTEMENT le même point ne rouvre plus rien (déjà vécu
+    # avec pydeck, voir l'historique de ce fichier) — la cause (un
+    # composant qui garde la sélection d'un rerun à l'autre) est
+    # générique à ce genre de composant interactif, pas spécifique à
+    # pydeck.
+    carte_version = st.session_state.get("annuaire_carte_version", 0)
+    evenement = st_folium(
+        carte, height=520, use_container_width=True,
+        returned_objects=["last_object_clicked"],
+        key=f"annuaire_map_{carte_version}",
+    )
+    clic = evenement.get("last_object_clicked")
+    if clic:
+        # Identifie le lieu cliqué par ses coordonnées plutôt que par un
+        # id direct : Leaflet ne renvoie que lat/lng au clic, jamais les
+        # métadonnées du marqueur. Égalité approchée (6 décimales,
+        # ~10cm) pour absorber un éventuel arrondi JS ; au pire le
+        # premier lieu trouvé à cette position gagne (coordonnées
+        # strictement identiques entre deux lieux : jamais observé).
+        lieu_selectionne = next(
+            (c for c in coords if round(c["lat"], 6) == round(clic["lat"], 6)
+             and round(c["lon"], 6) == round(clic["lng"], 6)),
+            None,
+        )
+        if lieu_selectionne:
+            st.session_state["annuaire_carte_version"] = carte_version + 1
+            st.session_state["annuaire_open_lieu_id"] = lieu_selectionne["id"]
+            st.rerun()
+
+    # Toujours réévalué ici (fragment-scoped OU rerun complet) : couvre à la
+    # fois l'ouverture déclenchée par un clic sur la carte ci-dessus et celle
+    # déclenchée par la grille/la recherche (rerun complet depuis le corps
+    # principal de la page, qui réexécute aussi ce fragment).
+    if "annuaire_open_lieu_id" in st.session_state:
+        _ouvrir_fiche_si_demandee(store, lieux, est_admin, user_id)
+
+
 def annuaire_tab(store, est_admin: bool, user_id: str):
     st.title(t("lieux_hybrides.title"))
     st.caption(t("lieux_hybrides.caption"))
@@ -1135,54 +1211,12 @@ def annuaire_tab(store, est_admin: bool, user_id: str):
         etendue = max(max(lats) - min(lats), max(lons) - min(lons), 0.02)
         zoom = max(3, min(round(math.log2(757 / etendue)), 14))
 
-        carte = _construire_carte_annuaire(coords, lat_centre, lon_centre, zoom)
-
-        # Même logique de clé versionnée que l'ancienne carte pydeck :
-        # reconstruire le composant après chaque clic consommé, sinon
-        # recliquer EXACTEMENT le même point ne rouvre plus rien (déjà vécu
-        # avec pydeck, voir l'historique de ce fichier) — la cause (un
-        # composant qui garde la sélection d'un rerun à l'autre) est
-        # générique à ce genre de composant interactif, pas spécifique à
-        # pydeck.
-        carte_version = st.session_state.get("annuaire_carte_version", 0)
-        evenement = st_folium(
-            carte, height=520, use_container_width=True,
-            returned_objects=["last_object_clicked"],
-            key=f"annuaire_map_{carte_version}",
-        )
-        clic = evenement.get("last_object_clicked")
-        if clic:
-            # Identifie le lieu cliqué par ses coordonnées plutôt que par un
-            # id direct : Leaflet ne renvoie que lat/lng au clic, jamais les
-            # métadonnées du marqueur. Égalité approchée (6 décimales,
-            # ~10cm) pour absorber un éventuel arrondi JS ; au pire le
-            # premier lieu trouvé à cette position gagne (coordonnées
-            # strictement identiques entre deux lieux : jamais observé).
-            lieu_selectionne = next(
-                (c for c in coords if round(c["lat"], 6) == round(clic["lat"], 6)
-                 and round(c["lon"], 6) == round(clic["lng"], 6)),
-                None,
-            )
-            if lieu_selectionne:
-                st.session_state["annuaire_carte_version"] = carte_version + 1
-                st.session_state["annuaire_open_lieu_id"] = lieu_selectionne["id"]
-                st.rerun()
-
-    if "annuaire_open_lieu_id" in st.session_state:
-        lieu_id = st.session_state.pop("annuaire_open_lieu_id")
-        lieu_ouvert = next((l for l in lieux if l.id == lieu_id), None)
-        if lieu_ouvert:
-            # Une vraie (ré)ouverture de fiche doit toujours revérifier la
-            # synthèse (enrich_lieu compare un hash, donc peu coûteux si rien
-            # n'a changé) — vécu : un lieu déjà ouvert une fois dans la
-            # session restait figé sur son ancienne synthèse même après un
-            # nouvel apport (entretien, document transmis) entre-temps, car
-            # _fiche_dialog ne revérifiait plus jamais ce lieu une fois
-            # marqué "déjà enrichi" pour toute la session.
-            st.session_state.pop("fiche_enrichie_lieu_id", None)
-            with st.spinner(t("annuaire.chargement_fiche")):
-                fiche = build_fiche_lieu(store, lieu_ouvert)
-            _fiche_dialog(store, fiche, est_admin, user_id)
+        _carte_et_fiche_annuaire(store, coords, lat_centre, lon_centre, zoom, lieux, est_admin, user_id)
+    elif "annuaire_open_lieu_id" in st.session_state:
+        # Pas de lieu géolocalisé affiché (coords vide) : la fiche demandée
+        # depuis la grille ou la recherche doit quand même s'ouvrir — repris
+        # hors fragment, identique à la branche correspondante ci-dessous.
+        _ouvrir_fiche_si_demandee(store, lieux, est_admin, user_id)
 
     cols_par_ligne = 4
     for i in range(0, len(lieux_affiches), cols_par_ligne):
