@@ -56,16 +56,13 @@ def donnees_annuaire():
     interaction (recherche, filtre, ouverture d'une fiche) relisait les
     ~4000 lieux et rejouait get_lieu_derive_batch, pas seulement un vrai
     rechargement de page : mesuré à 10-15s par interaction en production.
-    TTL remonté à 30 min (contre 2 min à l'origine) : avec le ping
-    keep-awake (.github/workflows/keep-awake.yml), un TTL plus court que
-    l'intervalle entre deux pings garantit un cache systématiquement expiré
-    à chaque ping, donc une relecture complète des ~4000 lieux à CHAQUE
-    ping — mesuré responsable de l'essentiel de l'Egress Supabase (7,29 ->
-    12,29 Go en 5 jours sur un palier gratuit à 5 Go, pour seulement 2 MAU
-    réels). Contrepartie acceptée : une édition de lieu depuis l'admin ou
-    une fiche peut mettre jusqu'à 30 min à apparaître dans la grille/les
-    stats publiques (la fiche individuelle rouverte, elle, relit toujours
-    en direct — jamais affectée par ce TTL)."""
+    TTL à 30 min (contre 2 min à l'origine) : une édition de lieu depuis
+    l'admin ou une fiche peut donc mettre jusqu'à 30 min à apparaître dans
+    la grille (la fiche individuelle rouverte, elle, relit toujours en
+    direct — jamais affectée par ce TTL). N'est plus sollicité par le ping
+    keep-awake depuis que l'accueil utilise stats_reseau() (requêtes
+    étroites) à la place de cette fonction — seule une vraie visite de
+    l'Annuaire déclenche encore cette lecture complète."""
     store = _store_pour_agregats()
     lieux = sorted(store.list_tiers_lieux(), key=lambda l: l.nom.lower())
     derive_par_lieu = store.get_lieu_derive_batch([l.id for l in lieux])
@@ -77,3 +74,21 @@ def prechargement_annuaire() -> threading.Thread:
     fil = threading.Thread(target=donnees_annuaire, daemon=True)
     fil.start()
     return fil
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def stats_reseau():
+    """3 compteurs pour la bannière d'accueil (nb_lieux, nb_pays,
+    nb_besoins) — PAS donnees_annuaire() : l'accueil est souvent le tout
+    premier contact avec le site (et la cible du ping keep-awake, voir
+    .github/workflows/keep-awake.yml), donc le moins cher à servir possible.
+    get_stats_reseau() (Store) fait des requêtes étroites côté base plutôt
+    que de transférer les ~4000 lieux complets + leurs synthèses juste pour
+    ces 3 nombres — l'ancienne implémentation (via donnees_annuaire()) était
+    identifiée comme la cause principale d'un dépassement de quota Egress
+    Supabase (7,29 -> 12,29 Go en 5 jours sur un palier gratuit à 5 Go, pour
+    seulement 2 MAU réels)."""
+    try:
+        return _store_pour_agregats().get_stats_reseau()
+    except Exception:
+        return 0, 0, 0

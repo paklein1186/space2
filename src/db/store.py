@@ -194,6 +194,16 @@ class Store(ABC):
     def list_tiers_lieux(self, owner_user_id: Optional[str] = None) -> list: ...
 
     @abstractmethod
+    def get_stats_reseau(self) -> tuple:
+        """(nb_lieux, nb_pays, nb_besoins) — bannière publique de l'accueil.
+        Requêtes étroites (compte + colonnes ciblées), PAS list_tiers_lieux()
+        + get_lieu_derive_batch() : la page d'accueil n'a besoin que de ces
+        3 nombres, jamais des ~4000 lieux complets ni de leurs synthèses
+        (donnees jsonb, plusieurs Ko chacune) — voir le commentaire d'appel
+        dans 0_Accueil.py pour le coût mesuré de l'ancienne implémentation."""
+        ...
+
+    @abstractmethod
     def get_or_create_contributeur(self, user_id: str, tiers_lieu_id: str, role: str) -> Contributeur: ...
 
     @abstractmethod

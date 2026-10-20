@@ -266,6 +266,20 @@ class SqliteStore(Store):
             rows = self.conn.execute("select * from tiers_lieux").fetchall()
         return [TiersLieu(**{**dict(r), "ctg_opt_in": bool(r["ctg_opt_in"])}) for r in rows]
 
+    def get_stats_reseau(self) -> tuple:
+        # Base locale (dev/tests) : pas de contrainte d'Egress, une lecture
+        # simple suffit — voir supabase_store.py pour la version optimisée
+        # (requêtes étroites) qui compte réellement en production.
+        nb_lieux = self.conn.execute("select count(*) from tiers_lieux").fetchone()[0]
+        nb_pays = self.conn.execute(
+            "select count(distinct pays) from tiers_lieux where pays is not null and pays != ''"
+        ).fetchone()[0]
+        nb_besoins = sum(
+            len(json.loads(r[0])) if r[0] else 0
+            for r in self.conn.execute("select besoins_mis_en_avant from lieu_derive").fetchall()
+        )
+        return nb_lieux, nb_pays, nb_besoins
+
     def delete_tiers_lieu(self, tiers_lieu_id: str) -> None:
         # Pas de ON DELETE CASCADE dans ce schéma SQLite (contrairement à
         # Postgres/schema.sql) : suppression manuelle dans l'ordre, table par

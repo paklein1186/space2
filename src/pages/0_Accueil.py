@@ -20,37 +20,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import streamlit as st
 
-from src.donnees_observatoire import donnees_annuaire
+from src.donnees_observatoire import stats_reseau
 from src.i18n import t
-
-
-def _stats_publiques() -> tuple[int, int, int]:
-    """Compteurs légers pour la bannière d'accueil — mêmes données déjà
-    publiques que l'Annuaire/l'Observatoire (tiers_lieux, lieu_derive),
-    jamais de donnée nominative. Réutilise donnees_annuaire() (mis en cache
-    2 min, préchargé au démarrage du serveur) plutôt que de relire
-    list_tiers_lieux()/get_lieu_derive_batch() en direct : sans ça, la page
-    d'accueil — souvent le tout premier contact avec le site — relisait les
-    ~4000 lieux à CHAQUE visite, pas seulement un vrai rechargement de page,
-    la rendant visiblement lente (même cause que l'Annuaire/l'Observatoire
-    avant leur mise en cache). Ne doit jamais faire planter la page
-    d'accueil : un échec de connexion renvoie des compteurs à zéro plutôt
-    qu'une erreur, cette page devant rester la plus robuste du site."""
-    try:
-        lieux, derive_par_lieu = donnees_annuaire()
-        nb_pays = len({l.pays for l in lieux if l.pays})
-        nb_besoins = sum(
-            len(d.besoins_mis_en_avant or []) for d in derive_par_lieu.values()
-        )
-        return len(lieux), nb_pays, nb_besoins
-    except Exception:
-        return 0, 0, 0
-
 
 st.title(t("accueil.hero_titre"))
 st.caption(t("accueil.hero_soustitre"))
 
-nb_lieux, nb_pays, nb_besoins = _stats_publiques()
+# stats_reseau() : requêtes étroites (comptes + colonnes ciblées), jamais les
+# ~4000 lieux complets ni leurs synthèses — l'accueil est souvent le tout
+# premier contact avec le site ET la cible du ping keep-awake
+# (.github/workflows/keep-awake.yml), donc le moins cher à servir possible.
+# Voir le commentaire de stats_reseau() (src/donnees_observatoire.py).
+nb_lieux, nb_pays, nb_besoins = stats_reseau()
 if nb_lieux:
     col1, col2, col3 = st.columns(3)
     col1.metric(t("accueil.stat_lieux"), nb_lieux)

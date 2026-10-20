@@ -140,6 +140,27 @@ class SupabaseStore(Store):
             return q.order("id")
         return [_to_dataclass(TiersLieu, row) for row in _lire_tout(requete)]
 
+    def get_stats_reseau(self) -> tuple:
+        # count="exact", head=True : PostgREST renvoie le compte dans l'en-tête
+        # de réponse SANS transférer la moindre ligne — le plus léger possible
+        # pour nb_lieux. Pour nb_pays/nb_besoins, on ne lit QUE la colonne
+        # nécessaire (pays / besoins_mis_en_avant) plutôt que la ligne entière
+        # (tiers_lieux.*  ou lieu_derive.* avec son donnees jsonb de plusieurs
+        # Ko) — remplace un ancien appel à donnees_annuaire() qui relisait les
+        # ~4000 lieux complets + leurs synthèses juste pour ces 3 nombres,
+        # identifié comme la cause principale d'un dépassement de quota
+        # Egress Supabase (ping keep-awake toutes les 20 min, voir
+        # .github/workflows/keep-awake.yml).
+        nb_lieux = (
+            self.client.table("tiers_lieux").select("id", count="exact", head=True).execute().count or 0
+        )
+        pays_rows = _lire_tout(lambda: self.client.table("tiers_lieux").select("pays").order("id"))
+        nb_pays = len({r["pays"] for r in pays_rows if r.get("pays")})
+        besoins_rows = _lire_tout(lambda: (
+            self.client.table("lieu_derive").select("besoins_mis_en_avant").order("tiers_lieu_id")))
+        nb_besoins = sum(len(r.get("besoins_mis_en_avant") or []) for r in besoins_rows)
+        return nb_lieux, nb_pays, nb_besoins
+
     def delete_tiers_lieu(self, tiers_lieu_id: str) -> None:
         # Toutes les tables qui référencent tiers_lieu_id sont en "on delete
         # cascade" côté schema.sql (contributeurs, reponses, notes_libres,
