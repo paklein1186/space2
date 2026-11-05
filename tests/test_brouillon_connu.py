@@ -58,6 +58,31 @@ def main():
         pitch = _champ_pitch(handler.get_current_section({}))
         check("description_courte déjà répondue -> reprise telle quelle comme brouillon",
               pitch.get("brouillon_connu") == "Un atelier partagé en centre-bourg.")
+        marqueur = handler.get_current_section({}).get("prochaine_question_deja_en_partie_connue")
+        check("marqueur de section (redondant) présent quand le brouillon porte sur le TOUT PROCHAIN champ",
+              marqueur is not None and marqueur["champ_id"] == "pitch"
+              and marqueur["brouillon"] == "Un atelier partagé en centre-bourg.")
+
+        # --- le champ avec brouillon n'est PAS le tout prochain à poser : pas
+        # de marqueur de section (resterait trompeur pour un autre champ) ---
+        store1b = SqliteStore(db_path=str(Path(tmp) / "brouillon1b.sqlite3"))
+        store1b.save_campagne_prioritaire(CampagnePrioritaire(
+            titre="KA122", champ_ids=["pays", "pitch"], date_debut=debut, date_fin=fin,
+        ))
+        lieu1b = store1b.get_or_create_tiers_lieu("user-1", "Lieu Pitch Pas En Tete")
+        contributeur1b = store1b.get_or_create_contributeur("user-1", lieu1b.id, Role.AUTRE.value)
+        store1b.save_answer(lieu1b.id, contributeur1b.id, "description_courte", "Un fablab associatif.")
+        session1b = store1b.get_or_start_session(lieu1b.id, contributeur1b.id)
+        handler1b = CollecteToolHandler(store1b, lieu1b.id, contributeur1b.id, session1b, Role.AUTRE,
+                                        mode_entretien="campagne")
+        section1b = handler1b.get_current_section({})
+        check("ordre : pays (sans brouillon) avant pitch",
+              [f["id"] for f in section1b["fields"]] == ["pays", "pitch"])
+        check("pitch garde son brouillon_connu même s'il n'est pas le tout prochain champ",
+              next(f for f in section1b["fields"] if f["id"] == "pitch").get("brouillon_connu")
+              == "Un fablab associatif.")
+        check("mais pas de marqueur de section : le tout prochain champ (pays) n'en a pas",
+              "prochaine_question_deja_en_partie_connue" not in section1b)
 
         # --- pas de description_courte, mais un résumé synthétisé existe ---
         store2 = SqliteStore(db_path=str(Path(tmp) / "brouillon2.sqlite3"))

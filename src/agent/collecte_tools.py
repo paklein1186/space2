@@ -541,7 +541,7 @@ class CollecteToolHandler:
                 self._cloture_affichee = True
                 return self._section_cloture_campagne()
             return None
-        return {
+        section = {
             "module_id": PRIORITY_MODULE_ID,
             "module_title": "Collecte prioritaire",
             "module_optional": False,
@@ -550,6 +550,21 @@ class CollecteToolHandler:
             "intro": self._intro_campagnes_actives(),
             "fields": fields,
         }
+        # Signal redondant, au niveau de la section plutôt que caché dans un
+        # champ parmi d'autres (même principe que a_dire_maintenant pour la
+        # clôture de campagne, déjà fiable dans ce code) — porte sur le
+        # PROCHAIN champ à poser (le premier de la liste, l'agent procédant
+        # un par un dans l'ordre reçu) : vécu qu'une consigne uniquement
+        # rattachée au champ lui-même (brouillon_connu) n'était pas toujours
+        # suivie, noyée parmi le reste du tool_result — ce marqueur de haut
+        # niveau est plus difficile à manquer.
+        premier_avec_brouillon = next((f for f in fields if f.get("brouillon_connu")), None)
+        if premier_avec_brouillon and fields[0] is premier_avec_brouillon:
+            section["prochaine_question_deja_en_partie_connue"] = {
+                "champ_id": premier_avec_brouillon["id"],
+                "brouillon": premier_avec_brouillon["brouillon_connu"],
+            }
+        return section
 
     def _intro_campagnes_actives(self) -> str:
         """Présentation explicite de la campagne (titre et description saisis
