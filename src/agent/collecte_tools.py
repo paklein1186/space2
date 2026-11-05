@@ -26,6 +26,21 @@ from ..questionnaire.schema import QUESTIONNAIRE, Role, all_fields, get_field, g
 
 PRIORITY_MODULE_ID = "__priorite__"
 
+# Champs de campagne qui recoupent une donnée déjà connue ailleurs sur le
+# lieu (ex. "pitch" d'une campagne demande essentiellement la même chose que
+# description_courte, déjà répondue pour la plupart des lieux importés) —
+# chaque entrée indique où chercher un brouillon avant de poser la question à
+# froid. Vécu concrètement : l'agent restitue un résumé riche en ouverture de
+# conversation ("Pour resituer : ...", voir _resume_ouverture dans
+# collecte_agent.py) puis, plusieurs tours plus tard, repose quand même ce
+# même contenu comme question neuve — la règle générique de SYSTEM_PROMPT
+# ("recoupe avec le résumé reçu en ouverture") existe déjà mais, mêlée à
+# beaucoup d'autres consignes et à distance de plusieurs tours de l'ouverture,
+# n'est pas fiable. Porter le brouillon directement DANS le champ renvoyé par
+# get_current_section (voir brouillon_connu plus bas) le rend disponible au
+# bon moment, sans compter sur un rappel à longue distance.
+CHAMPS_AVEC_BROUILLON_CONNU = {"pitch": "description_courte"}
+
 # Repli générique (campagne sans message_cloture propre) et rappel fixe
 # toujours ajouté après — constantes plutôt qu'en dur dans
 # _section_cloture_campagne : réutilisées telles quelles par l'export admin
@@ -377,6 +392,24 @@ class CollecteToolHandler:
     def _current_answers(self) -> dict:
         return self.store.get_answers(self.tiers_lieu_id, self.contributeur_id)
 
+    def _brouillon_connu(self, champ_id: str, answers: dict) -> Optional[str]:
+        """Texte déjà connu pour CE lieu qui répond essentiellement à la même
+        question que `champ_id` (voir CHAMPS_AVEC_BROUILLON_CONNU) — cherché
+        d'abord dans les réponses structurées déjà enregistrées (le plus
+        fiable, explicitement validé par un répondant), puis en repli dans le
+        résumé synthétisé (lieu_derive.donnees['resume'], génération
+        automatique moins sûre mais mieux que rien)."""
+        champ_source = CHAMPS_AVEC_BROUILLON_CONNU.get(champ_id)
+        if not champ_source:
+            return None
+        valeur = answers.get(champ_source)
+        if valeur:
+            return str(valeur)
+        derive = self.store.get_lieu_derive(self.tiers_lieu_id)
+        if derive and derive.donnees.get("resume"):
+            return derive.donnees["resume"]
+        return None
+
     def _country_code(self, answers: Optional[dict] = None) -> Optional[str]:
         """Accepte des réponses déjà chargées pour éviter une requête Supabase
         par appel — vécu : dans `_priority_section`, un appel sans paramètre
@@ -488,11 +521,15 @@ class CollecteToolHandler:
             # proposés d'un coup, condition ou pas.
             if f is None or not field_is_active(f, answers, self.role):
                 continue
-            fields.append({
+            champ = {
                 "id": f.id, "label": f.label, "type": f.type.value,
                 "options": f.resolved_options(code_pays),
                 "required": f.required, "help_text": f.help_text, "max_choices": f.max_choices,
-            })
+            }
+            brouillon = self._brouillon_connu(f.id, answers)
+            if brouillon:
+                champ["brouillon_connu"] = brouillon
+            fields.append(champ)
         if not fields:
             # Tout ce qui restait est devenu définitivement inactif (ex. une
             # condition jamais satisfaite, comme "participants" si dispo =
