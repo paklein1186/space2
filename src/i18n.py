@@ -273,6 +273,14 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "fr": "Répondre en priorité à un recensement ciblé actuellement ouvert par l'équipe.",
         "en": "Answer, as a priority, a targeted survey the team currently has open.",
     },
+    "entretien.choisir_campagne_label": {"fr": "Quelle campagne ?", "en": "Which campaign?"},
+    "entretien.commencer_campagne_btn": {"fr": "Commencer", "en": "Start"},
+    "entretien.lien_campagne_expire": {
+        "fr": "Le lien de campagne utilisé n'est plus valide (campagne terminée ou inconnue) — "
+              "vous pouvez quand même contribuer ci-dessous.",
+        "en": "The campaign link you used is no longer valid (campaign over or unknown) — "
+              "you can still contribute below.",
+    },
     "entretien.mode_besoins_btn": {"fr": "📣 Rendre visibles vos besoins actuels", "en": "📣 Make your current needs visible"},
     "entretien.mode_besoins_caption": {
         "fr": "Exprimer directement de quoi le lieu aurait besoin — utilisé dans l'Annuaire "

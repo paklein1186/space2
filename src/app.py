@@ -300,6 +300,49 @@ def contribution_selector(store, user_id: str):
     return nom_lieu, role
 
 
+def _slug_campagne(texte: str) -> str:
+    """'KA122 Mobilité !' -> 'ka122-mobilite' — minuscules, accents retirés,
+    tout ce qui n'est pas alphanumérique devient un tiret (dédoublonnés,
+    bords retirés). Pas d'unicité imposée en base : un doublon résout au
+    premier trouvé (voir _campagne_depuis_url), un risque jugé mineur plutôt
+    que de bloquer la création d'une campagne pour ça."""
+    import re
+    import unicodedata
+    sans_accents = unicodedata.normalize("NFKD", (texte or "").lower()).encode("ascii", "ignore").decode()
+    return re.sub(r"-+", "-", re.sub(r"[^a-z0-9]+", "-", sans_accents)).strip("-")[:60]
+
+
+def _campagne_depuis_url(campagnes_actives: list):
+    """Résout ?campagne=<code-ou-uuid> (lien direct, ex. flyer/QR code) vers
+    une campagne ACTIVE — accepte aussi bien le code court (CampagnePrioritaire
+    .code, lisible, à définir côté admin) que l'uuid brut (toujours valable,
+    y compris avant qu'un code soit défini). None si le paramètre est absent,
+    ou s'il ne correspond à aucune campagne actuellement active (expirée,
+    supprimée, faute de frappe) — jamais une erreur, juste pas d'auto-sélection."""
+    code_url = st.query_params.get("campagne")
+    if not code_url:
+        return None
+    return next((c for c in campagnes_actives if code_url in (c.code, c.id)), None)
+
+
+def _selecteur_campagnes(campagnes_actives: list, mode_key: str, campagne_id_key: str) -> None:
+    """Choix explicite parmi PLUSIEURS campagnes actives en parallèle — un
+    simple bouton ne suffit plus à distinguer laquelle rejoindre. Le
+    résultat (mode_key="campagne" + campagne_id_key) restreint ensuite
+    CollecteToolHandler à cette seule campagne (voir campagne_id et
+    _campagnes_actives_pertinentes dans collecte_tools.py) plutôt que de les
+    fusionner toutes, comme c'était le cas avant quand une seule campagne à
+    la fois pouvait être active."""
+    titres = [c.titre for c in campagnes_actives]
+    choix = st.selectbox(t("entretien.choisir_campagne_label"), options=titres, label_visibility="collapsed")
+    if st.button(t("entretien.commencer_campagne_btn"), use_container_width=True):
+        campagne = next(c for c in campagnes_actives if c.titre == choix)
+        st.session_state[mode_key] = "campagne"
+        st.session_state[campagne_id_key] = campagne.id
+        st.rerun()
+    st.caption(t("entretien.mode_campagne_caption"))
+
+
 def _maj_completion(store, state: dict) -> None:
     """Recalcule et stocke le % de complétion du formulaire de campagne en
     cours dans `state` (None si on n'est pas en train de répondre à une
@@ -528,33 +571,59 @@ def entretien_tab(store, user_id: str):
     # qu'au message suivant, ce qui est un compromis acceptable.
     session_key = f"agent::{nom_lieu}::{role}"
     mode_key = f"mode_entretien::{session_key}"
+    campagne_id_key = f"campagne_id::{session_key}"
     if session_key not in st.session_state and mode_key not in st.session_state:
-        st.subheader(t("entretien.par_ou_commencer"))
-        # Description en légende toujours visible sous le bouton plutôt qu'en
-        # tooltip au survol (help=) : le tooltip natif de Streamlit se
-        # superposait au titre "Par où commencer ?" juste au-dessus (bug de
-        # positionnement du composant lui-même, pas une régression de ce
-        # thème) — signalé confus par un utilisateur. Une légende visible en
-        # permanence est aussi plus accessible (pas de survol sur mobile).
         campagnes_actives = store.get_active_campagnes_prioritaires()
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            if st.button(t("entretien.mode_histoire_btn"), use_container_width=True):
-                st.session_state[mode_key] = "histoire"
-                st.rerun()
-            st.caption(t("entretien.mode_histoire_caption"))
-        with col2:
-            label_campagne = t("entretien.mode_campagne_btn") if campagnes_actives else t("entretien.mode_campagne_btn_vide")
-            if st.button(label_campagne, use_container_width=True, disabled=not campagnes_actives):
-                st.session_state[mode_key] = "campagne"
-                st.rerun()
-            st.caption(t("entretien.mode_campagne_caption"))
-        with col3:
-            if st.button(t("entretien.mode_besoins_btn"), use_container_width=True):
-                st.session_state[mode_key] = "besoins"
-                st.rerun()
-            st.caption(t("entretien.mode_besoins_caption"))
-        return
+        # Lien direct vers une campagne précise (?campagne=<code-ou-uuid>,
+        # ex. flyer/QR code imprimé — voir _campagne_depuis_url) : une fois
+        # le lieu choisi ci-dessus par contribution_selector, on saute
+        # directement en mode campagne SANS repasser par "Par où commencer ?"
+        # — c'est tout l'intérêt du lien, l'internaute n'a plus qu'à taper
+        # son lieu une fois connecté. Un code qui ne correspond plus à
+        # aucune campagne ACTIVE (expirée, supprimée, faute de frappe)
+        # retombe sur l'écran normal plutôt que de bloquer la contribution.
+        campagne_url = _campagne_depuis_url(campagnes_actives)
+        if campagne_url is not None:
+            st.session_state[mode_key] = "campagne"
+            st.session_state[campagne_id_key] = campagne_url.id
+        else:
+            if st.query_params.get("campagne"):
+                st.info(t("entretien.lien_campagne_expire"))
+            st.subheader(t("entretien.par_ou_commencer"))
+            # Description en légende toujours visible sous le bouton plutôt
+            # qu'en tooltip au survol (help=) : le tooltip natif de Streamlit
+            # se superposait au titre "Par où commencer ?" juste au-dessus
+            # (bug de positionnement du composant lui-même, pas une
+            # régression de ce thème) — signalé confus par un utilisateur.
+            # Une légende visible en permanence est aussi plus accessible
+            # (pas de survol sur mobile).
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                if st.button(t("entretien.mode_histoire_btn"), use_container_width=True):
+                    st.session_state[mode_key] = "histoire"
+                    st.rerun()
+                st.caption(t("entretien.mode_histoire_caption"))
+            with col2:
+                if len(campagnes_actives) >= 2:
+                    # Plusieurs campagnes en parallèle : un simple bouton ne
+                    # suffit plus à distinguer laquelle rejoindre — voir
+                    # _selecteur_campagnes.
+                    _selecteur_campagnes(campagnes_actives, mode_key, campagne_id_key)
+                else:
+                    label_campagne = (t("entretien.mode_campagne_btn") if campagnes_actives
+                                       else t("entretien.mode_campagne_btn_vide"))
+                    if st.button(label_campagne, use_container_width=True, disabled=not campagnes_actives):
+                        st.session_state[mode_key] = "campagne"
+                        if campagnes_actives:
+                            st.session_state[campagne_id_key] = campagnes_actives[0].id
+                        st.rerun()
+                    st.caption(t("entretien.mode_campagne_caption"))
+            with col3:
+                if st.button(t("entretien.mode_besoins_btn"), use_container_width=True):
+                    st.session_state[mode_key] = "besoins"
+                    st.rerun()
+                st.caption(t("entretien.mode_besoins_caption"))
+            return
     mode_entretien = st.session_state.get(mode_key, "histoire")
 
     if session_key not in st.session_state:
@@ -571,7 +640,8 @@ def entretien_tab(store, user_id: str):
             store.save_answer(tiers_lieu.id, contributeur.id, "nom_lieu", tiers_lieu.nom)
         session = store.get_or_start_session(tiers_lieu.id, contributeur.id)
         handler = CollecteToolHandler(store, tiers_lieu.id, contributeur.id, session, Role(role),
-                                       mode_entretien=mode_entretien)
+                                       mode_entretien=mode_entretien,
+                                       campagne_id=st.session_state.get(campagne_id_key))
         agent = CollecteAgent(handler, store=store, tiers_lieu_id=tiers_lieu.id)
         st.session_state[session_key] = {
             "agent": agent, "history": [],
@@ -1649,6 +1719,13 @@ def administration_tab(store, user_id: str) -> None:
                                 f"· {len(c.champ_ids)} champ(s)")
                     if c.description:
                         st.caption(c.description)
+                    # Lien direct (?campagne=...) : pour un flyer/QR code qui
+                    # amène directement sur cette campagne, sans passer par
+                    # "Par où commencer ?" — voir _campagne_depuis_url. Le
+                    # code (lisible) fonctionne dès qu'il est défini ;
+                    # l'uuid brut marche toujours, affiché en repli.
+                    lien_campagne = f"{URL_BASE_APP}/entretien?campagne={c.code or c.id}"
+                    st.caption(f"Lien direct : `{lien_campagne}`")
                 with col2:
                     if st.button("Supprimer", key=f"del_campagne_{c.id}"):
                         admin_store.delete_campagne_prioritaire(c.id)
@@ -1666,6 +1743,12 @@ def administration_tab(store, user_id: str) -> None:
         tous_les_champs = {f.id: f"{f.id} — {f.label}" for _, _, f in all_fields()}
         with st.form("nouvelle_campagne_form", clear_on_submit=True):
             titre = st.text_input("Titre de la campagne")
+            code = st.text_input(
+                "Code court pour le lien direct (optionnel)",
+                help="Pour un flyer/QR code qui amène directement sur cette campagne "
+                     "(?campagne=ce-code), sans repasser par « Par où commencer ? ». "
+                     "Laissez vide pour un code dérivé automatiquement du titre.",
+            )
             description = st.text_area("Description (optionnel)")
             champ_ids = st.multiselect("Champs du questionnaire existant", options=list(tous_les_champs.keys()),
                                         format_func=lambda cid: tous_les_champs[cid])
@@ -1696,7 +1779,7 @@ def administration_tab(store, user_id: str) -> None:
                     admin_store.save_campagne_prioritaire(CampagnePrioritaire(
                         titre=titre, description=description or None, champ_ids=tous_champ_ids,
                         date_debut=date_debut.isoformat(), date_fin=date_fin.isoformat(), cree_par=user_id,
-                        message_cloture=message_cloture or None,
+                        message_cloture=message_cloture or None, code=_slug_campagne(code) or _slug_campagne(titre),
                     ))
                     st.success("Campagne créée.")
                     st.rerun()

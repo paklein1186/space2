@@ -114,6 +114,12 @@ class CampagnePrioritaire:
     # les champs de cette campagne sont répondus — None = message générique
     # de repli, pas de texte propre à cette campagne.
     message_cloture: Optional[str] = None
+    # Identifiant court et lisible pour un lien direct (ex. flyer/QR code
+    # imprimé) — ?campagne=ka122 plutôt que l'uuid. Optionnel : None = pas
+    # encore défini, le lien direct retombe alors sur l'uuid (voir
+    # app.py::_campagne_depuis_url) — jamais bloquant, juste moins lisible
+    # tant qu'aucun code n'a été choisi côté admin.
+    code: Optional[str] = None
 
 
 @dataclass

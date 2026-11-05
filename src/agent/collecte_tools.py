@@ -309,13 +309,21 @@ class CollecteToolHandler:
     dès qu'on la regarde)."""
 
     def __init__(self, store: Store, tiers_lieu_id: str, contributeur_id: str, session: SessionEntretien, role: Role,
-                 mode_entretien: str = "histoire"):
+                 mode_entretien: str = "histoire", campagne_id: Optional[str] = None):
         self.store = store
         self.tiers_lieu_id = tiers_lieu_id
         self.contributeur_id = contributeur_id
         self.session_id = session.id
         self.role = role
         self.mode_entretien = mode_entretien
+        # Campagne choisie explicitement par le répondant (bouton dédié ou
+        # lien direct ?campagne=..., voir app.py) quand plusieurs campagnes
+        # sont actives en même temps — restreint _compute_priority_field_ids/
+        # _intro_campagnes_actives/_section_cloture_campagne à CETTE seule
+        # campagne au lieu de les fusionner toutes. None (mode "campagne"
+        # choisi alors qu'une seule campagne est active, ou mode "besoins") =
+        # comportement historique, pas de restriction.
+        self.campagne_id = campagne_id
         self._module_id: Optional[str] = session.module_courant
         self._section_id: Optional[str] = session.section_courante
         self._completed_section_ids: set = set(session.completed_sections or [])
@@ -379,9 +387,21 @@ class CollecteToolHandler:
             return None
         return {"total": total, "repondus": repondus, "pourcentage": round(100 * repondus / total)}
 
+    def _campagnes_actives_pertinentes(self) -> list:
+        """Campagnes actives à prendre en compte : toutes si le répondant n'a
+        pas choisi une campagne précise (mode "besoins", ou "campagne" choisi
+        alors qu'une seule était active), restreint à CELLE choisie sinon —
+        voir self.campagne_id. Une campagne choisie qui ne serait plus active
+        (expirée/supprimée entre le choix et maintenant) donne une liste vide
+        plutôt qu'un repli silencieux sur toutes les autres."""
+        actives = self.store.get_active_campagnes_prioritaires()
+        if self.campagne_id:
+            return [c for c in actives if c.id == self.campagne_id]
+        return actives
+
     def _compute_priority_field_ids(self) -> list:
         ids: list = []
-        for campagne in self.store.get_active_campagnes_prioritaires():
+        for campagne in self._campagnes_actives_pertinentes():
             for champ_id in campagne.champ_ids:
                 if champ_id in ids:
                     continue
@@ -458,7 +478,7 @@ class CollecteToolHandler:
         ajouté : continuer à nourrir sa fiche aide à mieux cerner les
         obstacles du lieu pour lui acheminer les bonnes ressources, et la
         Bibliothèque peut inspirer par l'exemple."""
-        campagnes = [c for c in self.store.get_active_campagnes_prioritaires() if c.message_cloture]
+        campagnes = [c for c in self._campagnes_actives_pertinentes() if c.message_cloture]
         message = campagnes[0].message_cloture if campagnes else MESSAGE_CLOTURE_GENERIQUE
         texte_cloture = message + CODA_CLOTURE_CAMPAGNE
         return {
@@ -571,7 +591,7 @@ class CollecteToolHandler:
         par l'admin : objet, cibles, éligibilité), pour que l'agent puisse
         proposer clairement de participer — pas un simple « recensement ciblé »
         sans nom."""
-        morceaux = [texte_intro_campagne(c) for c in self.store.get_active_campagnes_prioritaires() if c.champ_ids]
+        morceaux = [texte_intro_campagne(c) for c in self._campagnes_actives_pertinentes() if c.champ_ids]
         if not morceaux:
             return ("Un recensement ciblé est en cours en ce moment : ces informations sont "
                     "particulièrement utiles à collecter en priorité.")

@@ -108,7 +108,8 @@ create table if not exists campagnes_prioritaires (
     date_fin text not null,
     cree_par text,
     cree_le text not null default (datetime('now')),
-    message_cloture text
+    message_cloture text,
+    code text
 );
 create table if not exists journal_modifications (
     id text primary key,
@@ -214,7 +215,8 @@ class SqliteStore(Store):
                               ("tiers_lieux", "code_postal"),
                               ("lieu_derive", "donnees_publiques"),
                               ("lieu_derive", "donnees_publiques_source_hash"),
-                              ("lieu_derive", "donnees_publiques_maj")):
+                              ("lieu_derive", "donnees_publiques_maj"),
+                              ("campagnes_prioritaires", "code")):
             existantes = {r["name"] for r in self.conn.execute(f"pragma table_info({table})")}
             if column not in existantes:
                 self.conn.execute(f"alter table {table} add column {column} text")
@@ -724,14 +726,14 @@ class SqliteStore(Store):
     def save_campagne_prioritaire(self, campagne: CampagnePrioritaire) -> None:
         self.conn.execute(
             "insert into campagnes_prioritaires (id, titre, description, champ_ids, date_debut, "
-            "date_fin, cree_par, message_cloture) values (?, ?, ?, ?, ?, ?, ?, ?) "
+            "date_fin, cree_par, message_cloture, code) values (?, ?, ?, ?, ?, ?, ?, ?, ?) "
             "on conflict(id) do update set titre = excluded.titre, description = excluded.description, "
             "champ_ids = excluded.champ_ids, date_debut = excluded.date_debut, date_fin = excluded.date_fin, "
-            "message_cloture = excluded.message_cloture",
+            "message_cloture = excluded.message_cloture, code = excluded.code",
             (
                 campagne.id or str(uuid.uuid4()), campagne.titre, campagne.description,
                 json.dumps(campagne.champ_ids, ensure_ascii=False), campagne.date_debut,
-                campagne.date_fin, campagne.cree_par, campagne.message_cloture,
+                campagne.date_fin, campagne.cree_par, campagne.message_cloture, campagne.code,
             ),
         )
         self.conn.commit()
@@ -745,7 +747,7 @@ class SqliteStore(Store):
                 id=d["id"], titre=d["titre"], description=d["description"],
                 champ_ids=json.loads(d["champ_ids"]), date_debut=d["date_debut"],
                 date_fin=d["date_fin"], cree_par=d["cree_par"], cree_le=d["cree_le"],
-                message_cloture=d["message_cloture"],
+                message_cloture=d["message_cloture"], code=d["code"],
             ))
         return result
 

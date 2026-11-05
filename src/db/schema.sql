@@ -114,7 +114,8 @@ create table if not exists campagnes_prioritaires (
     date_fin timestamptz not null,
     cree_par uuid references auth.users(id),
     cree_le timestamptz not null default now(),
-    message_cloture text
+    message_cloture text,
+    code text
 );
 
 -- Journal d'écriture append-only (contrairement à `reponses`, qui ne garde
@@ -411,7 +412,8 @@ create table if not exists campagnes_prioritaires (
     date_fin timestamptz not null,
     cree_par uuid references auth.users(id),
     cree_le timestamptz not null default now(),
-    message_cloture text
+    message_cloture text,
+    code text
 );
 
 -- Journal d'écriture append-only (contrairement à `reponses`, qui ne garde

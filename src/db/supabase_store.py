@@ -623,6 +623,7 @@ class SupabaseStore(Store):
             "date_fin": campagne.date_fin,
             "cree_par": campagne.cree_par,
             "message_cloture": campagne.message_cloture,
+            "code": campagne.code,
         }
         if campagne.id:
             payload["id"] = campagne.id
