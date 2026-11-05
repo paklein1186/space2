@@ -281,6 +281,15 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "en": "The campaign link you used is no longer valid (campaign over or unknown) — "
               "you can still contribute below.",
     },
+    "entretien.continuer_campagne_btn": {
+        "fr": "📋 Continuer « {titre} » ({repondus}/{total})",
+        "en": "📋 Continue “{titre}” ({repondus}/{total})",
+    },
+    "entretien.continuer_campagne_caption": {
+        "fr": "Reprendre là où vous en étiez sur ce recensement ciblé.",
+        "en": "Pick up where you left off on this targeted survey.",
+    },
+    "entretien.autre_campagne_expander": {"fr": "Ou répondre à une autre campagne", "en": "Or answer a different campaign"},
     "entretien.mode_besoins_btn": {"fr": "📣 Rendre visibles vos besoins actuels", "en": "📣 Make your current needs visible"},
     "entretien.mode_besoins_caption": {
         "fr": "Exprimer directement de quoi le lieu aurait besoin — utilisé dans l'Annuaire "

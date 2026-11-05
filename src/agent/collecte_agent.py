@@ -369,16 +369,17 @@ class CollecteAgent:
                 return cloture
 
 
+_INSTRUCTION_CAMPAGNE_SUITE_LIEN = (
+    " Si un site web est déjà connu ou vient d'être transmis (analyser_lien), appuie-toi sur ce "
+    "qu'il raconte pour cadrer tes questions avec un angle plus spécifique plutôt que de les poser "
+    "à froid, et restitue brièvement ce que tu en retiens avant d'enchaîner — sinon, demande le "
+    "lien tôt dans l'échange pour pouvoir t'en servir."
+)
+
 _INSTRUCTIONS_MODE = {
-    "campagne": (
-        " Le répondant a choisi de commencer par la campagne prioritaire en cours plutôt que "
-        "par l'histoire complète du lieu — get_current_section te la proposera directement, "
-        "mentionne-le brièvement avant la première question de cette campagne. Si un site web est "
-        "déjà connu ou vient d'être transmis (analyser_lien), appuie-toi sur ce qu'il raconte pour "
-        "cadrer tes questions avec un angle plus spécifique plutôt que de les poser à froid, et "
-        "restitue brièvement ce que tu en retiens avant d'enchaîner — sinon, demande le lien tôt "
-        "dans l'échange pour pouvoir t'en servir."
-    ),
+    # "campagne" n'est pas ici : _instruction_campagne() ci-dessous construit
+    # ce texte dynamiquement (deux variantes, campagne jamais entamée vs déjà
+    # en cours — voir sa docstring).
     "besoins": (
         " Le répondant a choisi de commencer par exprimer les besoins actuels du lieu (pour les "
         "rendre visibles dans l'Annuaire et servir de base à une éventuelle mise en avant dans le "
@@ -388,8 +389,34 @@ _INSTRUCTIONS_MODE = {
 }
 
 
+def _instruction_campagne(campagne_titre: str | None, campagne_progression: dict | None) -> str:
+    """Texte de mode "campagne" — deux variantes bien distinctes pour ne
+    jamais reposer la question "vous voulez participer ?" à quelqu'un qui a
+    déjà commencé à répondre (signalé concrètement : l'agent restituait un
+    résumé d'ouverture correct PUIS repartait quand même sur une
+    présentation complète de la campagne et une demande de participation,
+    comme si de rien n'était — repondus==0 (jamais commencée) vs repondus>0
+    (déjà entamée, même partiellement) distinguent les deux cas."""
+    if campagne_progression and campagne_progression.get("repondus", 0) > 0:
+        titre = f" « {campagne_titre} »" if campagne_titre else ""
+        return (
+            f" Le répondant continue de répondre à la campagne prioritaire{titre}, déjà entamée "
+            f"({campagne_progression['repondus']}/{campagne_progression['total']} questions déjà "
+            "répondues pour ce lieu, par ce répondant ou un autre contributeur) — NE réintroduis PAS "
+            "la campagne depuis le début, NE redemande PAS s'il veut y participer (il a déjà "
+            "répondu, la question ne se pose plus) : un simple « Continuons la campagne"
+            f"{titre} » suffit avant d'enchaîner directement sur la suite via get_current_section."
+        ) + _INSTRUCTION_CAMPAGNE_SUITE_LIEN
+    return (
+        " Le répondant a choisi de commencer par la campagne prioritaire en cours plutôt que "
+        "par l'histoire complète du lieu — get_current_section te la proposera directement, "
+        "mentionne-le brièvement avant la première question de cette campagne."
+    ) + _INSTRUCTION_CAMPAGNE_SUITE_LIEN
+
+
 def opening_message(store, tiers_lieu_id: str, nom_lieu: str = "", contributeur_id: str | None = None,
-                     role_label: str = "", mode_entretien: str = "histoire") -> str:
+                     role_label: str = "", mode_entretien: str = "histoire",
+                     campagne_titre: str | None = None, campagne_progression: dict | None = None) -> str:
     """Message d'ouverture envoyé à l'agent pour démarrer la conversation —
     jamais affiché tel quel au répondant, mais donne à l'agent de quoi
     personnaliser son premier message (nom du lieu, éventuel résumé ou
@@ -413,7 +440,10 @@ def opening_message(store, tiers_lieu_id: str, nom_lieu: str = "", contributeur_
     if role_label:
         identite += f", en tant que {role_label.lower()}"
     identite += "."
-    identite += _INSTRUCTIONS_MODE.get(mode_entretien, "")
+    if mode_entretien == "campagne":
+        identite += _instruction_campagne(campagne_titre, campagne_progression)
+    else:
+        identite += _INSTRUCTIONS_MODE.get(mode_entretien, "")
 
     derive = store.get_lieu_derive(tiers_lieu_id)
     if derive and derive.lien_externe:

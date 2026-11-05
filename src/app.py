@@ -325,6 +325,33 @@ def _campagne_depuis_url(campagnes_actives: list):
     return next((c for c in campagnes_actives if code_url in (c.code, c.id)), None)
 
 
+def _campagne_en_cours_pour_lieu(store, nom_lieu: str, campagnes_actives: list):
+    """(campagne, stats) de la campagne active que CE lieu a déjà commencé à
+    renseigner (repondus > 0, par n'importe quel contributeur — même logique
+    "lieu" que get_answers(tiers_lieu_id) sans contributeur_id), ou (None,
+    None) si aucune. Détecté AVANT que le mode ne soit choisi, pour ne pas
+    proposer "Remplir une campagne en cours" comme si de rien n'était à
+    quelqu'un qui y a déjà répondu partiellement — voir le sélecteur dans
+    entretien_tab.
+
+    Réutilise donnees_annuaire() (mis en cache, déjà chargé pour la grille
+    de l'Annuaire) plutôt qu'un store.list_tiers_lieux() frais à chaque
+    visite de l'entretien — même raisonnement que la légèreté de l'accueil
+    (src/donnees_observatoire.py::stats_reseau)."""
+    if not campagnes_actives or not nom_lieu:
+        return None, None
+    lieux, _ = donnees_annuaire()
+    lieu_existant = next((l for l in lieux if l.nom.strip().lower() == nom_lieu.strip().lower()), None)
+    if lieu_existant is None:
+        return None, None
+    reponses_lieu = store.get_answers(lieu_existant.id)
+    for campagne in campagnes_actives:
+        stats = campagne_completion_stats(reponses_lieu, campagne.champ_ids)
+        if stats and stats["repondus"] > 0:
+            return campagne, stats
+    return None, None
+
+
 def _selecteur_campagnes(campagnes_actives: list, mode_key: str, campagne_id_key: str) -> None:
     """Choix explicite parmi PLUSIEURS campagnes actives en parallèle — un
     simple bouton ne suffit plus à distinguer laquelle rejoindre. Le
@@ -604,10 +631,35 @@ def entretien_tab(store, user_id: str):
                     st.rerun()
                 st.caption(t("entretien.mode_histoire_caption"))
             with col2:
-                if len(campagnes_actives) >= 2:
-                    # Plusieurs campagnes en parallèle : un simple bouton ne
-                    # suffit plus à distinguer laquelle rejoindre — voir
-                    # _selecteur_campagnes.
+                campagne_en_cours, progression_en_cours = _campagne_en_cours_pour_lieu(
+                    store, nom_lieu, campagnes_actives)
+                if campagne_en_cours is not None:
+                    # Ce lieu a déjà répondu à une partie de cette campagne
+                    # (par ce répondant ou un autre contributeur) : proposer
+                    # de CONTINUER, jamais "Remplir une campagne en cours"
+                    # comme si de rien n'était — signalé concrètement :
+                    # l'agent réintroduisait la campagne depuis le début et
+                    # redemandait s'il voulait y participer, alors qu'il
+                    # avait déjà répondu à 8 questions. Les autres campagnes
+                    # actives (s'il y en a) restent accessibles juste en
+                    # dessous, repliées — troisième choix explicite demandé :
+                    # continuer celle-ci / en rejoindre une autre / continuer
+                    # l'histoire hors campagne (col1, inchangé).
+                    label = t("entretien.continuer_campagne_btn", titre=campagne_en_cours.titre,
+                              repondus=progression_en_cours["repondus"], total=progression_en_cours["total"])
+                    if st.button(label, use_container_width=True):
+                        st.session_state[mode_key] = "campagne"
+                        st.session_state[campagne_id_key] = campagne_en_cours.id
+                        st.rerun()
+                    st.caption(t("entretien.continuer_campagne_caption"))
+                    autres_campagnes = [c for c in campagnes_actives if c.id != campagne_en_cours.id]
+                    if autres_campagnes:
+                        with st.expander(t("entretien.autre_campagne_expander")):
+                            _selecteur_campagnes(autres_campagnes, mode_key, campagne_id_key)
+                elif len(campagnes_actives) >= 2:
+                    # Plusieurs campagnes en parallèle, aucune encore
+                    # entamée : un simple bouton ne suffit plus à distinguer
+                    # laquelle rejoindre — voir _selecteur_campagnes.
                     _selecteur_campagnes(campagnes_actives, mode_key, campagne_id_key)
                 else:
                     label_campagne = (t("entretien.mode_campagne_btn") if campagnes_actives
@@ -636,17 +688,29 @@ def entretien_tab(store, user_id: str):
         # Le nom du lieu est déjà connu (saisi dans la barre latérale) : on le
         # pré-remplit comme réponse pour que l'entretien ne redemande jamais
         # "quel est le nom de votre lieu ?" en première question.
-        if store.get_answers(tiers_lieu.id, contributeur.id).get("nom_lieu") is None:
+        reponses_initiales = store.get_answers(tiers_lieu.id, contributeur.id)
+        if reponses_initiales.get("nom_lieu") is None:
             store.save_answer(tiers_lieu.id, contributeur.id, "nom_lieu", tiers_lieu.nom)
         session = store.get_or_start_session(tiers_lieu.id, contributeur.id)
+        campagne_id_actuelle = st.session_state.get(campagne_id_key)
         handler = CollecteToolHandler(store, tiers_lieu.id, contributeur.id, session, Role(role),
-                                       mode_entretien=mode_entretien,
-                                       campagne_id=st.session_state.get(campagne_id_key))
+                                       mode_entretien=mode_entretien, campagne_id=campagne_id_actuelle)
         agent = CollecteAgent(handler, store=store, tiers_lieu_id=tiers_lieu.id)
         st.session_state[session_key] = {
             "agent": agent, "history": [],
             "tiers_lieu_id": tiers_lieu.id, "contributeur_id": contributeur.id, "role": role,
         }
+        # Campagne déjà entamée pour ce lieu (par ce répondant ou un autre
+        # contributeur) : l'agent ne doit pas réintroduire la campagne depuis
+        # le début ni redemander s'il veut y participer — voir
+        # _instruction_campagne dans collecte_agent.py.
+        campagne_titre = campagne_progression = None
+        if mode_entretien == "campagne" and campagne_id_actuelle:
+            campagne_choisie = next(
+                (c for c in store.get_active_campagnes_prioritaires() if c.id == campagne_id_actuelle), None)
+            if campagne_choisie:
+                campagne_titre = campagne_choisie.titre
+                campagne_progression = campagne_completion_stats(reponses_initiales, campagne_choisie.champ_ids)
         # Premier appel LLM (résumé d'ouverture) : sans spinner, la page
         # restait visuellement figée le temps de cet appel (plusieurs
         # secondes), juste après avoir choisi/créé le lieu — perçu comme un
@@ -656,6 +720,7 @@ def entretien_tab(store, user_id: str):
                 store, tiers_lieu.id, nom_lieu=tiers_lieu.nom,
                 contributeur_id=contributeur.id, role_label=ROLE_LABELS[role],
                 mode_entretien=mode_entretien,
+                campagne_titre=campagne_titre, campagne_progression=campagne_progression,
             ))
         if opening is None:
             # Rien d'affichable dans state["history"] tant que l'ouverture n'a
