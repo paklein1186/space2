@@ -924,6 +924,14 @@ section_diagnostic_besoins_futurs = Section(
         Field("types_soutien_souhaites", "De quels types de soutien auriez-vous besoin ces 3 prochaines années ?",
               FieldType.MULTI_CHOICE, options=OPTIONS_SOUTIEN_ACCOMPAGNEMENT),
         Field("priorites_principales", "Parmi ces besoins, quelles sont vos 2 à 3 priorités ?", FieldType.TEXTAREA),
+        # Distinct de "Mise en réseau avec d'autres tiers-lieux" (une
+        # catégorie de besoin générale, ci-dessus) : une opportunité concrète
+        # et bornée dans le temps, utile pour effectivement organiser la
+        # table ronde plutôt que de rester une intention abstraite.
+        Field("interet_table_ronde_gestionnaires",
+              "Seriez-vous intéressé·e par une table ronde avec d'autres gestionnaires de coworkings/"
+              "tiers-lieux dans les prochains mois (demi-journée) ?", FieldType.BOOLEAN,
+              roles=ROLES_INTERNES),
     ],
 )
 
