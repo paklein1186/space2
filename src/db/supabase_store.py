@@ -220,14 +220,29 @@ class SupabaseStore(Store):
 
     def save_answer(self, tiers_lieu_id: str, contributeur_id: str, champ_id: str, valeur,
                      confidentiel: bool = False, campagne_id: Optional[str] = None) -> None:
-        self.client.table("reponses").upsert({
+        payload = {
             "tiers_lieu_id": tiers_lieu_id,
             "contributeur_id": contributeur_id,
             "champ_id": champ_id,
             "valeur": valeur,
             "confidentiel": confidentiel,
             "campagne_id": campagne_id,
-        }, on_conflict="tiers_lieu_id,contributeur_id,champ_id").execute()
+        }
+        try:
+            self.client.table("reponses").upsert(
+                payload, on_conflict="tiers_lieu_id,contributeur_id,champ_id").execute()
+        except Exception:
+            # Colonne `campagne_id` absente avant migration_017 : CHAQUE
+            # réponse de l'app passe par ici (contrairement à `code` sur
+            # campagnes_prioritaires, écrit seulement par l'admin) — sans ce
+            # repli, un oubli d'appliquer la migration casserait la sauvegarde
+            # de TOUTE réponse, partout dans l'app, jusqu'à ce qu'elle le
+            # soit. Dégradé mais fonctionnel : l'étiquette "répondu dans le
+            # cadre de cette campagne" est juste perdue tant que la migration
+            # n'est pas appliquée.
+            payload.pop("campagne_id", None)
+            self.client.table("reponses").upsert(
+                payload, on_conflict="tiers_lieu_id,contributeur_id,champ_id").execute()
         self._log_modification(tiers_lieu_id, contributeur_id, "reponse", champ_id, valeur)
 
     def _log_modification(self, tiers_lieu_id: str, contributeur_id: str, type_: str,
@@ -276,12 +291,18 @@ class SupabaseStore(Store):
 
     def get_campagne_ids_entames(self, tiers_lieu_id: str) -> set:
         bloques = self._contributeurs_bloques(tiers_lieu_id)
-        result = (
-            self.client.table("reponses")
-            .select("contributeur_id,campagne_id")
-            .eq("tiers_lieu_id", tiers_lieu_id)
-            .execute()
-        )
+        try:
+            result = (
+                self.client.table("reponses")
+                .select("contributeur_id,campagne_id")
+                .eq("tiers_lieu_id", tiers_lieu_id)
+                .execute()
+            )
+        except Exception:
+            # Colonne absente avant migration_017 : aucune campagne connue
+            # comme "entamée" plutôt qu'une page d'entretien qui plante —
+            # repli sûr, symétrique à celui de save_answer ci-dessus.
+            return set()
         return {
             r["campagne_id"] for r in result.data
             if r["campagne_id"] and r["contributeur_id"] not in bloques
