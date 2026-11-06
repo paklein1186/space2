@@ -2883,6 +2883,19 @@ def main():
     page_vient_de_changer = st.session_state.get("_derniere_page_active") != pg.url_path
     st.session_state["_page_vient_de_changer"] = page_vient_de_changer
     st.session_state["_derniere_page_active"] = pg.url_path
+    # Le caractère "collant" de _mode_entree_directe (session_state, voir
+    # _mode_entree_directe_actif) ne doit valoir que pour la session
+    # ininterrompue sur l'onglet Entretien ouvert via lien direct — pas pour
+    # le reste de la session Streamlit (qui survit à la navigation entre
+    # onglets, contrairement à un rechargement classique). Dès qu'on quitte
+    # l'onglet Entretien, on efface le drapeau : y revenir ensuite SANS
+    # paramètre d'URL (navigation normale depuis Accueil ou la barre
+    # latérale) retrouve alors le menu et le titre standard, conformément à
+    # "uniquement sur lien direct, pas si le chemin est suivi depuis
+    # l'accueil". Signalé concrètement : le menu restait masqué sur Accueil
+    # après être passé par un lien de campagne plus tôt dans la session.
+    if pg.url_path != "entretien":
+        st.session_state.pop("_mode_entree_directe", None)
     pg.run()
 
     # Barre latérale "compte" : rendue après pg.run() (pas avant), pour que
