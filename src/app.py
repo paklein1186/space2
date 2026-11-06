@@ -683,18 +683,26 @@ def _hero_entree_directe(store) -> None:
     ?campagne=...) quand elle se résout encore à une campagne active, sinon
     un message générique (lien expiré, ou ?entretien=general). Le CSS
     (_CSS_ENTREE_DIRECTE) est déjà injecté par page_entretien(), avant même
-    l'écran de connexion — pas réinjecté ici."""
+    l'écran de connexion — pas réinjecté ici.
+
+    Le sous-titre reprend la description propre à la campagne (renseignée
+    côté admin, voir administration_tab) quand elle existe — un visiteur qui
+    arrive par un lien direct (flyer, QR code, bouton "Candidater" d'un site
+    partenaire) n'a pas forcément vu le contexte ailleurs, contrairement à
+    quelqu'un qui navigue depuis le portail Space2 : ce rappel se place donc
+    uniquement ici, en amont du chat, pas dans entretien_tab (menu normal)."""
     titre, sous_titre = t("entretien.hero_general_titre"), t("entretien.hero_general_sous_titre")
     code_url = st.query_params.get("campagne")
     if code_url:
         campagne = _campagne_depuis_url(store.get_active_campagnes_prioritaires())
         if campagne is not None:
-            titre, sous_titre = campagne.titre, t("entretien.hero_campagne_sous_titre")
+            titre = campagne.titre
+            sous_titre = campagne.description or t("entretien.hero_campagne_sous_titre")
     st.markdown(
         f"""<div class="sp-portail"><div class="sp-portail-contenu">
         <div class="sp-badge">{html.escape(t("entretien.hero_badge"))}</div>
         <h1>{html.escape(titre)}</h1>
-        <p>{html.escape(sous_titre)}</p>
+        <p>{html.escape(sous_titre).replace(chr(10), "<br>")}</p>
         </div></div>""",
         unsafe_allow_html=True,
     )
@@ -1946,6 +1954,22 @@ def administration_tab(store, user_id: str) -> None:
                     )
                 with st.expander(f"Voir les répondants — {c.titre}"):
                     _tableau_repondants_campagne(admin_store, c.champ_ids)
+                # Édition de la description seule (pas du reste de la
+                # campagne : titre/champs/dates se corrigent en supprimant et
+                # recréant) — affichée en amont du chat sur le hero d'un lien
+                # direct, voir _hero_entree_directe, donc modifiable sans
+                # repasser par la recréation complète de la campagne.
+                with st.expander(f"Modifier la description — {c.titre}"):
+                    with st.form(f"modif_description_{c.id}"):
+                        nouvelle_description = st.text_area(
+                            "Description (affichée aux visiteurs arrivant par un lien direct)",
+                            value=c.description or "", height=150,
+                        )
+                        if st.form_submit_button("Enregistrer"):
+                            c.description = nouvelle_description.strip() or None
+                            admin_store.save_campagne_prioritaire(c)
+                            st.success("Description mise à jour.")
+                            st.rerun()
         else:
             st.caption("Aucune campagne prioritaire pour l'instant.")
 
