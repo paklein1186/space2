@@ -681,14 +681,15 @@ def _hero_entree_directe(store) -> None:
     """Bannière "portail" remplaçant le titre standard quand l'entretien est
     atteint via un lien direct — le titre reflète la campagne visée (lien
     ?campagne=...) quand elle se résout encore à une campagne active, sinon
-    un message générique (lien expiré, ou ?entretien=general)."""
+    un message générique (lien expiré, ou ?entretien=general). Le CSS
+    (_CSS_ENTREE_DIRECTE) est déjà injecté par page_entretien(), avant même
+    l'écran de connexion — pas réinjecté ici."""
     titre, sous_titre = t("entretien.hero_general_titre"), t("entretien.hero_general_sous_titre")
     code_url = st.query_params.get("campagne")
     if code_url:
         campagne = _campagne_depuis_url(store.get_active_campagnes_prioritaires())
         if campagne is not None:
             titre, sous_titre = campagne.titre, t("entretien.hero_campagne_sous_titre")
-    st.markdown(_CSS_ENTREE_DIRECTE, unsafe_allow_html=True)
     st.markdown(
         f"""<div class="sp-portail"><div class="sp-portail-contenu">
         <div class="sp-badge">{html.escape(t("entretien.hero_badge"))}</div>
@@ -2781,6 +2782,15 @@ def _rendre_isole(nom_page: str, fonction, *args) -> None:
 # restent accessibles sans connexion dans le même menu de navigation.
 
 def page_entretien() -> None:
+    # Colonne de gauche masquée dès CET écran (pas seulement une fois connecté
+    # dans entretien_tab) : un lien direct (?campagne=... ou ?entretien=
+    # general) amène d'abord sur l'écran de connexion (auth_screen, partagé
+    # avec les autres pages) — sans ce masquage ici, le menu restait visible
+    # le temps de taper l'email/le code, contredisant "sans colonne de
+    # gauche" pour toute la session. Signalé concrètement : le lien de
+    # campagne affichait encore le menu.
+    if _mode_entree_directe_actif():
+        st.markdown(_CSS_ENTREE_DIRECTE, unsafe_allow_html=True)
     user_id = auth_screen()
     if not user_id:
         return
