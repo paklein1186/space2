@@ -222,10 +222,27 @@ class Store(ABC):
 
     @abstractmethod
     def save_answer(self, tiers_lieu_id: str, contributeur_id: str, champ_id: str, valeur,
-                     confidentiel: bool = False) -> None: ...
+                     confidentiel: bool = False, campagne_id: Optional[str] = None) -> None:
+        """`campagne_id` : campagne prioritaire dans le cadre de laquelle cette
+        réponse a été donnée ACTIVEMENT via l'entretien conversationnel (posé
+        par CollecteToolHandler quand mode_entretien == "campagne"), jamais
+        par un import en masse ni par l'entretien général — sert uniquement à
+        détecter si une campagne est réellement "entamée" pour un lieu (voir
+        get_campagne_ids_entames), pas à restreindre la lecture des réponses
+        elles-mêmes (toujours lues sans distinction de campagne ailleurs)."""
+        ...
 
     @abstractmethod
     def get_answers(self, tiers_lieu_id: str, contributeur_id: Optional[str] = None) -> dict: ...
+
+    @abstractmethod
+    def get_campagne_ids_entames(self, tiers_lieu_id: str) -> set:
+        """Ids des campagnes prioritaires pour lesquelles ce lieu a au moins
+        une réponse donnée ACTIVEMENT via l'entretien conversationnel (voir
+        save_answer) — pas simplement un champ qui a déjà une valeur par
+        ailleurs (import en masse, entretien général). Exclut les réponses
+        de contributeurs bloqués, comme get_answers."""
+        ...
 
     @abstractmethod
     def get_all_answers_by_contributeur(self, tiers_lieu_id: str) -> dict: ...

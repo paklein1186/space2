@@ -327,12 +327,22 @@ def _campagne_depuis_url(campagnes_actives: list):
 
 def _campagne_en_cours_pour_lieu(store, nom_lieu: str, campagnes_actives: list):
     """(campagne, stats) de la campagne active que CE lieu a déjà commencé à
-    renseigner (repondus > 0, par n'importe quel contributeur — même logique
-    "lieu" que get_answers(tiers_lieu_id) sans contributeur_id), ou (None,
-    None) si aucune. Détecté AVANT que le mode ne soit choisi, pour ne pas
-    proposer "Remplir une campagne en cours" comme si de rien n'était à
-    quelqu'un qui y a déjà répondu partiellement — voir le sélecteur dans
-    entretien_tab.
+    renseigner ACTIVEMENT via l'entretien conversationnel (par n'importe quel
+    contributeur), ou (None, None) si aucune. Détecté AVANT que le mode ne
+    soit choisi, pour ne pas proposer "Remplir une campagne en cours" comme
+    si de rien n'était à quelqu'un qui y a déjà répondu partiellement — voir
+    le sélecteur dans entretien_tab.
+
+    "Entamée" = au moins une réponse marquée campagne_id == cette campagne
+    (voir Store.save_answer / get_campagne_ids_entames), PAS simplement un
+    champ qui a déjà une valeur par ailleurs (import en masse, entretien
+    général sans rapport avec cette campagne...) — un simple recoupement de
+    données ne doit jamais être pris pour un engagement actif sur cette
+    campagne. Signalé concrètement : "Continuer" proposé pour une campagne
+    jamais entamée en vrai, les champs recoupant uniquement des données
+    importées/générales. Une fois confirmée entamée, la progression affichée
+    (stats) redevient la vue complète, toutes sources confondues — seule la
+    détection est restreinte aux réponses actives.
 
     Réutilise donnees_annuaire() (mis en cache, déjà chargé pour la grille
     de l'Annuaire) plutôt qu'un store.list_tiers_lieux() frais à chaque
@@ -344,8 +354,13 @@ def _campagne_en_cours_pour_lieu(store, nom_lieu: str, campagnes_actives: list):
     lieu_existant = next((l for l in lieux if l.nom.strip().lower() == nom_lieu.strip().lower()), None)
     if lieu_existant is None:
         return None, None
+    campagnes_entamees = store.get_campagne_ids_entames(lieu_existant.id)
+    if not campagnes_entamees:
+        return None, None
     reponses_lieu = store.get_answers(lieu_existant.id)
     for campagne in campagnes_actives:
+        if campagne.id not in campagnes_entamees:
+            continue
         stats = campagne_completion_stats(reponses_lieu, campagne.champ_ids)
         if stats and stats["repondus"] > 0:
             return campagne, stats

@@ -1,0 +1,11 @@
+-- Trace la campagne prioritaire (si applicable) dans le cadre de laquelle
+-- une réponse a été donnée ACTIVEMENT via l'entretien conversationnel — posé
+-- par CollecteToolHandler.save_answer quand mode_entretien == "campagne",
+-- jamais par un import en masse (CSV/CommunECter) ni par l'entretien
+-- général. Sert à app.py::_campagne_en_cours_pour_lieu pour décider si une
+-- campagne est réellement "entamée" pour un lieu, plutôt que de se fier à de
+-- simples champs déjà remplis par ailleurs (signalé concrètement : "Continuer"
+-- proposé pour une campagne jamais entamée en vrai, juste des champs qui
+-- recoupaient des données importées). NULL = réponse hors contexte de
+-- campagne (entretien général, besoins, import).
+alter table reponses add column if not exists campagne_id uuid;

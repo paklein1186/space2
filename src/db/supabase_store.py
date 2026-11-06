@@ -219,13 +219,14 @@ class SupabaseStore(Store):
         }).eq("id", session_id).execute()
 
     def save_answer(self, tiers_lieu_id: str, contributeur_id: str, champ_id: str, valeur,
-                     confidentiel: bool = False) -> None:
+                     confidentiel: bool = False, campagne_id: Optional[str] = None) -> None:
         self.client.table("reponses").upsert({
             "tiers_lieu_id": tiers_lieu_id,
             "contributeur_id": contributeur_id,
             "champ_id": champ_id,
             "valeur": valeur,
             "confidentiel": confidentiel,
+            "campagne_id": campagne_id,
         }, on_conflict="tiers_lieu_id,contributeur_id,champ_id").execute()
         self._log_modification(tiers_lieu_id, contributeur_id, "reponse", champ_id, valeur)
 
@@ -272,6 +273,19 @@ class SupabaseStore(Store):
         # en cas de divergence (même logique que SqliteStore).
         rows = sorted(rows, key=lambda r: r["contributeur_id"] == contributeur_id)
         return {r["champ_id"]: r["valeur"] for r in rows}
+
+    def get_campagne_ids_entames(self, tiers_lieu_id: str) -> set:
+        bloques = self._contributeurs_bloques(tiers_lieu_id)
+        result = (
+            self.client.table("reponses")
+            .select("contributeur_id,campagne_id")
+            .eq("tiers_lieu_id", tiers_lieu_id)
+            .execute()
+        )
+        return {
+            r["campagne_id"] for r in result.data
+            if r["campagne_id"] and r["contributeur_id"] not in bloques
+        }
 
     def get_all_answers_by_contributeur(self, tiers_lieu_id: str) -> dict:
         bloques = self._contributeurs_bloques(tiers_lieu_id)

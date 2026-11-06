@@ -63,6 +63,7 @@ create table if not exists reponses (
     champ_id text not null,
     valeur text,
     confidentiel integer not null default 0,
+    campagne_id text,
     primary key (tiers_lieu_id, contributeur_id, champ_id)
 );
 create table if not exists notes_libres (
@@ -216,7 +217,8 @@ class SqliteStore(Store):
                               ("lieu_derive", "donnees_publiques"),
                               ("lieu_derive", "donnees_publiques_source_hash"),
                               ("lieu_derive", "donnees_publiques_maj"),
-                              ("campagnes_prioritaires", "code")):
+                              ("campagnes_prioritaires", "code"),
+                              ("reponses", "campagne_id")):
             existantes = {r["name"] for r in self.conn.execute(f"pragma table_info({table})")}
             if column not in existantes:
                 self.conn.execute(f"alter table {table} add column {column} text")
@@ -345,13 +347,13 @@ class SqliteStore(Store):
     # -- reponses --------------------------------------------------
 
     def save_answer(self, tiers_lieu_id: str, contributeur_id: str, champ_id: str, valeur,
-                     confidentiel: bool = False) -> None:
+                     confidentiel: bool = False, campagne_id: Optional[str] = None) -> None:
         self.conn.execute(
-            "insert into reponses (tiers_lieu_id, contributeur_id, champ_id, valeur, confidentiel) "
-            "values (?, ?, ?, ?, ?) "
+            "insert into reponses (tiers_lieu_id, contributeur_id, champ_id, valeur, confidentiel, campagne_id) "
+            "values (?, ?, ?, ?, ?, ?) "
             "on conflict(tiers_lieu_id, contributeur_id, champ_id) do update set valeur = excluded.valeur, "
-            "confidentiel = excluded.confidentiel",
-            (tiers_lieu_id, contributeur_id, champ_id, json.dumps(valeur), int(confidentiel)),
+            "confidentiel = excluded.confidentiel, campagne_id = excluded.campagne_id",
+            (tiers_lieu_id, contributeur_id, champ_id, json.dumps(valeur), int(confidentiel), campagne_id),
         )
         self._log_modification(tiers_lieu_id, contributeur_id, "reponse", champ_id, valeur)
         self.conn.commit()
@@ -392,6 +394,15 @@ class SqliteStore(Store):
                 continue
             merged[r["champ_id"]] = json.loads(r["valeur"]) if r["valeur"] is not None else None
         return merged
+
+    def get_campagne_ids_entames(self, tiers_lieu_id: str) -> set:
+        bloques = self._contributeurs_bloques(tiers_lieu_id)
+        rows = self.conn.execute(
+            "select distinct contributeur_id, campagne_id from reponses "
+            "where tiers_lieu_id = ? and campagne_id is not null",
+            (tiers_lieu_id,),
+        ).fetchall()
+        return {r["campagne_id"] for r in rows if r["contributeur_id"] not in bloques}
 
     def get_all_answers_by_contributeur(self, tiers_lieu_id: str,
                                          exclure_confidentiel: bool = False) -> dict:

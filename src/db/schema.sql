@@ -53,6 +53,7 @@ create table if not exists reponses (
     champ_id text not null,
     valeur jsonb,
     confidentiel boolean not null default false,
+    campagne_id uuid,  -- campagne répondue ACTIVEMENT via l'entretien (migration_017)
     maj_le timestamptz not null default now(),
     unique (tiers_lieu_id, contributeur_id, champ_id)
 );
@@ -351,6 +352,7 @@ create table if not exists reponses (
     champ_id text not null,
     valeur jsonb,
     confidentiel boolean not null default false,
+    campagne_id uuid,  -- campagne répondue ACTIVEMENT via l'entretien (migration_017)
     maj_le timestamptz not null default now(),
     unique (tiers_lieu_id, contributeur_id, champ_id)
 );

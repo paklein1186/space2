@@ -671,7 +671,15 @@ class CollecteToolHandler:
             self.store.save_free_text_note(self.tiers_lieu_id, self.contributeur_id, PRIORITY_MODULE_ID, texte)
             self._libres_repondues.add(champ_id)
         else:
-            self.store.save_answer(self.tiers_lieu_id, self.contributeur_id, champ_id, valeur, confidentiel)
+            # campagne_id : uniquement en mode "campagne" (jamais "histoire"/
+            # "besoins") — sert à distinguer une réponse donnée ACTIVEMENT
+            # dans le cadre de cette campagne d'un champ qui aurait déjà une
+            # valeur par ailleurs (voir Store.save_answer / app.py::
+            # _campagne_en_cours_pour_lieu).
+            self.store.save_answer(
+                self.tiers_lieu_id, self.contributeur_id, champ_id, valeur, confidentiel,
+                campagne_id=self.campagne_id if self.mode_entretien == "campagne" else None,
+            )
             if champ_id in ("pays", "region") and valeur:
                 # Synchronise vers la fiche du lieu elle-même (tiers_lieux.pays/
                 # region), pas seulement la réponse structurée — sans ça, un lieu
