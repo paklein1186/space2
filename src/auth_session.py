@@ -28,7 +28,6 @@ from datetime import datetime, timedelta, timezone
 import streamlit as st
 
 COOKIE_NAME = "lh_session"
-THEME_COOKIE_NAME = "lh_theme"
 LANG_COOKIE_NAME = "lh_lang"
 
 _SNAPSHOT_KEY = "_cookies_snapshot"

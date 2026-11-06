@@ -2,10 +2,8 @@
 début de chaque script Streamlit (app.py + chaque page de src/pages/, qui
 s'exécutent indépendamment et n'héritent donc rien les uns des autres).
 
-Clair et sombre sont tous deux des palettes maison (pas les presets
-génériques de Streamlit) : le choix est un simple radio en barre latérale,
-mémorisé dans st.session_state["ui_theme"] (partagé entre les pages d'une
-même session), et c'est cette valeur — pas config.toml — qui pilote les
+Thème clair uniquement (mode sombre retiré à la demande explicite) : une
+palette maison (pas les presets génériques de Streamlit), qui pilote les
 couleurs via des surcharges CSS ciblant les attributs `data-testid`, plus
 stables d'une version Streamlit à l'autre que les noms de classes générés.
 """
@@ -15,13 +13,6 @@ from __future__ import annotations
 import streamlit as st
 
 _PALETTES = {
-    "dark": {
-        "bg": "#0F1812", "bg_elevated": "#16251A", "bg_sidebar": "#0C1610",
-        "text": "#EAF2E9", "text_muted": "#93AB9B",
-        "border_soft": "rgba(74,222,128,0.22)", "border": "rgba(74,222,128,0.45)",
-        "accent": "#4ADE80", "accent_ink": "#06210F",
-        "glow": "0 0 0 1px rgba(74,222,128,0.35), 0 0 22px rgba(74,222,128,0.16)",
-    },
     "light": {
         "bg": "#F4F7F1", "bg_elevated": "#FFFFFF", "bg_sidebar": "#EAF0E4",
         "text": "#122016", "text_muted": "#4B5D50",
@@ -230,63 +221,22 @@ a[data-testid="stSidebarNavLink"][href$="/fiche"]{{ display: none; }}
 
 
 def apply_theme() -> str:
-    """Affiche le sélecteur clair/sombre en barre latérale et injecte le CSS
-    correspondant. À appeler une fois, juste après st.set_page_config(), sur
-    chaque script (app.py + chaque page) — retourne le mode actif ("dark" ou
-    "light") si un appelant veut l'utiliser ailleurs (ex. couleurs de graphique).
-
-    Le choix est mémorisé dans un cookie (pas seulement st.session_state) :
-    app.py et chaque page de src/pages/ sont des scripts Streamlit distincts,
-    et st.session_state ne s'est pas propagé de façon fiable entre eux en
-    pratique (réglé sur une page, revenu à "sombre" par défaut en naviguant
-    vers une autre) — le cookie devient la source de vérité commune, relue
-    au tout début de chaque page, qui persiste aussi d'une visite à l'autre.
-
-    Le composant cookie (iframe bidirectionnel) ne répond pas forcément dès
-    le premier passage du script : une lecture peut renvoyer vide alors qu'un
-    cookie existe bel et bien, le temps que le navigateur réponde. Tant que
-    l'utilisateur n'a pas explicitement touché le bouton (détecté via
-    on_click, pas juste "le widget a été rendu"), on continue de relire le
-    cookie à chaque rerun et de s'y aligner — sans quoi une lecture prématurée
-    (vide) se figerait et écraserait ensuite un cookie déjà valide."""
-    from src.auth_session import THEME_COOKIE_NAME, read_cookie, refresh_cookies, save_cookie
+    """Injecte le CSS du thème clair — seul thème disponible (mode sombre
+    retiré du site à la demande explicite : plus de sélecteur, plus de cookie
+    de thème). À appeler une fois, juste après st.set_page_config() (app.py
+    seulement : les pages de src/pages/ en héritent, voir leurs docstrings).
+    Retourne le mode actif ("light") si un appelant veut l'utiliser ailleurs
+    (ex. couleurs de graphique)."""
+    from src.auth_session import refresh_cookies
 
     # Seul vrai appel au composant cookie de tout le script (voir la note
-    # dans auth_session.py) : auth_screen()/read_session_cookie() ne font
-    # ensuite que relire l'instantané que ce refresh vient de poser, sans
-    # réinvoquer le composant — deux appels avec la même clé dans un même
-    # passage de script feraient planter l'app (StreamlitDuplicateElementKey,
-    # rencontré concrètement).
+    # dans auth_session.py) : auth_screen()/read_session_cookie()/
+    # language_toggle() ne font ensuite que relire l'instantané que ce
+    # refresh vient de poser, sans réinvoquer le composant — deux appels avec
+    # la même clé dans un même passage de script feraient planter l'app
+    # (StreamlitDuplicateElementKey, rencontré concrètement). Gardé ici même
+    # sans cookie de thème à lire : la langue et la session en dépendent.
     refresh_cookies()
 
-    if "ui_theme" not in st.session_state:
-        st.session_state["ui_theme"] = "dark"
-        st.session_state["ui_theme_user_set"] = False
-
-    if not st.session_state.get("ui_theme_user_set"):
-        cookie_value = read_cookie(THEME_COOKIE_NAME)
-        if cookie_value in _PALETTES:
-            st.session_state["ui_theme"] = cookie_value
-
-    def _basculer_theme() -> None:
-        st.session_state["ui_theme"] = "light" if st.session_state["ui_theme"] == "dark" else "dark"
-        st.session_state["ui_theme_user_set"] = True
-        save_cookie(THEME_COOKIE_NAME, st.session_state["ui_theme"])
-
-    mode = st.session_state["ui_theme"]
-    # Un simple bouton bascule (icône soleil/lune) plutôt qu'un st.selectbox :
-    # la structure DOM interne du composant BaseWeb Select (utilisé par
-    # st.selectbox) ne correspondait plus au sélecteur CSS ciblé pour le
-    # thème sombre — le menu déroulant s'affichait avec un fond blanc
-    # illisible. st.button suit le même style déjà éprouvé partout ailleurs
-    # dans l'app (voir _CSS_TEMPLATE plus haut), sans ce risque.
-    from src.i18n import t
-
-    st.sidebar.button(
-        t("theme.light") if mode == "dark" else t("theme.dark"),
-        key="ui_theme_toggle", on_click=_basculer_theme, use_container_width=True,
-    )
-
-    palette = _PALETTES.get(mode, _PALETTES["dark"])
-    st.markdown(_CSS_TEMPLATE.format(**palette), unsafe_allow_html=True)
-    return mode
+    st.markdown(_CSS_TEMPLATE.format(**_PALETTES["light"]), unsafe_allow_html=True)
+    return "light"

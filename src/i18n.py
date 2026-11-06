@@ -51,8 +51,6 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "en": "Local admin mode (LOCAL_DEV_AUTOLOGIN) — full access, RLS bypassed.",
     },
 
-    "theme.light": {"fr": "☀️ Mode clair", "en": "☀️ Light mode"},
-    "theme.dark": {"fr": "🌙 Mode sombre", "en": "🌙 Dark mode"},
     "lang.toggle": {"fr": "🇬🇧 English", "en": "🇫🇷 Français"},
 
     "entretien.title": {"fr": "Compléter l'histoire", "en": "Complete the story"},
