@@ -7,6 +7,7 @@ travailler sans compte Supabase.
 
 from __future__ import annotations
 
+import html
 import math
 import io
 import os
@@ -592,8 +593,118 @@ def _notifier_reponse_prete() -> None:
     )
 
 
+# ---------- Entrée directe (?campagne=... ou ?entretien=general) ----------
+# Un flyer/QR code amène directement sur l'entretien, sans jamais passer par
+# l'accueil normal de l'app — colonne de gauche masquée et habillage dédié
+# pendant toute la session d'entretien (pas seulement l'écran d'ouverture :
+# même logique que le reste de cette page, re-rendue à chaque tour de chat),
+# pour une arrivée qui "embarque" directement plutôt que de ressembler à
+# n'importe quel autre onglet de l'app. Décision explicite (voir discussion) :
+# cet habillage dure toute la session, le répondant n'a plus accès à la
+# navigation standard tant qu'il reste sur cette page.
+_CSS_ENTREE_DIRECTE = """<style>
+[data-testid="stSidebar"], [data-testid="stSidebarCollapseButton"] { display: none !important; }
+
+@keyframes sp-pulse-glow {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+@keyframes sp-drift {
+  0% { background-position: 0 0; }
+  100% { background-position: 120px 120px; }
+}
+
+.sp-portail {
+  position: relative;
+  margin: -1rem -1rem 2rem -1rem;
+  padding: 3rem 1.5rem 2.75rem;
+  overflow: hidden;
+  border-radius: 0 0 28px 28px;
+  background:
+    radial-gradient(ellipse 60% 50% at 18% 0%, color-mix(in srgb, var(--sp-accent) 22%, transparent), transparent 70%),
+    radial-gradient(ellipse 50% 60% at 85% 15%, color-mix(in srgb, var(--sp-accent) 15%, transparent), transparent 70%),
+    var(--sp-bg);
+  border-bottom: 1px solid var(--sp-border-soft);
+}
+.sp-portail::before {
+  content: "";
+  position: absolute; inset: 0;
+  background-image: linear-gradient(var(--sp-border-soft) 1px, transparent 1px),
+                     linear-gradient(90deg, var(--sp-border-soft) 1px, transparent 1px);
+  background-size: 42px 42px;
+  opacity: 0.35;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 15%, black 20%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 15%, black 20%, transparent 75%);
+  animation: sp-drift 14s linear infinite;
+}
+.sp-portail-contenu { position: relative; max-width: 760px; margin: 0 auto; text-align: center; }
+.sp-badge {
+  display: inline-flex; align-items: center; gap: 0.5em;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--sp-accent) !important; border: 1px solid var(--sp-border);
+  border-radius: 999px; padding: 0.3em 0.9em; margin-bottom: 1.1rem;
+  box-shadow: var(--sp-glow);
+}
+.sp-badge::before {
+  content: ""; width: 7px; height: 7px; border-radius: 50%; flex: none;
+  background: var(--sp-accent); box-shadow: 0 0 8px 1px var(--sp-accent);
+  animation: sp-pulse-glow 1.8s ease-in-out infinite;
+}
+.sp-portail h1 {
+  font-family: 'Sora', sans-serif !important; font-weight: 800 !important;
+  font-size: clamp(1.6rem, 4.2vw, 2.5rem); line-height: 1.14;
+  margin: 0 0 0.6rem !important; letter-spacing: -0.015em; color: var(--sp-text) !important;
+}
+.sp-portail p {
+  font-size: 1.02rem; color: var(--sp-text-muted) !important; margin: 0; line-height: 1.5;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp-portail::before, .sp-badge::before { animation: none; }
+}
+</style>"""
+
+
+def _mode_entree_directe_actif() -> bool:
+    """True si cette session a été ouverte (une fois) via un lien direct
+    (?campagne=... ou ?entretien=general) — mémorisé en session_state pour
+    rester actif tout le reste de la session même si les query params
+    disparaissent en cours de route (certains reruns Streamlit les
+    réinitialisent), conformément à la décision de garder l'habillage sur
+    toute la session, pas juste l'écran d'ouverture."""
+    if st.query_params.get("campagne") or st.query_params.get("entretien") == "general":
+        st.session_state["_mode_entree_directe"] = True
+    return bool(st.session_state.get("_mode_entree_directe"))
+
+
+def _hero_entree_directe(store) -> None:
+    """Bannière "portail" remplaçant le titre standard quand l'entretien est
+    atteint via un lien direct — le titre reflète la campagne visée (lien
+    ?campagne=...) quand elle se résout encore à une campagne active, sinon
+    un message générique (lien expiré, ou ?entretien=general)."""
+    titre, sous_titre = t("entretien.hero_general_titre"), t("entretien.hero_general_sous_titre")
+    code_url = st.query_params.get("campagne")
+    if code_url:
+        campagne = _campagne_depuis_url(store.get_active_campagnes_prioritaires())
+        if campagne is not None:
+            titre, sous_titre = campagne.titre, t("entretien.hero_campagne_sous_titre")
+    st.markdown(_CSS_ENTREE_DIRECTE, unsafe_allow_html=True)
+    st.markdown(
+        f"""<div class="sp-portail"><div class="sp-portail-contenu">
+        <div class="sp-badge">{html.escape(t("entretien.hero_badge"))}</div>
+        <h1>{html.escape(titre)}</h1>
+        <p>{html.escape(sous_titre)}</p>
+        </div></div>""",
+        unsafe_allow_html=True,
+    )
+
+
 def entretien_tab(store, user_id: str):
-    st.title(t("entretien.title"))
+    mode_entree_directe = _mode_entree_directe_actif()
+    if mode_entree_directe:
+        _hero_entree_directe(store)
+    else:
+        st.title(t("entretien.title"))
     nom_lieu, role = contribution_selector(store, user_id)
     if not nom_lieu:
         st.info(t("contribution.choisir_pour_demarrer"))
@@ -628,6 +739,18 @@ def entretien_tab(store, user_id: str):
         if campagne_url is not None:
             st.session_state[mode_key] = "campagne"
             st.session_state[campagne_id_key] = campagne_url.id
+        elif st.query_params.get("entretien") == "general":
+            # Lien direct vers l'entretien général (?entretien=general) :
+            # respecte quand même une campagne déjà ENTAMÉE pour ce lieu
+            # plutôt que de l'ignorer (même détection que le bouton
+            # "Continuer" ci-dessous) — sinon un répondant déjà engagé sur
+            # une campagne perdrait sa progression en suivant ce lien.
+            campagne_en_cours, _ = _campagne_en_cours_pour_lieu(store, nom_lieu, campagnes_actives)
+            if campagne_en_cours is not None:
+                st.session_state[mode_key] = "campagne"
+                st.session_state[campagne_id_key] = campagne_en_cours.id
+            else:
+                st.session_state[mode_key] = "histoire"
         else:
             if st.query_params.get("campagne"):
                 st.info(t("entretien.lien_campagne_expire"))
@@ -1790,6 +1913,11 @@ def administration_tab(store, user_id: str) -> None:
     with st.expander("Campagnes prioritaires (recensement ciblé)", expanded=False):
         st.caption("Pendant leur fenêtre active, les champs listés sont proposés en priorité dans "
                     "l'entretien, avant la suite normale du questionnaire.")
+        # Lien direct vers l'entretien général (pas une campagne précise) :
+        # même traitement "arrivée directe" (colonne de gauche masquée,
+        # habillage dédié) que les liens de campagne ci-dessous — voir
+        # _mode_entree_directe_actif/_hero_entree_directe.
+        st.caption(f"Lien direct (entretien général) : `{URL_BASE_APP}/entretien?entretien=general`")
         campagnes = store.list_campagnes_prioritaires()
         if campagnes:
             for c in campagnes:

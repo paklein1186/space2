@@ -290,6 +290,16 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "en": "Pick up where you left off on this targeted survey.",
     },
     "entretien.autre_campagne_expander": {"fr": "Ou répondre à une autre campagne", "en": "Or answer a different campaign"},
+    "entretien.hero_badge": {"fr": "Accès direct", "en": "Direct access"},
+    "entretien.hero_campagne_sous_titre": {
+        "fr": "Un recensement ciblé — quelques questions, le temps d'y répondre.",
+        "en": "A targeted survey — just a few questions to answer.",
+    },
+    "entretien.hero_general_titre": {"fr": "Documenter votre lieu", "en": "Document your space"},
+    "entretien.hero_general_sous_titre": {
+        "fr": "Quelques minutes pour raconter la genèse, le fonctionnement et les défis de votre lieu.",
+        "en": "A few minutes to tell the story, day-to-day and challenges of your space.",
+    },
     "entretien.mode_besoins_btn": {"fr": "📣 Rendre visibles vos besoins actuels", "en": "📣 Make your current needs visible"},
     "entretien.mode_besoins_caption": {
         "fr": "Exprimer directement de quoi le lieu aurait besoin — utilisé dans l'Annuaire "
