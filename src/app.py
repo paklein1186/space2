@@ -1979,6 +1979,9 @@ def administration_tab(store, user_id: str) -> None:
                         nouvelle_description = st.text_area(
                             "Description (affichée aux visiteurs arrivant par un lien direct)",
                             value=c.description or "", height=150,
+                            help="Un retour à la ligne par idée/rubrique (ex. « Au programme : ... », "
+                                 "« Pour qui : ... », « Calendrier : ... ») — chaque ligne s'affiche comme "
+                                 "un paragraphe distinct dans l'encart, plutôt qu'un seul bloc de texte.",
                         )
                         if st.form_submit_button("Enregistrer"):
                             c.description = nouvelle_description.strip() or None
@@ -1997,7 +2000,12 @@ def administration_tab(store, user_id: str) -> None:
                      "(?campagne=ce-code), sans repasser par « Par où commencer ? ». "
                      "Laissez vide pour un code dérivé automatiquement du titre.",
             )
-            description = st.text_area("Description (optionnel)")
+            description = st.text_area(
+                "Description (optionnel)",
+                help="Un retour à la ligne par idée/rubrique (ex. « Au programme : ... », "
+                     "« Pour qui : ... », « Calendrier : ... ») — chaque ligne s'affiche comme "
+                     "un paragraphe distinct dans l'encart du lien direct, plutôt qu'un seul bloc de texte.",
+            )
             champ_ids = st.multiselect("Champs du questionnaire existant", options=list(tous_les_champs.keys()),
                                         format_func=lambda cid: tous_les_champs[cid])
             questions_libres_brut = st.text_area(
