@@ -638,6 +638,14 @@ _CSS_ENTREE_DIRECTE = """<style>
   animation: sp-drift 14s linear infinite;
 }
 .sp-portail-contenu { position: relative; max-width: 760px; margin: 0 auto; text-align: center; }
+.sp-encart {
+  text-align: left; max-width: 620px; margin: 1.5rem auto 0;
+  background: color-mix(in srgb, var(--sp-bg-elevated) 70%, transparent);
+  border: 1px solid var(--sp-border-soft); border-radius: 16px;
+  padding: 1.1rem 1.4rem;
+}
+.sp-encart p { margin: 0; }
+.sp-encart p + p { margin-top: 0.7em; }
 .sp-badge {
   display: inline-flex; align-items: center; gap: 0.5em;
   font-family: 'JetBrains Mono', ui-monospace, monospace;
@@ -698,11 +706,18 @@ def _hero_entree_directe(store) -> None:
         if campagne is not None:
             titre = campagne.titre
             sous_titre = campagne.description or t("entretien.hero_campagne_sous_titre")
+    # Un paragraphe par ligne (pas de <br> à l'intérieur d'un seul <p>) :
+    # une description saisie comme plusieurs phrases/idées distinctes (une
+    # par ligne dans le formulaire admin) doit se lire comme des paragraphes
+    # séparés, pas comme un unique bloc de texte centré peu lisible.
+    paragraphes = "".join(
+        f"<p>{html.escape(ligne)}</p>" for ligne in sous_titre.splitlines() if ligne.strip()
+    )
     st.markdown(
         f"""<div class="sp-portail"><div class="sp-portail-contenu">
         <div class="sp-badge">{html.escape(t("entretien.hero_badge"))}</div>
         <h1>{html.escape(titre)}</h1>
-        <p>{html.escape(sous_titre).replace(chr(10), "<br>")}</p>
+        <div class="sp-encart">{paragraphes}</div>
         </div></div>""",
         unsafe_allow_html=True,
     )
