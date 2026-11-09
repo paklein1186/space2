@@ -1762,9 +1762,17 @@ def _tableau_repondants_campagne(admin_store, champ_ids: list) -> None:
     # Regroupe par (lieu, contributeur) : plusieurs lignes brutes (une par
     # champ) deviennent une seule ligne de tableau avec une colonne par champ.
     par_repondant: dict = {}
+    # Regroupe aussi par LIEU seul (tous contributeurs confondus, imports
+    # inclus) : un champ de la campagne déjà connu via un import (pays,
+    # adresse, statut juridique...) n'est jamais reproposé au répondant (voir
+    # CollecteToolHandler.get_current_section) — sans ce repli, sa ligne du
+    # tableau afficherait "—" pour ces champs alors que la valeur est bel et
+    # bien connue pour son lieu, juste enregistrée sous un autre contributeur.
+    par_lieu: dict = {}
     for l in lignes:
         cle = (l["tiers_lieu_id"], l["contributeur_id"])
         par_repondant.setdefault(cle, {})[l["champ_id"]] = l["valeur"]
+        par_lieu.setdefault(l["tiers_lieu_id"], {}).setdefault(l["champ_id"], l["valeur"])
 
     # Une campagne réutilise souvent des champs déjà répondus ailleurs (pays,
     # region, adresse, activités, surface...) — un lieu importé en masse
@@ -1822,6 +1830,8 @@ def _tableau_repondants_campagne(admin_store, champ_ids: list) -> None:
         }
         for champ_id in champs_schema:
             valeur = reponses.get(champ_id)
+            if valeur is None:
+                valeur = par_lieu.get(tlid, {}).get(champ_id)
             ligne[field_label(champ_id)] = ", ".join(valeur) if isinstance(valeur, list) else (valeur or "—")
         lignes_tableau.append(ligne)
 
@@ -1974,7 +1984,7 @@ def administration_tab(store, user_id: str) -> None:
                 # recréant) — affichée en amont du chat sur le hero d'un lien
                 # direct, voir _hero_entree_directe, donc modifiable sans
                 # repasser par la recréation complète de la campagne.
-                with st.expander(f"Modifier la description — {c.titre}"):
+                with st.expander(f"Modifier description & message de clôture — {c.titre}"):
                     with st.form(f"modif_description_{c.id}"):
                         nouvelle_description = st.text_area(
                             "Description (affichée aux visiteurs arrivant par un lien direct)",
@@ -1983,10 +1993,17 @@ def administration_tab(store, user_id: str) -> None:
                                  "« Pour qui : ... », « Calendrier : ... ») — chaque ligne s'affiche comme "
                                  "un paragraphe distinct dans l'encart, plutôt qu'un seul bloc de texte.",
                         )
+                        nouveau_message_cloture = st.text_area(
+                            "Message de clôture (affiché une fois, quand toutes les questions "
+                            "prioritaires de la campagne ont été répondues)",
+                            value=c.message_cloture or "", height=100,
+                            help="Laisser vide pour le message générique par défaut.",
+                        )
                         if st.form_submit_button("Enregistrer"):
                             c.description = nouvelle_description.strip() or None
+                            c.message_cloture = nouveau_message_cloture.strip() or None
                             admin_store.save_campagne_prioritaire(c)
-                            st.success("Description mise à jour.")
+                            st.success("Mis à jour.")
                             st.rerun()
         else:
             st.caption("Aucune campagne prioritaire pour l'instant.")

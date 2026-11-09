@@ -963,7 +963,8 @@ section_expedition_ka122 = Section(
         Field("dispo", "Disponible pour l'expédition — 4 jours en France (Bourgogne), mai 2027 ?",
               FieldType.SINGLE_CHOICE, options=["Oui", "À confirmer", "Non"]),
         Field("participants",
-              "Qui participerait ? (porteur + nb de staff + rôles) · besoins d'accessibilité", FieldType.TEXT,
+              "Qui participerait ? (porteur + nb de staff + rôles, 2 personnes par lieu maximum) · "
+              "besoins d'accessibilité", FieldType.TEXT,
               condition=Condition("dispo", "ne", "Non")),
         Field("donner_recevoir",
               "Donner & recevoir : ce que vous venez chercher (résultat utile, à découvrir) et ce que "
