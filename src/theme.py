@@ -216,6 +216,33 @@ a[data-testid="stSidebarNavLink"][href$="/fiche"]{{ display: none; }}
 .st-key-entretien_messages, .st-key-bibliotheque_messages {{
   display: flex; flex-direction: column; justify-content: flex-end; min-height: 55vh;
 }}
+
+/* ---------- Bibliothèque : titres markdown de l'agent en "encarts", pas en titres de page ---------- */
+/* Les réponses de l'agent citent souvent plusieurs lieux à la suite, chacun
+   introduit par un titre markdown (#, ##...) — rendu par défaut à la taille
+   d'un titre de PAGE (jusqu'à ~2.25rem), beaucoup trop imposant dans une
+   bulle de chat et disparate d'une réponse à l'autre selon le niveau choisi
+   par le modèle (signalé : "police plus modeste"). Ramené à un seul gabarit
+   compact, commun à h1/h2/h3/h4, et mis en encart (liseré d'accent + fond
+   teinté) pour continuer à bien séparer chaque lieu visuellement sans la
+   taille d'un titre de page. */
+[data-testid="stChatMessage"] .stMarkdown h1, [data-testid="stChatMessage"] .stMarkdown h2,
+[data-testid="stChatMessage"] .stMarkdown h3, [data-testid="stChatMessage"] .stMarkdown h4 {{
+  font-size: 1.02rem !important; font-weight: 700 !important; line-height: 1.3 !important;
+  margin: 1.1em 0 0.4em !important; padding: 0.35em 0.7em !important;
+  border: none !important; border-left: 3px solid var(--sp-accent) !important;
+  background: var(--sp-border-soft) !important; border-radius: 0 8px 8px 0 !important;
+}}
+[data-testid="stChatMessage"] .stMarkdown h1:first-child, [data-testid="stChatMessage"] .stMarkdown h2:first-child,
+[data-testid="stChatMessage"] .stMarkdown h3:first-child, [data-testid="stChatMessage"] .stMarkdown h4:first-child {{
+  margin-top: 0 !important;
+}}
+[data-testid="stChatMessage"] .stMarkdown h1 a, [data-testid="stChatMessage"] .stMarkdown h2 a,
+[data-testid="stChatMessage"] .stMarkdown h3 a, [data-testid="stChatMessage"] .stMarkdown h4 a {{
+  color: var(--sp-text) !important; text-decoration: underline; text-decoration-color: var(--sp-border) !important;
+}}
+[data-testid="stChatMessage"] .stMarkdown ul {{ margin-top: 0.15em !important; }}
+[data-testid="stChatMessage"] .stMarkdown li {{ margin-bottom: 0.2em !important; }}
 </style>
 """
 

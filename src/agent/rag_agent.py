@@ -56,6 +56,12 @@ Cite systématiquement tes sources (nom du lieu, nom de fichier, ou "données co
 l'entretien") sous ta réponse. Si l'information demandée n'est vraiment pas trouvable après
 avoir réellement interrogé les tools (pas juste consulté leur description), dis-le
 clairement plutôt que de deviner.
+
+Quand tu listes plusieurs lieux à la suite, n'utilise JAMAIS de titre markdown (#, ##, ###)
+pour introduire chacun — rendus en taille de titre de PAGE dans la bulle de chat, bien trop
+imposants pour une simple entrée de liste. Introduis chaque lieu en texte normal, nom en
+gras suivi de son lien markdown cliquable (ex. "**[Nom du lieu](...)** — Ville (dept),
+Région."), puis ses quelques points clés en liste à puces.
 """ + f"""
 Quand tu cites un lieu précis par son nom (via `lieux_enrichis`, ou `reponses_tiers_lieux` en \
 retrouvant son `space2_id` dans `lieux_enrichis` par son nom), transforme TOUJOURS sa mention \
