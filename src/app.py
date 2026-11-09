@@ -1397,6 +1397,48 @@ def _carte_et_fiche_annuaire(store, coords: list, lat_centre: float, lon_centre:
         _ouvrir_fiche_si_demandee(store, lieux, est_admin, user_id)
 
 
+@st.fragment
+def _grille_annuaire(store, lieux_affiches: list, derive_par_lieu: dict, lieux: list,
+                      est_admin: bool, user_id: str) -> None:
+    """Grille des vignettes dans un st.fragment : sans lui, ouvrir la fiche
+    d'un lieu (clic sur une vignette) déclenchait un rerun COMPLET de la
+    page — recalcul des filtres ET reconstruction de la carte Folium
+    (coûteuse, volontairement non mise en cache, voir
+    _construire_carte_annuaire) pour un simple clic sur une carte de la
+    grille, avec le même voile grisé que le clic sur la carte avant sa
+    propre mise en fragment. st.rerun() appelé ICI ne rejoue que ce
+    fragment : la carte et les filtres au-dessus ne sont plus recalculés à
+    chaque ouverture de fiche depuis la grille."""
+    cols_par_ligne = 4
+    for i in range(0, len(lieux_affiches), cols_par_ligne):
+        cols = st.columns(cols_par_ligne)
+        for col, lieu in zip(cols, lieux_affiches[i:i + cols_par_ligne]):
+            derive = derive_par_lieu.get(lieu.id)
+            donnees = derive.donnees if derive else {}
+            with col:
+                with st.container(border=True):
+                    if derive and derive.photo_url:
+                        st.markdown(photo_html(derive.photo_url), unsafe_allow_html=True)
+                    else:
+                        emoji, couleur = default_visual(lieu.nom, donnees)
+                        st.markdown(vignette_html(emoji, couleur), unsafe_allow_html=True)
+                    if donnees.get("categories"):
+                        st.markdown(category_chips_html(donnees["categories"]), unsafe_allow_html=True)
+                    if derive and derive.besoins_mis_en_avant:
+                        st.markdown(besoins_chips_html(derive.besoins_mis_en_avant), unsafe_allow_html=True)
+                    if st.button(lieu.nom, key=f"open_{lieu.id}", use_container_width=True):
+                        st.session_state["annuaire_open_lieu_id"] = lieu.id
+                        st.rerun()
+                    st.caption(lieu.pays or "—")
+
+    # Même logique que dans le fragment de la carte : couvre l'ouverture
+    # déclenchée par un clic sur une vignette ci-dessus (rerun scopé à CE
+    # fragment, donc à auto-gérer ici plutôt que de compter sur le corps
+    # principal de la page qui ne sera pas réexécuté).
+    if "annuaire_open_lieu_id" in st.session_state:
+        _ouvrir_fiche_si_demandee(store, lieux, est_admin, user_id)
+
+
 def annuaire_tab(store, est_admin: bool, user_id: str):
     st.title(t("lieux_hybrides.title"))
     st.caption(t("lieux_hybrides.caption"))
@@ -1515,27 +1557,7 @@ def annuaire_tab(store, est_admin: bool, user_id: str):
         # hors fragment, identique à la branche correspondante ci-dessous.
         _ouvrir_fiche_si_demandee(store, lieux, est_admin, user_id)
 
-    cols_par_ligne = 4
-    for i in range(0, len(lieux_affiches), cols_par_ligne):
-        cols = st.columns(cols_par_ligne)
-        for col, lieu in zip(cols, lieux_affiches[i:i + cols_par_ligne]):
-            derive = derive_par_lieu.get(lieu.id)
-            donnees = derive.donnees if derive else {}
-            with col:
-                with st.container(border=True):
-                    if derive and derive.photo_url:
-                        st.markdown(photo_html(derive.photo_url), unsafe_allow_html=True)
-                    else:
-                        emoji, couleur = default_visual(lieu.nom, donnees)
-                        st.markdown(vignette_html(emoji, couleur), unsafe_allow_html=True)
-                    if donnees.get("categories"):
-                        st.markdown(category_chips_html(donnees["categories"]), unsafe_allow_html=True)
-                    if derive and derive.besoins_mis_en_avant:
-                        st.markdown(besoins_chips_html(derive.besoins_mis_en_avant), unsafe_allow_html=True)
-                    if st.button(lieu.nom, key=f"open_{lieu.id}", use_container_width=True):
-                        st.session_state["annuaire_open_lieu_id"] = lieu.id
-                        st.rerun()
-                    st.caption(lieu.pays or "—")
+    _grille_annuaire(store, lieux_affiches, derive_par_lieu, lieux, est_admin, user_id)
 
 
 def _est_steward_ou_admin(store, lieu_id: str, user_id: str, est_admin: bool) -> bool:
