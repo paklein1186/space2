@@ -1329,7 +1329,6 @@ def _construire_carte_annuaire(coords: list, lat_centre: float, lon_centre: floa
             location=[c["lat"], c["lon"]],
             radius=6,
             color=TEINTE_CARTE, weight=1, fill=True, fill_color=TEINTE_CARTE, fill_opacity=0.85,
-            tooltip=c["nom"],
         ).add_to(cluster)
     return carte
 
