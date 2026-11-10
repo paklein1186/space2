@@ -10,6 +10,8 @@ d'injection tout en couvrant les besoins d'analyse courants.
 from __future__ import annotations
 
 import json
+import threading
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -25,6 +27,16 @@ from .structured_query import run_structured_query
 from .vectorstore import ChromaStore, get_vectorstore
 
 CATALOG_PATH = Path("data/catalog.json")
+# Même TTL que OutilsComplets._load_dataframe (src/api/ask_agent.py, déjà en
+# place côté API/ctg pour la même raison) : reconstruire reponses_tiers_lieux
+# (un aller-retour Supabase batché mais quand même ~4000 lieux) coûtait
+# ~9s À CHAQUE appel de query_structured_data — mesuré en chronométrant la
+# boucle agent (src/agent/rag_agent.py) sur une question Bibliothèque
+# ordinaire ("combien de lieux...", qui déclenche deux query_structured_data
+# en parallèle sur le même dataset : sans cache, les DEUX reconstruisaient le
+# DataFrame en double). 5 minutes de fraîcheur est un compromis déjà validé
+# côté API pour ces mêmes données.
+TTL_DATASETS = 300
 
 TOOL_DEFINITIONS = [
     {
@@ -268,6 +280,27 @@ class RagToolHandler:
         return {"datasets": datasets, "geodata": geodata}
 
     def _load_dataframe(self, dataset_name: str) -> Optional[pd.DataFrame]:
+        """Mis en cache quelques minutes (TTL_DATASETS) : voir la note sur la
+        constante. self.__dict__.setdefault plutôt qu'une init dans
+        __init__ : OutilsComplets (src/api/ask_agent.py), qui hérite de
+        cette classe, saute volontairement RagToolHandler.__init__() (pour
+        ne pas instancier Voyage/Chroma) — une dépendance à des attributs
+        posés dans __init__ serait silencieusement absente sur ces
+        instances-là. Verrou nécessaire : plusieurs tool_use du même tour
+        s'exécutent en parallèle (voir RagAgent._executer_tool_uses) et
+        peuvent viser le même dataset_name en même temps."""
+        cache = self.__dict__.setdefault("_df_cache", {})
+        verrou = self.__dict__.setdefault("_df_cache_lock", threading.Lock())
+        with verrou:
+            entree = cache.get(dataset_name)
+            if entree and time.monotonic() - entree[0] < TTL_DATASETS:
+                return entree[1]
+        df = self._construire_dataframe(dataset_name)
+        with verrou:
+            cache[dataset_name] = (time.monotonic(), df)
+        return df
+
+    def _construire_dataframe(self, dataset_name: str) -> Optional[pd.DataFrame]:
         if dataset_name == "reponses_tiers_lieux":
             return reponses_long_dataframe(self.store)
         if dataset_name == "lieux_enrichis":

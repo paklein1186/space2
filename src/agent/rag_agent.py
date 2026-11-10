@@ -6,7 +6,9 @@ les deux partagent le même store et donc les mêmes données collectées.
 from __future__ import annotations
 
 import json
+import logging
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
@@ -15,6 +17,26 @@ from anthropic import Anthropic
 from .caching import apply_single_cache_breakpoint, cached_system, to_plain_content
 from .rag_tools import TOOL_DEFINITIONS, RagToolHandler
 from .usage import log_usage
+
+# Chronométrage diagnostic (durée par tour d'appel API, par tool, total par
+# question) — pour localiser où passe le temps sur une question RAG lente,
+# plutôt que de deviner (ex. "augmenter la RAM", qui n'a aucune prise sur de
+# la latence réseau/API). Simple logging.INFO : remonte tel quel dans les
+# logs Streamlit Cloud (Manage app → Logs), sans table ni migration, et sans
+# rien changer à l'interface vue par les utilisateurs. À retirer (ou passer
+# en DEBUG) une fois le diagnostic terminé.
+_log = logging.getLogger("space2.rag")
+# Handler explicite plutôt que de compter sur une config globale : le niveau
+# racine par défaut de Python (WARNING) avalerait silencieusement nos
+# messages INFO, et Streamlit ne configure que SON PROPRE logger "streamlit"
+# au démarrage, pas les loggers applicatifs. propagate=False évite un double
+# affichage si le process ajoute un jour un handler sur le logger racine.
+if not _log.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
+    _log.addHandler(_handler)
+_log.setLevel(logging.INFO)
+_log.propagate = False
 
 # Même constante que src/app.py (URL_BASE_APP) — dupliquée plutôt
 # qu'importée : app.py exécute st.set_page_config()/load_dotenv() à
@@ -94,7 +116,11 @@ class RagAgent:
         réponse) ne cède aucun texte tant que ces tools n'ont pas répondu ;
         le texte final commence ensuite à s'afficher au fil de l'eau."""
         self.messages.append({"role": "user", "content": user_text})
+        debut_total = time.monotonic()
+        tours = 0
         while True:
+            tours += 1
+            debut_tour = time.monotonic()
             apply_single_cache_breakpoint(self.messages)
             with self.client.messages.stream(
                 model=self.model,
@@ -105,6 +131,7 @@ class RagAgent:
             ) as stream:
                 yield from stream.text_stream
                 final_message = stream.get_final_message()
+            _log.info("[rag] tour %d (%s) : %.2fs", tours, self.model, time.monotonic() - debut_tour)
 
             if self.store is not None:
                 log_usage(self.store, "rag_query", self.model, final_message.usage)
@@ -112,6 +139,7 @@ class RagAgent:
 
             tool_uses = [b for b in final_message.content if b.type == "tool_use"]
             if not tool_uses:
+                _log.info("[rag] total : %.2fs sur %d tour(s)", time.monotonic() - debut_total, tours)
                 if final_message.stop_reason == "max_tokens":
                     yield ("\n\n*(Réponse interrompue — trop longue pour être générée en une fois. "
                            "Redemandez « continue » pour la suite, ou reformulez une question plus ciblée.)*")
@@ -138,16 +166,23 @@ class RagAgent:
             # de l'API ("tool_use ids were found without tool_result
             # blocks"). Convertir toute exception en résultat d'erreur normal
             # évite les deux.
+            debut = time.monotonic()
             try:
                 return self.tool_handler.execute(tu.name, tu.input)
             except Exception as exc:
                 return {"error": f"{type(exc).__name__}: {exc}"}
+            finally:
+                _log.info("[rag] tool %s : %.2fs", tu.name, time.monotonic() - debut)
 
+        debut_groupe = time.monotonic()
         if len(tool_uses) == 1:
             resultats = [_executer(tool_uses[0])]
         else:
             with ThreadPoolExecutor(max_workers=len(tool_uses)) as executor:
                 resultats = list(executor.map(_executer, tool_uses))
+        if len(tool_uses) > 1:
+            _log.info("[rag] groupe de %d tools (parallèle) : %.2fs",
+                       len(tool_uses), time.monotonic() - debut_groupe)
 
         return [
             {
@@ -159,7 +194,11 @@ class RagAgent:
         ]
 
     def _run_until_text(self) -> str:
+        debut_total = time.monotonic()
+        tours = 0
         while True:
+            tours += 1
+            debut_tour = time.monotonic()
             apply_single_cache_breakpoint(self.messages)
             response = self.client.messages.create(
                 model=self.model,
@@ -172,6 +211,7 @@ class RagAgent:
                 tools=TOOL_DEFINITIONS,
                 messages=self.messages,
             )
+            _log.info("[rag] tour %d (%s) : %.2fs", tours, self.model, time.monotonic() - debut_tour)
             if self.store is not None:
                 log_usage(self.store, "rag_query", self.model, response.usage)
             self.messages.append({"role": "assistant", "content": to_plain_content(response.content)})
@@ -183,6 +223,7 @@ class RagAgent:
                 if response.stop_reason == "max_tokens":
                     texte += ("\n\n*(Réponse interrompue — trop longue pour être générée en une fois. "
                               "Redemandez « continue » pour la suite, ou reformulez une question plus ciblée.)*")
+                _log.info("[rag] total : %.2fs sur %d tour(s)", time.monotonic() - debut_total, tours)
                 return texte
 
             self.messages.append({"role": "user", "content": self._executer_tool_uses(tool_uses)})
