@@ -50,7 +50,7 @@ def prechargement_observatoire() -> threading.Thread:
     return fil
 
 
-@st.cache_data(ttl=1800, show_spinner=False)
+@st.cache_resource(ttl=1800, show_spinner=False)
 def donnees_annuaire():
     """Grille de l'Annuaire (liste + synthèses) — sans ce cache, CHAQUE
     interaction (recherche, filtre, ouverture d'une fiche) relisait les
@@ -62,7 +62,21 @@ def donnees_annuaire():
     direct — jamais affectée par ce TTL). N'est plus sollicité par le ping
     keep-awake depuis que l'accueil utilise stats_reseau() (requêtes
     étroites) à la place de cette fonction — seule une vraie visite de
-    l'Annuaire déclenche encore cette lecture complète."""
+    l'Annuaire déclenche encore cette lecture complète.
+
+    cache_resource plutôt que cache_data (le choix d'origine) : même en
+    cache chaud (donnée déjà en mémoire), st.cache_data recopie en
+    profondeur toute la valeur retournée à CHAQUE appel — mesuré à ~2,6s
+    par appel sur ~4000 TiersLieu + leurs LieuDerive une fois en cache,
+    soit la quasi-totalité du temps de chargement de la page Lieux hybrides
+    (chronométrage dans src/app.py::annuaire_tab, 3 appels par page pour
+    ~7,8s au total). cache_resource renvoie directement le même objet,
+    sans copie. ATTENTION — ça rend lieux/derive_par_lieu PARTAGÉS entre
+    TOUTES les sessions tant que le TTL n'a pas expiré : aucun appelant
+    actuel ne modifie un TiersLieu/LieuDerive en place (vérifié : annuaire_
+    tab et _campagne_en_cours_pour_lieu ne font que lire ces objets) — ce
+    doit rester vrai pour tout futur appelant, sous peine de corrompre les
+    données vues par les autres sessions."""
     store = _store_pour_agregats()
     lieux = sorted(store.list_tiers_lieux(), key=lambda l: l.nom.lower())
     derive_par_lieu = store.get_lieu_derive_batch([l.id for l in lieux])

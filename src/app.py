@@ -8,6 +8,7 @@ travailler sans compte Supabase.
 from __future__ import annotations
 
 import html
+import logging
 import math
 import io
 import os
@@ -56,6 +57,18 @@ from src.theme import apply_theme
 from src.voice_input import bouton_dictee, consume_voice_transcript
 
 ROLES_INTERNES = {"fondateur", "equipe", "steward"}
+
+# Chronométrage diagnostic de l'Annuaire (données/carte/grille) — même
+# principe que src/agent/rag_agent.py (_log) : localiser où passe le temps
+# sur un chargement lent plutôt que de deviner. logging.INFO, visible dans
+# les logs Streamlit Cloud (Manage app → Logs).
+_log = logging.getLogger("space2.app")
+if not _log.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
+    _log.addHandler(_handler)
+_log.setLevel(logging.INFO)
+_log.propagate = False
 
 RAG_DISPONIBLE = bool(os.environ.get("VOYAGE_API_KEY"))
 # Pas d'API stable pour lire l'URL publique depuis le serveur Streamlit —
@@ -1356,7 +1369,9 @@ def _carte_et_fiche_annuaire(store, coords: list, lat_centre: float, lon_centre:
     grise"). st.rerun() appelé ICI (dans un fragment) ne rejoue QUE ce
     fragment par défaut — la grille, les filtres, le titre ne sont plus
     recalculés pour un simple clic sur la carte."""
+    debut_carte = time.monotonic()
     carte = _construire_carte_annuaire(coords, lat_centre, lon_centre, zoom)
+    _log.info("[annuaire] construction carte (%d marqueurs) : %.2fs", len(coords), time.monotonic() - debut_carte)
 
     # Même logique de clé versionnée que l'ancienne carte pydeck :
     # reconstruire le composant après chaque clic consommé, sinon
@@ -1366,11 +1381,14 @@ def _carte_et_fiche_annuaire(store, coords: list, lat_centre: float, lon_centre:
     # générique à ce genre de composant interactif, pas spécifique à
     # pydeck.
     carte_version = st.session_state.get("annuaire_carte_version", 0)
+    debut_st_folium = time.monotonic()
     evenement = st_folium(
         carte, height=520, use_container_width=True,
         returned_objects=["last_object_clicked"],
         key=f"annuaire_map_{carte_version}",
     )
+    _log.info("[annuaire] st_folium() (composant, %d marqueurs) : %.2fs",
+              len(coords), time.monotonic() - debut_st_folium)
     clic = evenement.get("last_object_clicked")
     if clic:
         # Identifie le lieu cliqué par ses coordonnées plutôt que par un
@@ -1409,6 +1427,7 @@ def _grille_annuaire(store, lieux_affiches: list, derive_par_lieu: dict, lieux: 
     propre mise en fragment. st.rerun() appelé ICI ne rejoue que ce
     fragment : la carte et les filtres au-dessus ne sont plus recalculés à
     chaque ouverture de fiche depuis la grille."""
+    debut_grille = time.monotonic()
     cols_par_ligne = 4
     for i in range(0, len(lieux_affiches), cols_par_ligne):
         cols = st.columns(cols_par_ligne)
@@ -1430,6 +1449,7 @@ def _grille_annuaire(store, lieux_affiches: list, derive_par_lieu: dict, lieux: 
                         st.session_state["annuaire_open_lieu_id"] = lieu.id
                         st.rerun()
                     st.caption(lieu.pays or "—")
+    _log.info("[annuaire] rendu grille (%d cartes) : %.2fs", len(lieux_affiches), time.monotonic() - debut_grille)
 
     # Même logique que dans le fragment de la carte : couvre l'ouverture
     # déclenchée par un clic sur une vignette ci-dessus (rerun scopé à CE
@@ -1440,6 +1460,7 @@ def _grille_annuaire(store, lieux_affiches: list, derive_par_lieu: dict, lieux: 
 
 
 def annuaire_tab(store, est_admin: bool, user_id: str):
+    debut_page = time.monotonic()
     st.title(t("lieux_hybrides.title"))
     st.caption(t("lieux_hybrides.caption"))
     # Grille et carte : list_tiers_lieux + un batch de lieu_derive (2
@@ -1453,7 +1474,10 @@ def annuaire_tab(store, est_admin: bool, user_id: str):
     # 10-15s par clic en production une fois la base à ~4000 lieux.
     # Ordre alphabétique par défaut plutôt que l'ordre d'insertion en base,
     # peu significatif pour qui parcourt la liste.
+    debut_donnees = time.monotonic()
     lieux, derive_par_lieu = donnees_annuaire()
+    _log.info("[annuaire] donnees_annuaire() (%d lieux, cache_data) : %.2fs",
+              len(lieux), time.monotonic() - debut_donnees)
     lieux = sorted(lieux, key=lambda l: l.nom.lower())
     if not lieux:
         st.info(t("annuaire.aucun_lieu"))
@@ -1558,6 +1582,8 @@ def annuaire_tab(store, est_admin: bool, user_id: str):
         _ouvrir_fiche_si_demandee(store, lieux, est_admin, user_id)
 
     _grille_annuaire(store, lieux_affiches, derive_par_lieu, lieux, est_admin, user_id)
+    _log.info("[annuaire] page complète (%d lieux affichés) : %.2fs",
+              len(lieux_affiches), time.monotonic() - debut_page)
 
 
 def _est_steward_ou_admin(store, lieu_id: str, user_id: str, est_admin: bool) -> bool:
