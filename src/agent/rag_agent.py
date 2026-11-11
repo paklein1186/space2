@@ -95,7 +95,8 @@ n'invente jamais un id).
 
 
 class RagAgent:
-    def __init__(self, tool_handler: RagToolHandler, model: str = "claude-sonnet-5", store=None):
+    def __init__(self, tool_handler: RagToolHandler, model: str = "claude-sonnet-5", store=None,
+                 user_id: Optional[str] = None):
         # Timeout explicite : voir la même note dans collecte_agent.py /
         # enrichissement.py — sans lui, une requête sans réponse peut bloquer
         # l'interface indéfiniment plutôt que d'échouer proprement.
@@ -104,6 +105,11 @@ class RagAgent:
         self.tool_handler = tool_handler
         self.messages: list = []
         self.store = store or getattr(tool_handler, "store", None)
+        # Personne posée derrière chaque question à la Bibliothèque — pour le
+        # suivi d'usage/coût par utilisateur (voir log_usage), pas pour une
+        # autre logique : None si l'appelant ne le fournit pas (ex. usage hors
+        # Streamlit, script CLI).
+        self.user_id = user_id
 
     def send(self, user_text: str) -> str:
         self.messages.append({"role": "user", "content": user_text})
@@ -134,7 +140,7 @@ class RagAgent:
             _log.info("[rag] tour %d (%s) : %.2fs", tours, self.model, time.monotonic() - debut_tour)
 
             if self.store is not None:
-                log_usage(self.store, "rag_query", self.model, final_message.usage)
+                log_usage(self.store, "rag_query", self.model, final_message.usage, user_id=self.user_id)
             self.messages.append({"role": "assistant", "content": to_plain_content(final_message.content)})
 
             tool_uses = [b for b in final_message.content if b.type == "tool_use"]
@@ -213,7 +219,7 @@ class RagAgent:
             )
             _log.info("[rag] tour %d (%s) : %.2fs", tours, self.model, time.monotonic() - debut_tour)
             if self.store is not None:
-                log_usage(self.store, "rag_query", self.model, response.usage)
+                log_usage(self.store, "rag_query", self.model, response.usage, user_id=self.user_id)
             self.messages.append({"role": "assistant", "content": to_plain_content(response.content)})
 
             tool_uses = [b for b in response.content if b.type == "tool_use"]

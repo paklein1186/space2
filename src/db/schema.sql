@@ -151,6 +151,7 @@ create table if not exists llm_calls (
     id uuid primary key default gen_random_uuid(),
     type_appel text not null check (type_appel in ('entretien', 'enrichissement', 'rag_query', 'import_questionnaire', 'crawl_extraction', 'traduction_fiche', 'extraction_lieux')),
     tiers_lieu_id uuid references tiers_lieux(id) on delete set null,
+    user_id uuid references auth.users(id) on delete set null,  -- utilisateur déclencheur (migration_018), NULL si non attribuable
     model text not null,
     tokens_in integer not null,
     tokens_out integer not null,
@@ -261,8 +262,11 @@ create policy "ecriture des donnees derivees" on lieu_derive
 create policy "mise a jour des donnees derivees" on lieu_derive
     for update using (auth.role() = 'authenticated');
 
-create policy "lecture publique du suivi des couts" on llm_calls
-    for select using (auth.role() = 'authenticated');
+-- Admin uniquement (pas "authenticated" comme le reste de ce bloc) :
+-- user_id (migration_018) identifie une personne précise, jamais exposé à
+-- n'importe quel autre utilisateur connecté.
+create policy "admin lit le suivi des couts" on llm_calls
+    for select using (exists (select 1 from admins where user_id = auth.uid()));
 create policy "ecriture du suivi des couts" on llm_calls
     for insert with check (auth.role() = 'authenticated');
 
@@ -450,6 +454,7 @@ create table if not exists llm_calls (
     id uuid primary key default gen_random_uuid(),
     type_appel text not null check (type_appel in ('entretien', 'enrichissement', 'rag_query', 'import_questionnaire', 'crawl_extraction', 'traduction_fiche')),
     tiers_lieu_id uuid references tiers_lieux(id) on delete set null,
+    user_id uuid references auth.users(id) on delete set null,  -- utilisateur déclencheur (migration_018), NULL si non attribuable
     model text not null,
     tokens_in integer not null,
     tokens_out integer not null,
@@ -560,8 +565,11 @@ create policy "ecriture des donnees derivees" on lieu_derive
 create policy "mise a jour des donnees derivees" on lieu_derive
     for update using (auth.role() = 'authenticated');
 
-create policy "lecture publique du suivi des couts" on llm_calls
-    for select using (auth.role() = 'authenticated');
+-- Admin uniquement (pas "authenticated" comme le reste de ce bloc) :
+-- user_id (migration_018) identifie une personne précise, jamais exposé à
+-- n'importe quel autre utilisateur connecté.
+create policy "admin lit le suivi des couts" on llm_calls
+    for select using (exists (select 1 from admins where user_id = auth.uid()));
 create policy "ecriture du suivi des couts" on llm_calls
     for insert with check (auth.role() = 'authenticated');
 

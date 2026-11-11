@@ -412,7 +412,20 @@ class Store(ABC):
 
     @abstractmethod
     def log_llm_call(self, type_appel: str, model: str, tokens_in: int, tokens_out: int,
-                      cout_estime: float, tiers_lieu_id: Optional[str] = None) -> None: ...
+                      cout_estime: float, tiers_lieu_id: Optional[str] = None,
+                      user_id: Optional[str] = None) -> None: ...
+
+    @abstractmethod
+    def get_usage_par_utilisateur(self, depuis: Optional[str] = None) -> list:
+        """Usage/coût LLM agrégé par utilisateur (user_id non NULL seulement —
+        les appels sans utilisateur attribuable, imports/crawl/enrichissement
+        en tâche de fond, ne comptent dans aucune ligne utilisateur) :
+        {"user_id", "nb_appels", "tokens_in", "tokens_out", "cout_total"},
+        triés du coût total le plus élevé au plus faible. `depuis` (ISO
+        8601) filtre sur cree_le >= cette date si fourni — None = tout
+        l'historique. Utilisé par la section Administration > Usage & coûts,
+        avant de résoudre les user_id en emails via map_user_emails."""
+        ...
 
     # -- historique des conversations Bibliothèque ------------------------
 

@@ -218,7 +218,8 @@ class SqliteStore(Store):
                               ("lieu_derive", "donnees_publiques_source_hash"),
                               ("lieu_derive", "donnees_publiques_maj"),
                               ("campagnes_prioritaires", "code"),
-                              ("reponses", "campagne_id")):
+                              ("reponses", "campagne_id"),
+                              ("llm_calls", "user_id")):
             existantes = {r["name"] for r in self.conn.execute(f"pragma table_info({table})")}
             if column not in existantes:
                 self.conn.execute(f"alter table {table} add column {column} text")
@@ -679,13 +680,28 @@ class SqliteStore(Store):
     # -- suivi des coûts LLM --------------------------------------------------
 
     def log_llm_call(self, type_appel: str, model: str, tokens_in: int, tokens_out: int,
-                      cout_estime: float, tiers_lieu_id: Optional[str] = None) -> None:
+                      cout_estime: float, tiers_lieu_id: Optional[str] = None,
+                      user_id: Optional[str] = None) -> None:
         self.conn.execute(
-            "insert into llm_calls (id, type_appel, tiers_lieu_id, model, tokens_in, tokens_out, "
-            "cout_estime) values (?, ?, ?, ?, ?, ?, ?)",
-            (str(uuid.uuid4()), type_appel, tiers_lieu_id, model, tokens_in, tokens_out, cout_estime),
+            "insert into llm_calls (id, type_appel, tiers_lieu_id, user_id, model, tokens_in, tokens_out, "
+            "cout_estime) values (?, ?, ?, ?, ?, ?, ?, ?)",
+            (str(uuid.uuid4()), type_appel, tiers_lieu_id, user_id, model, tokens_in, tokens_out, cout_estime),
         )
         self.conn.commit()
+
+    def get_usage_par_utilisateur(self, depuis: Optional[str] = None) -> list:
+        requete = (
+            "select user_id, count(*) as nb_appels, sum(tokens_in) as tokens_in, "
+            "sum(tokens_out) as tokens_out, sum(cout_estime) as cout_total "
+            "from llm_calls where user_id is not null"
+        )
+        params: tuple = ()
+        if depuis:
+            requete += " and cree_le >= ?"
+            params = (depuis,)
+        requete += " group by user_id order by cout_total desc"
+        rows = self.conn.execute(requete, params).fetchall()
+        return [dict(r) for r in rows]
 
     # -- administration --------------------------------------------------
 

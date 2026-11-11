@@ -14,6 +14,7 @@ import io
 import os
 import time
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -870,7 +871,7 @@ def entretien_tab(store, user_id: str):
         campagne_id_actuelle = st.session_state.get(campagne_id_key)
         handler = CollecteToolHandler(store, tiers_lieu.id, contributeur.id, session, Role(role),
                                        mode_entretien=mode_entretien, campagne_id=campagne_id_actuelle)
-        agent = CollecteAgent(handler, store=store, tiers_lieu_id=tiers_lieu.id)
+        agent = CollecteAgent(handler, store=store, tiers_lieu_id=tiers_lieu.id, user_id=user_id)
         st.session_state[session_key] = {
             "agent": agent, "history": [],
             "tiers_lieu_id": tiers_lieu.id, "contributeur_id": contributeur.id, "role": role,
@@ -1940,6 +1941,49 @@ def administration_tab(store, user_id: str) -> None:
             } for u in utilisateurs]
             st.dataframe(pd.DataFrame(lignes), use_container_width=True, hide_index=True)
 
+    with st.expander("Usage & coûts (par utilisateur)", expanded=False):
+        st.caption(
+            "Appels LLM (entretien, Bibliothèque) attribués à la personne qui les a "
+            "déclenchés — les tâches de fond (imports, crawl, enrichissement automatique) "
+            "n'ont pas d'utilisateur attribuable et n'apparaissent jamais ici. Vue de suivi "
+            "seulement : rien n'est limité ni bloqué automatiquement."
+        )
+        periode_label = st.radio(
+            "Période", ["7 derniers jours", "30 derniers jours", "90 derniers jours", "Tout l'historique"],
+            index=1, horizontal=True, key="admin_usage_periode",
+        )
+        jours_par_periode = {"7 derniers jours": 7, "30 derniers jours": 30, "90 derniers jours": 90}
+        jours = jours_par_periode.get(periode_label)
+        depuis = (datetime.now(timezone.utc) - timedelta(days=jours)).isoformat() if jours else None
+
+        usage = admin_store.get_usage_par_utilisateur(depuis)
+        if not usage:
+            st.caption("Aucun usage journalisé pour cette période.")
+        else:
+            emails = admin_store.map_user_emails([u["user_id"] for u in usage])
+            # Même filtre que la table des répondants de campagne ci-dessus :
+            # un compte de service (import en masse, crawl) n'est pas "un
+            # utilisateur" à suivre ici, même s'il apparaissait par erreur.
+            from src.db.migrate_sqlite_to_supabase import SERVICE_ACCOUNTS_EMAIL_DOMAIN
+
+            lignes_usage = []
+            for u in usage:
+                email = emails.get(u["user_id"], u["user_id"])
+                if email.endswith(f"@{SERVICE_ACCOUNTS_EMAIL_DOMAIN}"):
+                    continue
+                lignes_usage.append({
+                    "Email": email,
+                    "Appels": u["nb_appels"],
+                    "Tokens entrée": u["tokens_in"],
+                    "Tokens sortie": u["tokens_out"],
+                    "Coût estimé ($)": round(u["cout_total"], 4),
+                })
+            if not lignes_usage:
+                st.caption("Aucun usage journalisé pour cette période (hors comptes de service).")
+            else:
+                st.dataframe(pd.DataFrame(lignes_usage), use_container_width=True, hide_index=True)
+                st.caption(f"Coût total estimé sur la période : ${sum(l['Coût estimé ($)'] for l in lignes_usage):.4f}")
+
     with st.expander("Lieux (éditer ou supprimer)", expanded=False):
         st.caption(
             "Corriger le nom, le pays ou la région d'un lieu, ou le supprimer définitivement avec "
@@ -2696,7 +2740,7 @@ def rag_tab(store, user_id: str):
 
         try:
             with st.spinner("Chargement de la bibliothèque..."):
-                st.session_state["rag_agent"] = RagAgent(RagToolHandler(store))
+                st.session_state["rag_agent"] = RagAgent(RagToolHandler(store), user_id=user_id)
             st.session_state["rag_history"] = []
         except Exception as exc:
             # L'initialisation de ChromaDB (index vectoriel local) peut échouer

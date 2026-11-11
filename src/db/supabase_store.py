@@ -573,15 +573,45 @@ class SupabaseStore(Store):
         }).eq("tiers_lieu_id", tiers_lieu_id).execute()
 
     def log_llm_call(self, type_appel: str, model: str, tokens_in: int, tokens_out: int,
-                      cout_estime: float, tiers_lieu_id: Optional[str] = None) -> None:
+                      cout_estime: float, tiers_lieu_id: Optional[str] = None,
+                      user_id: Optional[str] = None) -> None:
         self.client.table("llm_calls").insert({
             "type_appel": type_appel,
             "tiers_lieu_id": tiers_lieu_id,
+            "user_id": user_id,
             "model": model,
             "tokens_in": tokens_in,
             "tokens_out": tokens_out,
             "cout_estime": cout_estime,
         }).execute()
+
+    def get_usage_par_utilisateur(self, depuis: Optional[str] = None) -> list:
+        # Pas d'agrégation SQL côté PostgREST sans RPC dédiée : on rapatrie les
+        # lignes brutes (user_id non NULL, fenêtre de temps déjà filtrée côté
+        # base) et on agrège côté Python — volume raisonnable (un suivi de
+        # coûts, pas la table reponses à ~4000 lieux x N champs).
+        try:
+            requete = self.client.table("llm_calls").select("user_id, tokens_in, tokens_out, cout_estime") \
+                .not_.is_("user_id", "null")
+            if depuis:
+                requete = requete.gte("cree_le", depuis)
+            lignes = requete.execute().data
+        except Exception:
+            # Colonne absente avant migration_018 : dégrader en "aucun usage"
+            # plutôt que de faire planter toute la page Administration (même
+            # choix que list_lieux_portfolio/list_campagnes_prioritaires pour
+            # une colonne/table pas encore migrée sur ce projet Supabase).
+            return []
+        par_utilisateur: dict = {}
+        for l in lignes:
+            agg = par_utilisateur.setdefault(l["user_id"], {
+                "user_id": l["user_id"], "nb_appels": 0, "tokens_in": 0, "tokens_out": 0, "cout_total": 0.0,
+            })
+            agg["nb_appels"] += 1
+            agg["tokens_in"] += l["tokens_in"] or 0
+            agg["tokens_out"] += l["tokens_out"] or 0
+            agg["cout_total"] += l["cout_estime"] or 0.0
+        return sorted(par_utilisateur.values(), key=lambda a: a["cout_total"], reverse=True)
 
     # -- administration --------------------------------------------------
     # add_admin_by_email nécessite l'API Admin Supabase (recherche par email)

@@ -263,7 +263,7 @@ def _message_cloture_depuis_resultats(raw_results: list) -> "str | None":
 
 class CollecteAgent:
     def __init__(self, tool_handler: CollecteToolHandler, model: str = "claude-sonnet-5",
-                 store=None, tiers_lieu_id: str | None = None):
+                 store=None, tiers_lieu_id: str | None = None, user_id: str | None = None):
         # Timeout explicite : sans lui, une requête sans réponse peut laisser
         # l'interface figée indéfiniment plutôt que d'échouer proprement (même
         # classe de bug qu'un enrichissement en masse resté bloqué des heures
@@ -274,6 +274,9 @@ class CollecteAgent:
         self.messages: list = []
         self.store = store
         self.tiers_lieu_id = tiers_lieu_id
+        # Répondant qui mène CET entretien — pour le suivi d'usage/coût par
+        # utilisateur (voir log_usage), pas pour une autre logique.
+        self.user_id = user_id
 
     def send(self, user_text: str) -> str:
         self.messages.append({"role": "user", "content": user_text})
@@ -305,7 +308,7 @@ class CollecteAgent:
                 final_message = stream.get_final_message()
 
             if self.store is not None:
-                log_usage(self.store, "entretien", self.model, final_message.usage, self.tiers_lieu_id)
+                log_usage(self.store, "entretien", self.model, final_message.usage, self.tiers_lieu_id, self.user_id)
             self.messages.append({"role": "assistant", "content": to_plain_content(final_message.content)})
 
             tool_uses = [b for b in final_message.content if b.type == "tool_use"]
@@ -357,7 +360,7 @@ class CollecteAgent:
                 messages=self.messages,
             )
             if self.store is not None:
-                log_usage(self.store, "entretien", self.model, response.usage, self.tiers_lieu_id)
+                log_usage(self.store, "entretien", self.model, response.usage, self.tiers_lieu_id, self.user_id)
             self.messages.append({"role": "assistant", "content": to_plain_content(response.content)})
 
             tool_uses = [b for b in response.content if b.type == "tool_use"]

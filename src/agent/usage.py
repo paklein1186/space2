@@ -36,10 +36,16 @@ def estimate_cost(model: str, tokens_in: int, tokens_out: int,
     return input_cost + output_cost
 
 
-def log_usage(store: Store, type_appel: str, model: str, usage, tiers_lieu_id: Optional[str] = None) -> None:
+def log_usage(store: Store, type_appel: str, model: str, usage, tiers_lieu_id: Optional[str] = None,
+              user_id: Optional[str] = None) -> None:
     """`usage` est l'objet `response.usage` du SDK Anthropic. `tokens_in` couvre
     uniquement les tokens neufs (non cachés) — cache_creation_input_tokens et
-    cache_read_input_tokens sont comptés séparément avec leur propre tarif."""
+    cache_read_input_tokens sont comptés séparément avec leur propre tarif.
+    `user_id` : utilisateur humain à l'origine de CET appel précis (répondant
+    de l'entretien, personne posant la question à la Bibliothèque...), pour
+    le suivi d'usage par utilisateur (Administration > Usage & coûts) — None
+    pour un appel sans utilisateur attribuable (import en masse, crawl,
+    enrichissement automatique en tâche de fond)."""
     tokens_in = getattr(usage, "input_tokens", 0) or 0
     tokens_out = getattr(usage, "output_tokens", 0) or 0
     cache_creation = getattr(usage, "cache_creation_input_tokens", 0) or 0
@@ -49,7 +55,7 @@ def log_usage(store: Store, type_appel: str, model: str, usage, tiers_lieu_id: O
         # tokens_in enregistré inclut les tokens de cache pour que le total reste lisible
         # (nombre de tokens réellement traités), le coût lui tient compte du tarif réel de chacun.
         store.log_llm_call(type_appel, model, tokens_in + cache_creation + cache_read, tokens_out,
-                            cout, tiers_lieu_id)
+                            cout, tiers_lieu_id, user_id)
     except Exception:
         # Un journal de coût qui échoue (ex. contrainte llm_calls_type_appel_
         # check pas encore mise à jour pour un nouveau type_appel — vécu deux
