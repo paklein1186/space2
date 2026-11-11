@@ -1,8 +1,10 @@
 """Clôture d'une campagne prioritaire (collecte_tools.py) : une fois tous ses
 champs répondus, un message de clôture (celui de la campagne, ou un repli
-générique) est renvoyé une seule fois — jamais répété, et jamais déclenché en
-mode "besoins" (qui réutilise le même mécanisme de file prioritaire sans être
-une vraie campagne). Sans réseau, sans appel LLM.
+générique) est renvoyé une seule fois — jamais répété. Le mode "besoins"
+réutilise le même mécanisme de file prioritaire (pas une vraie campagne) et
+reçoit lui aussi un message de clôture dédié, pour ne jamais retomber en
+silence sur le questionnaire complet sans transition ni consentement du
+répondant. Sans réseau, sans appel LLM.
 
 Usage : python3 -m tests.test_campagne_cloture
 """
@@ -14,7 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.agent.collecte_tools import PRIORITY_MODULE_ID, CollecteToolHandler
+from src.agent.collecte_tools import MESSAGE_CLOTURE_BESOINS, PRIORITY_MODULE_ID, CollecteToolHandler
 from src.db.sqlite_store import SqliteStore
 from src.db.store import CampagnePrioritaire
 from src.questionnaire.schema import Role
@@ -98,8 +100,10 @@ def main():
         check("sans message_cloture configuré : repli générique non vide",
               "next_section" in r3 and r3["next_section"]["intro"].startswith("Merci, vous avez répondu"))
 
-        # --- mode "besoins" : même mécanisme de file prioritaire, mais
-        #     jamais de message de clôture (pas une vraie campagne) ---
+        # --- mode "besoins" : même mécanisme de file prioritaire ; pas une
+        #     vraie campagne (pas de message_cloture configurable), mais une
+        #     clôture dédiée quand même, pour ne jamais retomber en silence
+        #     sur le questionnaire complet ---
         store3 = SqliteStore(db_path=str(Path(tmp) / "besoins.sqlite3"))
         lieu3 = store3.get_or_create_tiers_lieu("user-1", "Lieu Besoins Test")
         contributeur3 = store3.get_or_create_contributeur("user-1", lieu3.id, Role.AUTRE.value)
@@ -109,12 +113,26 @@ def main():
         section3 = handler3.get_current_section({})
         check("mode besoins : section prioritaire aussi proposée en premier",
               section3["section_id"] == PRIORITY_MODULE_ID)
+        r_besoins = None
         for f in list(section3["fields"]):
             valeur = ["Autre"] if f["type"] == "multi_choice" else "texte de test"
             r_besoins = handler3.execute("save_answer", {"champ_id": f["id"], "valeur": valeur})
-        check("mode besoins : jamais de section de clôture, même épuisé",
-              "next_section" not in r_besoins or r_besoins["next_section"]["section_id"] != PRIORITY_MODULE_ID
-              or r_besoins["next_section"]["fields"] != [])
+        check("mode besoins : next_section renvoyé directement sur le dernier champ",
+              "next_section" in r_besoins)
+        cloture_besoins = r_besoins["next_section"]
+        check("mode besoins : section de clôture dédiée, zéro champ",
+              cloture_besoins["section_id"] == PRIORITY_MODULE_ID and cloture_besoins["fields"] == [])
+        check("mode besoins : marqueur cloture_campagne présent (même mécanisme que les campagnes)",
+              cloture_besoins.get("cloture_campagne") is True)
+        check("mode besoins : message de clôture dédié, pas celui d'une campagne au hasard",
+              MESSAGE_CLOTURE_BESOINS in cloture_besoins["intro"])
+        check("mode besoins : propose explicitement d'arrêter là ou de continuer",
+              "arrête" in cloture_besoins["intro"] and "continuer" in cloture_besoins["intro"])
+
+        section3_suivante = handler3.get_current_section({})
+        check("mode besoins : appel suivant, la clôture n'est plus jamais reproposée",
+              section3_suivante.get("section_id") != PRIORITY_MODULE_ID
+              or MESSAGE_CLOTURE_BESOINS not in (section3_suivante.get("intro") or ""))
 
         # --- un champ retiré du schéma PENDANT une conversation déjà ouverte
         # (ex. rgpd/image retirés de KA122 en production) ne doit jamais

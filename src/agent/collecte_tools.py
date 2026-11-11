@@ -54,6 +54,22 @@ CODA_CLOTURE_CAMPAGNE = (
     "secteur et découvrir des exemples inspirants."
 )
 
+# Équivalent pour le mode "besoins" (voir _section_cloture_priorite) — sans
+# cloture dédiée ici, get_current_section retombait silencieusement, une
+# fois les champs de diagnostic_besoins_futurs épuisés, sur la progression
+# normale du questionnaire complet : la conversation "basculait" en
+# entretien classique sans transition ni consentement du répondant, qui
+# n'avait demandé que de lister ses besoins actuels (vécu concrètement).
+# Le message propose explicitement d'arrêter là OU de continuer, pour que
+# la suite reste un choix du répondant plutôt qu'un enchaînement automatique.
+MESSAGE_CLOTURE_BESOINS = "Merci, vos besoins actuels sont enregistrés et visibles dans l'Annuaire."
+CODA_CLOTURE_BESOINS = (
+    " On peut s'arrêter là pour aujourd'hui, ou continuer à compléter le reste de la fiche du "
+    "lieu (histoire, activités, gouvernance, modèle économique...) si vous avez un peu de temps "
+    "— ça nous aide à mieux cerner vos obstacles et à vous orienter vers les bonnes ressources. "
+    "Vous préférez continuer maintenant, ou on s'arrête là pour l'instant ?"
+)
+
 
 def texte_intro_campagne(campagne) -> str:
     """Titre + description d'UNE campagne, tels qu'injectés dans l'intro que
@@ -468,22 +484,31 @@ class CollecteToolHandler:
             return champ_id in self._libres_repondues
         return answers.get(champ_id) is not None
 
-    def _section_cloture_campagne(self) -> dict:
+    def _section_cloture_priorite(self) -> dict:
         """Section synthétique à un seul passage (zéro champ), renvoyée une
-        fois quand une campagne prioritaire (mode "campagne" uniquement — pas
-        "besoins", qui réutilise le même mécanisme de file prioritaire sans
-        être une vraie campagne à clôturer) vient d'être entièrement
-        répondue. `intro` combine le message propre à la campagne (configuré
-        par l'admin) ou un repli générique, plus un rappel fixe toujours
-        ajouté : continuer à nourrir sa fiche aide à mieux cerner les
-        obstacles du lieu pour lui acheminer les bonnes ressources, et la
-        Bibliothèque peut inspirer par l'exemple."""
-        campagnes = [c for c in self._campagnes_actives_pertinentes() if c.message_cloture]
-        message = campagnes[0].message_cloture if campagnes else MESSAGE_CLOTURE_GENERIQUE
-        texte_cloture = message + CODA_CLOTURE_CAMPAGNE
+        fois que la file prioritaire active ("campagne" ou "besoins") vient
+        d'être entièrement répondue. En mode "campagne", `intro` combine le
+        message propre à la campagne (configuré par l'admin) ou un repli
+        générique, plus un rappel fixe : continuer à nourrir sa fiche aide à
+        mieux cerner les obstacles du lieu pour lui acheminer les bonnes
+        ressources, et la Bibliothèque peut inspirer par l'exemple. En mode
+        "besoins", `self.campagne_id` est None (pas une vraie campagne
+        choisie) donc `_campagnes_actives_pertinentes()` renverrait TOUTES
+        les campagnes actives sans rapport avec ce diagnostic — message
+        dédié à la place (MESSAGE_CLOTURE_BESOINS/CODA_CLOTURE_BESOINS), qui
+        propose explicitement d'arrêter là ou de continuer vers le
+        questionnaire complet plutôt que d'y basculer sans transition."""
+        if self.mode_entretien == "besoins":
+            texte_cloture = MESSAGE_CLOTURE_BESOINS + CODA_CLOTURE_BESOINS
+            section_title = "Besoins enregistrés"
+        else:
+            campagnes = [c for c in self._campagnes_actives_pertinentes() if c.message_cloture]
+            message = campagnes[0].message_cloture if campagnes else MESSAGE_CLOTURE_GENERIQUE
+            texte_cloture = message + CODA_CLOTURE_CAMPAGNE
+            section_title = "Campagne terminée"
         return {
             "module_id": PRIORITY_MODULE_ID, "module_title": "Collecte prioritaire", "module_optional": False,
-            "section_id": PRIORITY_MODULE_ID, "section_title": "Campagne terminée",
+            "section_id": PRIORITY_MODULE_ID, "section_title": section_title,
             "intro": texte_cloture, "fields": [],
             # Marqueur dédié, distinct de "intro" (un champ que l'agent voit
             # sur toute section, facilement traité comme un simple élément de
@@ -514,11 +539,11 @@ class CollecteToolHandler:
         answers = self._current_answers()
         restants = [cid for cid in self._priority_field_ids if not self._priority_field_done(cid, answers)]
         if not restants:
-            cloture = self._priority_active and self.mode_entretien == "campagne" and not self._cloture_affichee
+            cloture = self._priority_active and self.mode_entretien in ("campagne", "besoins") and not self._cloture_affichee
             self._priority_active = False
             if cloture:
                 self._cloture_affichee = True
-                return self._section_cloture_campagne()
+                return self._section_cloture_priorite()
             return None
         code_pays = self._country_code(answers)
         fields = []
@@ -555,11 +580,11 @@ class CollecteToolHandler:
             # condition jamais satisfaite, comme "participants" si dispo =
             # "Non") plutôt que répondu un par un — même traitement de
             # clôture que l'épuisement normal ci-dessus.
-            cloture = self._priority_active and self.mode_entretien == "campagne" and not self._cloture_affichee
+            cloture = self._priority_active and self.mode_entretien in ("campagne", "besoins") and not self._cloture_affichee
             self._priority_active = False
             if cloture:
                 self._cloture_affichee = True
-                return self._section_cloture_campagne()
+                return self._section_cloture_priorite()
             return None
         section = {
             "module_id": PRIORITY_MODULE_ID,
