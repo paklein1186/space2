@@ -1,4 +1,10 @@
-anthropic>=0.40.0
+# Épinglé (contrairement aux autres dépendances) : le SDK anthropic enchaîne
+# des versions majeures avec de vraies ruptures de compatibilité (ex. Files
+# API/Skills sortis de beta) — un simple `>=` fait dériver silencieusement la
+# prod (redéploiement = réinstallation complète) loin de ce qui tourne en
+# local, rendant les tests locaux non représentatifs. 2.6.0 est la version
+# actuellement déployée et vérifiée en prod.
+anthropic==2.6.0
 streamlit==1.50.0
 supabase>=2.9.0
 python-dotenv>=1.0.1
