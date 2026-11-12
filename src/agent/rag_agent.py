@@ -139,19 +139,30 @@ class RagAgent:
                 final_message = stream.get_final_message()
             _log.info("[rag] tour %d (%s) : %.2fs", tours, self.model, time.monotonic() - debut_tour)
 
-            if self.store is not None:
-                log_usage(self.store, "rag_query", self.model, final_message.usage, user_id=self.user_id)
-            self.messages.append({"role": "assistant", "content": to_plain_content(final_message.content)})
+            # Diagnostic temporaire : en production, le flux s'arrête
+            # systématiquement après ce point sans jamais atteindre le tour
+            # suivant, et le message d'erreur générique de l'appelant
+            # (_agent_stream_surveille dans app.py) avale l'exception avant
+            # qu'elle soit visible dans les logs — ce bloc la journalise en
+            # entier avant de la laisser remonter, pour identifier la cause
+            # réelle. À retirer une fois la cause trouvée et corrigée.
+            try:
+                if self.store is not None:
+                    log_usage(self.store, "rag_query", self.model, final_message.usage, user_id=self.user_id)
+                self.messages.append({"role": "assistant", "content": to_plain_content(final_message.content)})
 
-            tool_uses = [b for b in final_message.content if b.type == "tool_use"]
-            if not tool_uses:
-                _log.info("[rag] total : %.2fs sur %d tour(s)", time.monotonic() - debut_total, tours)
-                if final_message.stop_reason == "max_tokens":
-                    yield ("\n\n*(Réponse interrompue — trop longue pour être générée en une fois. "
-                           "Redemandez « continue » pour la suite, ou reformulez une question plus ciblée.)*")
-                return
+                tool_uses = [b for b in final_message.content if b.type == "tool_use"]
+                if not tool_uses:
+                    _log.info("[rag] total : %.2fs sur %d tour(s)", time.monotonic() - debut_total, tours)
+                    if final_message.stop_reason == "max_tokens":
+                        yield ("\n\n*(Réponse interrompue — trop longue pour être générée en une fois. "
+                               "Redemandez « continue » pour la suite, ou reformulez une question plus ciblée.)*")
+                    return
 
-            self.messages.append({"role": "user", "content": self._executer_tool_uses(tool_uses)})
+                self.messages.append({"role": "user", "content": self._executer_tool_uses(tool_uses)})
+            except Exception:
+                _log.exception("[rag] échec après le tour %d (diagnostic)", tours)
+                raise
 
     def _executer_tool_uses(self, tool_uses: list) -> list:
         """Exécute tous les tool_use d'un même tour — en parallèle plutôt
