@@ -233,6 +233,8 @@ def auth_screen() -> str | None:
             st.session_state["user_email"] = result.user.email
             if result.session and result.session.refresh_token:
                 save_session_cookie(result.session.refresh_token)
+            from src.notifications import notifier_connexion
+            notifier_connexion(result.user.email)
             st.rerun()
         else:
             st.error(t("auth.invalid_code"))
@@ -413,6 +415,32 @@ def _maj_completion(store, state: dict) -> None:
     fréquent) réintroduirait exactement la lenteur déjà corrigée ailleurs
     dans cet onglet."""
     state["completion"] = state["agent"].tool_handler.campagne_completion()
+    completion = state["completion"]
+    if (completion and completion["pourcentage"] >= 50 and state.get("campagne_titre")
+            and not state.get("notif_mi_chemin_envoyee")):
+        # Une seule fois par session (pas à chaque tour une fois franchi) —
+        # le flag reste même si la progression redescend ensuite (réponse
+        # effacée), pour ne jamais notifier deux fois le même mi-chemin.
+        state["notif_mi_chemin_envoyee"] = True
+        _notifier_mi_chemin_campagne(store, state, completion["pourcentage"])
+
+
+def _notifier_mi_chemin_campagne(store, state: dict, pourcentage: int) -> None:
+    from src.notifications import notifier_mi_chemin_campagne
+    answers = store.get_answers(state["tiers_lieu_id"], state["contributeur_id"])
+    reponses = []
+    for champ_id in state.get("campagne_champ_ids") or []:
+        valeur = answers.get(champ_id)
+        if valeur in (None, ""):
+            continue
+        if champ_id.startswith("libre::"):
+            continue
+        champ = get_field(champ_id)
+        reponses.append((champ.label if champ else champ_id, valeur))
+    notifier_mi_chemin_campagne(
+        nom_lieu=state.get("nom_lieu") or "?", role_label=ROLE_LABELS.get(state["role"], state["role"]),
+        campagne_titre=state["campagne_titre"], pourcentage=pourcentage, reponses=reponses,
+    )
 
 
 _MESSAGE_ERREUR_AGENT = (
@@ -875,18 +903,22 @@ def entretien_tab(store, user_id: str):
         st.session_state[session_key] = {
             "agent": agent, "history": [],
             "tiers_lieu_id": tiers_lieu.id, "contributeur_id": contributeur.id, "role": role,
+            "nom_lieu": tiers_lieu.nom,
         }
         # Campagne déjà entamée pour ce lieu (par ce répondant ou un autre
         # contributeur) : l'agent ne doit pas réintroduire la campagne depuis
         # le début ni redemander s'il veut y participer — voir
         # _instruction_campagne dans collecte_agent.py.
-        campagne_titre = campagne_progression = None
+        campagne_titre = campagne_progression = campagne_champ_ids = None
         if mode_entretien == "campagne" and campagne_id_actuelle:
             campagne_choisie = next(
                 (c for c in store.get_active_campagnes_prioritaires() if c.id == campagne_id_actuelle), None)
             if campagne_choisie:
                 campagne_titre = campagne_choisie.titre
+                campagne_champ_ids = campagne_choisie.champ_ids
                 campagne_progression = campagne_completion_stats(reponses_initiales, campagne_choisie.champ_ids)
+        st.session_state[session_key]["campagne_titre"] = campagne_titre
+        st.session_state[session_key]["campagne_champ_ids"] = campagne_champ_ids
         # Premier appel LLM (résumé d'ouverture) : sans spinner, la page
         # restait visuellement figée le temps de cet appel (plusieurs
         # secondes), juste après avoir choisi/créé le lieu — perçu comme un
