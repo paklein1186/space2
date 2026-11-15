@@ -402,7 +402,7 @@ def _selecteur_campagnes(campagnes_actives: list, mode_key: str, campagne_id_key
     st.caption(t("entretien.mode_campagne_caption"))
 
 
-def _maj_completion(store, state: dict) -> None:
+def _maj_completion(store, state: dict, ouverture: bool = False) -> None:
     """Recalcule et stocke le % de complétion du formulaire de campagne en
     cours dans `state` (None si on n'est pas en train de répondre à une
     campagne prioritaire — voir CollecteToolHandler.campagne_completion) :
@@ -418,10 +418,15 @@ def _maj_completion(store, state: dict) -> None:
     completion = state["completion"]
     if (completion and completion["pourcentage"] >= 50 and state.get("campagne_titre")
             and not state.get("notif_mi_chemin_envoyee")):
-        # Une seule fois par session (pas à chaque tour une fois franchi) —
-        # le flag reste même si la progression redescend ensuite (réponse
-        # effacée), pour ne jamais notifier deux fois le même mi-chemin.
+        # Une seule fois au total, pas une fois par session : on ne notifie
+        # que le FRANCHISSEMENT des 50% pendant cette session. Un répondant
+        # qui revient sur une campagne déjà à mi-chemin ou plus (ouverture
+        # d'une nouvelle session) a déjà été notifié la fois où il a franchi
+        # le seuil — on marque le flag sans renvoyer d'email. Le flag reste
+        # même si la progression redescend ensuite (réponse effacée).
         state["notif_mi_chemin_envoyee"] = True
+        if ouverture:
+            return
         _notifier_mi_chemin_campagne(store, state, completion["pourcentage"])
 
 
@@ -937,7 +942,7 @@ def entretien_tab(store, user_id: str):
             del st.session_state[session_key]
             return
         st.session_state[session_key]["history"].append(("assistant", opening))
-        _maj_completion(store, st.session_state[session_key])
+        _maj_completion(store, st.session_state[session_key], ouverture=True)
 
     state = st.session_state[session_key]
     completion = state.get("completion")
