@@ -184,6 +184,17 @@ alter table llm_calls enable row level security;
 alter table admins enable row level security;
 alter table campagnes_prioritaires enable row level security;
 
+-- Accès partenaires à une campagne (voir migration_019) : RLS sans policy,
+-- service_role uniquement — jamais dans campagnes_prioritaires (lecture publique).
+create table if not exists campagne_acces_partenaires (
+    campagne_id uuid not null references campagnes_prioritaires(id) on delete cascade,
+    email text not null,
+    cree_le timestamptz not null default now(),
+    primary key (campagne_id, email)
+);
+create index if not exists campagne_acces_partenaires_email_idx on campagne_acces_partenaires (email);
+alter table campagne_acces_partenaires enable row level security;
+
 create policy "chacun voit s'il est admin" on admins for select using (user_id = auth.uid());
 
 create policy "lecture publique campagnes" on campagnes_prioritaires for select using (true);
@@ -486,6 +497,17 @@ alter table lieu_derive enable row level security;
 alter table llm_calls enable row level security;
 alter table admins enable row level security;
 alter table campagnes_prioritaires enable row level security;
+
+-- Accès partenaires à une campagne (voir migration_019) : RLS sans policy,
+-- service_role uniquement — jamais dans campagnes_prioritaires (lecture publique).
+create table if not exists campagne_acces_partenaires (
+    campagne_id uuid not null references campagnes_prioritaires(id) on delete cascade,
+    email text not null,
+    cree_le timestamptz not null default now(),
+    primary key (campagne_id, email)
+);
+create index if not exists campagne_acces_partenaires_email_idx on campagne_acces_partenaires (email);
+alter table campagne_acces_partenaires enable row level security;
 
 create policy "chacun voit s'il est admin" on admins for select using (user_id = auth.uid());
 

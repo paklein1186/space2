@@ -10,6 +10,7 @@ from supabase import Client, create_client
 
 from .store import (
     ROLES_VALIDATION_HUMAINE,
+    normaliser_emails,
     CampagnePrioritaire,
     CandidatLieu,
     ConversationBibliotheque,
@@ -438,7 +439,7 @@ class SupabaseStore(Store):
         )
         return bool(result.data)
 
-    def get_reponses_pour_champs(self, champ_ids: list) -> list:
+    def get_reponses_pour_champs(self, champ_ids: list, exclure_confidentiel: bool = False) -> list:
         # _lire_tout : sans pagination, PostgREST tronquait silencieusement à
         # 1000 lignes — avec ~3900+ lieux et jusqu'à 26 champs pour une seule
         # campagne (KA122), la table reponses dépasse largement ce seuil,
@@ -450,12 +451,14 @@ class SupabaseStore(Store):
             return []
 
         def requete():
-            return (
+            q = (
                 self.client.table("reponses")
                 .select("tiers_lieu_id,contributeur_id,champ_id,valeur")
                 .in_("champ_id", champ_ids)
-                .order("id")
             )
+            if exclure_confidentiel:
+                q = q.eq("confidentiel", False)
+            return q.order("id")
         return _lire_tout(requete)
 
     def save_candidat_lieu(self, candidat: CandidatLieu) -> CandidatLieu:
@@ -708,6 +711,52 @@ class SupabaseStore(Store):
 
     def delete_campagne_prioritaire(self, campagne_id: str) -> None:
         self.client.table("campagnes_prioritaires").delete().eq("id", campagne_id).execute()
+
+    # Table campagne_acces_partenaires (migration_019) : RLS sans policy,
+    # donc lisible/écrivable UNIQUEMENT via le store service_role (admin).
+    # Avant migration, la lecture dégrade en "aucun accès" (jamais d'accès
+    # accordé par erreur) ; l'écriture lève une erreur explicite.
+
+    def list_acces_partenaires(self, campagne_id: str) -> list:
+        try:
+            result = (self.client.table("campagne_acces_partenaires").select("email")
+                      .eq("campagne_id", campagne_id).order("email").execute())
+        except Exception:
+            return []
+        return [r["email"] for r in result.data]
+
+    def set_acces_partenaires(self, campagne_id: str, emails: list) -> None:
+        try:
+            self.client.table("campagne_acces_partenaires").delete().eq("campagne_id", campagne_id).execute()
+            lignes = [{"campagne_id": campagne_id, "email": e} for e in normaliser_emails(emails)]
+            if lignes:
+                self.client.table("campagne_acces_partenaires").insert(lignes).execute()
+        except Exception as exc:
+            raise RuntimeError(
+                "Impossible d'enregistrer les accès partenaires — la table campagne_acces_partenaires "
+                f"existe-t-elle (src/db/migration_019_campagne_acces_partenaires.sql) ? Détail : {exc}"
+            ) from exc
+
+    def get_repondants_campagne(self, campagne_id: str) -> set:
+        def requete():
+            return (self.client.table("reponses").select("tiers_lieu_id,contributeur_id")
+                    .eq("campagne_id", campagne_id).order("id"))
+        try:
+            lignes = _lire_tout(requete)
+        except Exception:
+            return set()  # colonne campagne_id absente (avant migration_017)
+        return {(l["tiers_lieu_id"], l["contributeur_id"]) for l in lignes}
+
+    def campagne_ids_pour_partenaire(self, email: str) -> list:
+        cible = normaliser_emails([email])
+        if not cible:
+            return []
+        try:
+            result = (self.client.table("campagne_acces_partenaires").select("campagne_id")
+                      .eq("email", cible[0]).execute())
+        except Exception:
+            return []
+        return [r["campagne_id"] for r in result.data]
 
     def list_users_with_last_login(self) -> list:
         users = self.client.auth.admin.list_users()

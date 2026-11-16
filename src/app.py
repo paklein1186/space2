@@ -1846,20 +1846,29 @@ def _export_campagne_pdf(campagne) -> bytes:
     return tampon.getvalue()
 
 
-def _tableau_repondants_campagne(admin_store, champ_ids: list) -> None:
+def _tableau_repondants_campagne(admin_store, champ_ids: list, vue_partenaire: bool = False,
+                                 nom_fichier: str = "repondants_campagne.xlsx",
+                                 campagne_id: Optional[str] = None) -> None:
     """Tableau des répondants à une campagne prioritaire (email, lieu, rôle,
     et leurs réponses aux champs de la campagne) — tous lieux confondus,
-    puisqu'une campagne prioritaire n'est pas limitée à un seul lieu."""
+    puisqu'une campagne prioritaire n'est pas limitée à un seul lieu.
+
+    `vue_partenaire=True` (page ?partenaire=<code>, lecteurs externes à l'équipe) :
+    réponses marquées confidentielles écartées, contributeurs bloqués
+    (modération) écartés, et pas de colonne « Email » du compte de connexion
+    — le partenaire voit le contact que le répondant a lui-même donné dans
+    la campagne (champ `contact`), pas l'identifiant de son compte Space2."""
     champs_schema = [cid for cid in champ_ids if not cid.startswith("libre::")]
     champs_libres = [cid for cid in champ_ids if cid.startswith("libre::")]
-    if champs_libres:
+    if champs_libres and not vue_partenaire:
         st.caption(
             "Questions libres collées dans cette campagne (réponses visibles par lieu dans "
             "« Données brutes » ci-dessous, pas dans ce tableau) : "
             + " · ".join(field_label(cid) for cid in champs_libres)
         )
 
-    lignes = admin_store.get_reponses_pour_champs(champs_schema) if champs_schema else []
+    lignes = (admin_store.get_reponses_pour_champs(champs_schema, exclure_confidentiel=vue_partenaire)
+              if champs_schema else [])
     if not lignes:
         st.caption("Aucune réponse pour l'instant.")
         return
@@ -1895,11 +1904,22 @@ def _tableau_repondants_campagne(admin_store, champ_ids: list) -> None:
             return True
         return isinstance(valeur, str) and valeur.strip().lower().startswith("oui")
 
-    par_repondant = {
-        cle: reponses for cle, reponses in par_repondant.items()
-        if len(reponses) >= 3 or any(_positive(v) for v in reponses.values())
-    }
+    if campagne_id:
+        # Critère strict (vue partenaire) : seuls ceux qui ont réellement
+        # répondu DANS cette campagne — sans lui, l'Autodiagnostic affichait
+        # avant même son ouverture les répondants KA122 (pays, statut,
+        # contact... sont communs aux deux campagnes).
+        repondants = admin_store.get_repondants_campagne(campagne_id)
+        par_repondant = {cle: reponses for cle, reponses in par_repondant.items() if cle in repondants}
+    else:
+        par_repondant = {
+            cle: reponses for cle, reponses in par_repondant.items()
+            if len(reponses) >= 3 or any(_positive(v) for v in reponses.values())
+        }
     if not par_repondant:
+        if campagne_id:
+            st.caption("Aucun répondant pour l'instant.")
+            return
         st.caption("Aucun répondant suffisamment engagé pour l'instant "
                     "(réponses isolées à des champs partagés avec d'autres imports, écartées).")
         return
@@ -1928,24 +1948,40 @@ def _tableau_repondants_campagne(admin_store, champ_ids: list) -> None:
         email = emails.get(contributeur.user_id, "—") if contributeur else "—"
         if email.endswith(f"@{SERVICE_ACCOUNTS_EMAIL_DOMAIN}"):
             continue
+        if vue_partenaire and (contributeur is None or contributeur.bloque):
+            continue
         ligne = {
             "Lieu": noms_lieux.get(tlid, "—"),
             "Rôle": ROLE_LABELS.get(contributeur.role, contributeur.role) if contributeur else "—",
-            "Email": email,
         }
+        if not vue_partenaire:
+            ligne["Email"] = email
         for champ_id in champs_schema:
             valeur = reponses.get(champ_id)
             if valeur is None:
                 valeur = par_lieu.get(tlid, {}).get(champ_id)
-            ligne[field_label(champ_id)] = ", ".join(valeur) if isinstance(valeur, list) else (valeur or "—")
+            # Toujours du texte : une colonne mêlant nombres (2019) et texte
+            # ("2019-2020") faisait échouer la sérialisation Arrow du tableau.
+            if isinstance(valeur, bool):
+                texte = "Oui" if valeur else "Non"
+            elif isinstance(valeur, list):
+                texte = ", ".join(map(str, valeur)) or "—"
+            else:
+                texte = str(valeur) if valeur not in (None, "") else "—"
+            ligne[field_label(champ_id)] = texte
         lignes_tableau.append(ligne)
 
     if not lignes_tableau:
+        if campagne_id:
+            st.caption("Aucun répondant pour l'instant.")
+            return
         st.caption("Aucun répondant suffisamment engagé pour l'instant "
                     "(réponses isolées ou comptes d'import, écartés).")
         return
 
     df_repondants = pd.DataFrame(lignes_tableau)
+    if vue_partenaire:
+        st.caption(f"{len(df_repondants)} répondant(s)")
     st.dataframe(df_repondants, use_container_width=True, hide_index=True)
 
     tampon = io.BytesIO()
@@ -1953,9 +1989,40 @@ def _tableau_repondants_campagne(admin_store, champ_ids: list) -> None:
         df_repondants.to_excel(writer, index=False, sheet_name="Répondants")
     st.download_button(
         "Exporter en .xlsx", data=tampon.getvalue(),
-        file_name="repondants_campagne.xlsx",
+        file_name=nom_fichier,
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
+
+
+def _formulaire_acces_partenaires(admin_store, campagne) -> None:
+    """Liste des emails partenaires autorisés à consulter CETTE campagne sur
+    la page ?partenaire=<code> (questions + répondants + données, sans menu).
+    Seul un admin y accède (page Administration) ; un email mal formé est
+    signalé et jamais enregistré."""
+    lien = f"{URL_BASE_APP}/?partenaire={campagne.code or campagne.id}"
+    st.caption(f"Page partenaire : `{lien}` — la personne se connecte avec un code reçu sur son "
+               "email ; seuls les emails listés ci-dessous y ont accès. Réponses confidentielles "
+               "et email de compte des répondants ne sont jamais montrés.")
+    actuels = admin_store.list_acces_partenaires(campagne.id)
+    with st.form(f"acces_partenaires_{campagne.id}"):
+        saisie = st.text_area(
+            "Emails autorisés (un par ligne)", value="\n".join(actuels), height=120,
+            key=f"acces_partenaires_saisie_{campagne.id}",
+        )
+        if st.form_submit_button("Enregistrer les accès"):
+            from src.acces_partenaires import parser_emails
+
+            valides, invalides = parser_emails(saisie)
+            if invalides:
+                st.error("Adresse(s) invalide(s), rien n'a été enregistré : " + ", ".join(invalides))
+                return
+            try:
+                admin_store.set_acces_partenaires(campagne.id, valides)
+            except RuntimeError as exc:
+                st.error(str(exc))
+                return
+            st.success(f"{len(valides)} accès enregistré(s).")
+            st.rerun()
 
 
 def administration_tab(store, user_id: str) -> None:
@@ -2127,6 +2194,8 @@ def administration_tab(store, user_id: str) -> None:
                     )
                 with st.expander(f"Voir les répondants — {c.titre}"):
                     _tableau_repondants_campagne(admin_store, c.champ_ids)
+                with st.expander(f"Accès partenaires — {c.titre}"):
+                    _formulaire_acces_partenaires(admin_store, c)
                 # Édition de la description seule (pas du reste de la
                 # campagne : titre/champs/dates se corrigent en supprimant et
                 # recréant) — affichée en amont du chat sur le hero d'un lien
@@ -3050,6 +3119,127 @@ def page_administration() -> None:
     _rendre_isole("Administration", administration_tab, store, user_id)
 
 
+_CSS_SANS_MENU = """<style>
+[data-testid="stSidebar"], [data-testid="stSidebarCollapseButton"], [data-testid="stSidebarNav"],
+[data-testid="stSidebarCollapsedControl"], [data-testid="stExpandSidebarButton"] { display: none !important; }
+</style>"""
+
+
+def _sur_page_partenaire() -> bool:
+    """Vrai pour un lien partenaire (?partenaire=<code de campagne>). Un
+    paramètre d'URL plutôt qu'un chemin (/partenaire) : il est lisible AVANT
+    st.navigation() (st.context.url ne donne pas le chemin de la page), ce
+    qui permet de ne construire, dans ce cas, QUE la page partenaire, en
+    navigation masquée — aucun menu, et aucune entrée « Espace partenaire »
+    dans le menu des autres visiteurs."""
+    return bool(st.query_params.get("partenaire"))
+
+
+def _deconnecter() -> None:
+    clear_session_cookie()
+    for key in ("user_id", "user_email", "otp_sent_to", "cookie_restore_failed",
+                "use_admin_store", "supabase_client"):
+        st.session_state.pop(key, None)
+    st.session_state["just_logged_out"] = True
+    st.rerun()
+
+
+def _statut_fenetre(campagne) -> str:
+    from datetime import datetime, timezone
+
+    from src.db.store import _parse_dt
+
+    maintenant = datetime.now(timezone.utc)
+    debut, fin = _parse_dt(campagne.date_debut), _parse_dt(campagne.date_fin)
+    if debut and debut > maintenant:
+        return "à venir"
+    if fin and fin < maintenant:
+        return "clôturée"
+    return "en cours"
+
+
+def partenaire_tab(store, user_id: str) -> None:
+    """Page partenaire d'une campagne : questions, répondants et données
+    collectées, en lecture seule. Accès réservé aux emails inscrits par un
+    admin pour CETTE campagne (voir _formulaire_acces_partenaires), comparés
+    à l'email VÉRIFIÉ par la connexion (code à usage unique) — ou à un admin."""
+    from src.acces_partenaires import campagne_demandee, campagnes_visibles
+
+    admin_store = _admin_store_or_error()
+    if admin_store is None:
+        return
+    email = st.session_state.get("user_email") or ""
+    visibles = campagnes_visibles(admin_store, email, _est_admin(store, user_id))
+
+    col_titre, col_compte = st.columns([5, 1])
+    with col_compte:
+        st.caption(email)
+        if st.button(t("sidebar.logout"), key="partenaire_logout", use_container_width=True):
+            _deconnecter()
+
+    code = st.query_params.get("partenaire")
+    campagne = campagne_demandee(visibles, code)
+    if campagne is None:
+        if code or not visibles:
+            with col_titre:
+                st.warning(
+                    f"Aucune campagne n'est accessible avec l'adresse {email} à ce lien. "
+                    "Si vous êtes partenaire, demandez à l'équipe Space2 d'inscrire cette adresse "
+                    "pour la campagne concernée."
+                )
+        if not visibles:
+            return
+        if len(visibles) == 1 and not code:
+            campagne = visibles[0]
+        else:
+            campagne = st.selectbox(
+                "Campagne", visibles, index=None, format_func=lambda c: c.titre,
+                placeholder="Choisir une campagne", key="partenaire_choix_campagne",
+            )
+            if campagne is None:
+                return
+
+    with col_titre:
+        st.title(campagne.titre)
+        st.caption(
+            f"Du {campagne.date_debut[:10]} au {campagne.date_fin[:10]} · {_statut_fenetre(campagne)} · "
+            f"{len(campagne.champ_ids)} questions"
+        )
+    if campagne.description:
+        st.markdown(campagne.description)
+
+    onglet_repondants, onglet_questions = st.tabs(["Répondants et réponses", "Questions"])
+    with onglet_repondants:
+        st.caption("Une ligne par personne ayant répondu dans le cadre de cette campagne. Les réponses "
+                   "marquées confidentielles par les répondants ne sont pas affichées.")
+        _tableau_repondants_campagne(
+            admin_store, campagne.champ_ids, vue_partenaire=True,
+            nom_fichier=f"repondants_{campagne.code or 'campagne'}.xlsx", campagne_id=campagne.id,
+        )
+    with onglet_questions:
+        for i, cid in enumerate(campagne.champ_ids, start=1):
+            st.markdown(f"**{i}. {field_label(cid)}**")
+            options = _options_question(cid)
+            if options:
+                st.caption(options)
+        st.download_button(
+            "Exporter les questions (PDF)", data=_export_campagne_pdf(campagne),
+            file_name=f"questions_{campagne.code or 'campagne'}.pdf", mime="application/pdf",
+            key="partenaire_export_pdf",
+        )
+
+
+def page_partenaire() -> None:
+    # Sans menu dès l'écran de connexion (même logique que page_entretien
+    # sur lien direct) : un partenaire n'a accès qu'à cette page.
+    st.markdown(_CSS_SANS_MENU, unsafe_allow_html=True)
+    user_id = auth_screen()
+    if not user_id:
+        return
+    store = _resolve_store(user_id)
+    _rendre_isole("Espace partenaire", partenaire_tab, store, user_id)
+
+
 def main():
     # Administration est une page comme les autres (rendue dans la zone
     # principale, pas coincée dans la colonne étroite de la barre latérale —
@@ -3086,7 +3276,12 @@ def main():
             st.Page(page_administration, title=t("nav.administration"), icon="⚙️", url_path="administration"),
         ]
 
-    pg = st.navigation(pages)
+    sur_page_partenaire = _sur_page_partenaire()
+    if sur_page_partenaire:
+        pg = st.navigation([st.Page(page_partenaire, title="Espace partenaire", icon="🤝", default=True)],
+                           position="hidden")
+    else:
+        pg = st.navigation(pages)
     # Détecte un changement d'onglet (pas juste un rerun causé par un widget
     # à l'intérieur du même onglet) : sert à repartir d'une Bibliothèque
     # vierge à chaque fois qu'on y revient depuis un autre onglet, plutôt que
@@ -3116,18 +3311,13 @@ def main():
     # instant sans bouton "Se déconnecter" ni email, le temps d'un rerun de
     # rattrapage (LOCAL_DEV_AUTOLOGIN notamment, qui ne force pas de rerun).
     user_id = st.session_state.get("user_id")
-    if user_id:
+    if user_id and not sur_page_partenaire:
         with st.sidebar:
             if st.session_state.get("use_admin_store"):
                 st.warning(t("sidebar.admin_local_mode"))
             st.caption(t("sidebar.connected_as", email=st.session_state.get("user_email") or user_id))
             if st.button(t("sidebar.logout"), use_container_width=True):
-                clear_session_cookie()
-                for key in ("user_id", "user_email", "otp_sent_to", "cookie_restore_failed",
-                            "use_admin_store", "supabase_client"):
-                    st.session_state.pop(key, None)
-                st.session_state["just_logged_out"] = True
-                st.rerun()
+                _deconnecter()
 
 
 if __name__ == "__main__":

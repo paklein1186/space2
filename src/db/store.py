@@ -54,6 +54,14 @@ class Contributeur:
 ROLES_VALIDATION_HUMAINE = ["fondateur", "equipe", "steward"]
 
 
+def normaliser_emails(emails) -> list:
+    """Emails d'accès partenaire : minuscules, sans espaces, dédoublonnés,
+    triés — la comparaison avec l'email de connexion se fait toujours sur
+    cette forme (un "Prenom.Nom@Region.be" saisi par l'admin doit matcher
+    "prenom.nom@region.be" renvoyé par Supabase Auth)."""
+    return sorted({e.strip().lower() for e in emails if e and e.strip()})
+
+
 @dataclass
 class SessionEntretien:
     id: str
@@ -321,11 +329,13 @@ class Store(ABC):
         ...
 
     @abstractmethod
-    def get_reponses_pour_champs(self, champ_ids: list) -> list:
+    def get_reponses_pour_champs(self, champ_ids: list, exclure_confidentiel: bool = False) -> list:
         """Réponses à un ensemble de champs, tous lieux confondus — chaque
         élément : {tiers_lieu_id, contributeur_id, champ_id, valeur}. Utilisé
         pour lister les répondants d'une campagne prioritaire (email, lieu,
-        rôle) indépendamment du lieu auquel ils appartiennent."""
+        rôle) indépendamment du lieu auquel ils appartiennent.
+        `exclure_confidentiel=True` écarte les réponses marquées
+        `confidentiel` (vue partenaire, externe à l'équipe Space2)."""
         ...
 
     @abstractmethod
@@ -496,6 +506,32 @@ class Store(ABC):
 
     @abstractmethod
     def delete_campagne_prioritaire(self, campagne_id: str) -> None: ...
+
+    # -- accès partenaires à une campagne (page ?partenaire=<code>) ---------------
+
+    @abstractmethod
+    def list_acces_partenaires(self, campagne_id: str) -> list:
+        """Emails (minuscules, triés) autorisés à consulter cette campagne
+        sur la page partenaire."""
+        ...
+
+    @abstractmethod
+    def set_acces_partenaires(self, campagne_id: str, emails: list) -> None:
+        """Remplace la liste complète des emails autorisés pour cette
+        campagne (normalisés en minuscules, sans doublons)."""
+        ...
+
+    @abstractmethod
+    def get_repondants_campagne(self, campagne_id: str) -> set:
+        """{(tiers_lieu_id, contributeur_id)} ayant donné au moins une
+        réponse DANS cette campagne (reponses.campagne_id, posé uniquement
+        en mode campagne — jamais par un import ni l'entretien général)."""
+        ...
+
+    @abstractmethod
+    def campagne_ids_pour_partenaire(self, email: str) -> list:
+        """Ids des campagnes que cet email est autorisé à consulter."""
+        ...
 
     @abstractmethod
     def map_user_emails(self, user_ids: list) -> dict:

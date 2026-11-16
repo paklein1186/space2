@@ -12,6 +12,7 @@ from typing import Optional
 
 from .store import (
     ROLES_VALIDATION_HUMAINE,
+    normaliser_emails,
     CampagnePrioritaire,
     CandidatLieu,
     ConversationBibliotheque,
@@ -111,6 +112,12 @@ create table if not exists campagnes_prioritaires (
     cree_le text not null default (datetime('now')),
     message_cloture text,
     code text
+);
+create table if not exists campagne_acces_partenaires (
+    campagne_id text not null,
+    email text not null,
+    cree_le text not null default (datetime('now')),
+    primary key (campagne_id, email)
 );
 create table if not exists journal_modifications (
     id text primary key,
@@ -528,13 +535,14 @@ class SqliteStore(Store):
         ).fetchone()
         return row is not None
 
-    def get_reponses_pour_champs(self, champ_ids: list) -> list:
+    def get_reponses_pour_champs(self, champ_ids: list, exclure_confidentiel: bool = False) -> list:
         if not champ_ids:
             return []
         placeholders = ",".join("?" * len(champ_ids))
+        filtre_confidentiel = " and not confidentiel" if exclure_confidentiel else ""
         rows = self.conn.execute(
             f"select tiers_lieu_id, contributeur_id, champ_id, valeur from reponses "
-            f"where champ_id in ({placeholders})",
+            f"where champ_id in ({placeholders}){filtre_confidentiel}",
             champ_ids,
         ).fetchall()
         return [
@@ -779,8 +787,38 @@ class SqliteStore(Store):
         return result
 
     def delete_campagne_prioritaire(self, campagne_id: str) -> None:
+        self.conn.execute("delete from campagne_acces_partenaires where campagne_id = ?", (campagne_id,))
         self.conn.execute("delete from campagnes_prioritaires where id = ?", (campagne_id,))
         self.conn.commit()
+
+    def list_acces_partenaires(self, campagne_id: str) -> list:
+        rows = self.conn.execute(
+            "select email from campagne_acces_partenaires where campagne_id = ? order by email", (campagne_id,),
+        ).fetchall()
+        return [r["email"] for r in rows]
+
+    def set_acces_partenaires(self, campagne_id: str, emails: list) -> None:
+        self.conn.execute("delete from campagne_acces_partenaires where campagne_id = ?", (campagne_id,))
+        self.conn.executemany(
+            "insert into campagne_acces_partenaires (campagne_id, email) values (?, ?)",
+            [(campagne_id, e) for e in normaliser_emails(emails)],
+        )
+        self.conn.commit()
+
+    def get_repondants_campagne(self, campagne_id: str) -> set:
+        rows = self.conn.execute(
+            "select distinct tiers_lieu_id, contributeur_id from reponses where campagne_id = ?", (campagne_id,),
+        ).fetchall()
+        return {(r["tiers_lieu_id"], r["contributeur_id"]) for r in rows}
+
+    def campagne_ids_pour_partenaire(self, email: str) -> list:
+        cible = normaliser_emails([email])
+        if not cible:
+            return []
+        rows = self.conn.execute(
+            "select campagne_id from campagne_acces_partenaires where email = ?", (cible[0],),
+        ).fetchall()
+        return [r["campagne_id"] for r in rows]
 
     def map_user_emails(self, user_ids: list) -> dict:
         # Pas de système d'auth séparé en local : user_id EST déjà l'email
