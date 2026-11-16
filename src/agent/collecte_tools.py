@@ -115,13 +115,21 @@ def _decouper_choix_multiples(texte: str, canoniques: dict) -> list:
     qu'en liste. On ne découpe pas bêtement sur les virgules : plusieurs
     options en contiennent elles-mêmes ("… (production, transformation,
     distribution)"). On repère d'abord chaque option présente dans le texte
-    (la plus longue d'abord), puis le reste éventuel devient un élément libre."""
-    reste = _cle_option(texte)
+    (la plus longue d'abord), puis le reste éventuel devient un élément libre.
+
+    Une option n'est reconnue que comme mot(s) entier(s) : vécu, l'option
+    « Hébergement » était extraite du mot « hébergements » d'une réponse
+    libre, laissant un « s » orphelin dans le reste. Le reste garde aussi
+    sa casse d'origine (seule la comparaison ignore la casse)."""
+    reste = " ".join(texte.split())
     trouvees = []
     for cle in sorted(canoniques, key=len, reverse=True):
-        if cle and cle in reste:
+        if not cle:
+            continue
+        motif = re.compile(r"(?<!\w)" + re.escape(cle) + r"(?!\w)", re.IGNORECASE)
+        if motif.search(reste):
             trouvees.append(canoniques[cle])
-            reste = reste.replace(cle, " ")
+            reste = motif.sub(" ", reste)
     ordre = list(canoniques.values())
     trouvees.sort(key=ordre.index)
     reste = re.sub(r"^[\s,;/\-–•]+|[\s,;/\-–•]+$", "", re.sub(r"(\s*[,;]\s*)+", ", ", reste)).strip()

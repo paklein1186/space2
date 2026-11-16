@@ -39,6 +39,15 @@ def main():
     check("nouveau champ engagement présent",
           get_field("engagement_capitalisation") is not None
           and _canonicaliser_valeur(get_field("engagement_capitalisation"), "oui") == "Oui")
+    activites = get_field("activites_principales")
+    texte_libre = ("Vente directe de produits locaux (paniers, circuit court), balades, hébergements, "
+                   "événements conviviaux et culturels")
+    resultat = _canonicaliser_valeur(activites, texte_libre)
+    check("option jamais extraite d'un mot plus long (« hébergements » ≠ « Hébergement »)",
+          "Hébergement" not in resultat and not any(" s," in x or x.endswith(" s") for x in resultat))
+    check("texte libre sans option entière : gardé intact, casse comprise", resultat == [texte_libre])
+    check("option entière en texte : toujours reconnue",
+          _canonicaliser_valeur(activites, "hébergement, Vente de balades") [0] == "Hébergement")
     print("\nTous les tests sont passés.")
 
 
