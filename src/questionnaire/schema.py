@@ -966,6 +966,10 @@ section_expedition_ka122 = Section(
               "Qui participerait ? (porteur + nb de staff + rôles, 2 personnes par lieu maximum) · "
               "besoins d'accessibilité", FieldType.TEXT,
               condition=Condition("dispo", "ne", "Non")),
+        Field("engagement_capitalisation",
+              "Vous engagez-vous à participer à l'expédition et à la capitalisation "
+              "(partage des apprentissages avec le réseau après le voyage) ?",
+              FieldType.SINGLE_CHOICE, options=["Oui", "Non"]),
         Field("donner_recevoir",
               "Donner & recevoir : ce que vous venez chercher (résultat utile, à découvrir) et ce que "
               "VOUS pouvez partager", FieldType.TEXTAREA),

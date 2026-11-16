@@ -10,6 +10,7 @@ reprise exacte après interruption — voir `db.store.SessionEntretien`.
 
 from __future__ import annotations
 
+import html
 import unicodedata
 from typing import Optional
 
@@ -90,6 +91,37 @@ _SYNONYMES_CHAMPS = {
     "scic": "societe cooperative interet collectif statut juridique",
     "scop": "societe cooperative participative statut juridique",
 }
+
+
+def _cle_option(texte: str) -> str:
+    return " ".join(texte.split()).casefold()
+
+
+def _canonicaliser_valeur(field, valeur):
+    """Nettoie une valeur avant enregistrement : entités HTML décodées (vécu :
+    l'agent a écrit "&gt; 75%" au lieu de "> 75%" pour un choix unique, valeur
+    alors invisible pour tout filtre sur les options), puis, pour un champ à
+    choix, recalage sur l'orthographe exacte de l'option quand seuls la casse
+    ou les espaces diffèrent. Une valeur qui ne correspond à aucune option est
+    gardée telle quelle (réponse "Autre" précisée, par ex.) — jamais rejetée,
+    pour ne pas bloquer l'entretien."""
+    if isinstance(valeur, str):
+        valeur = html.unescape(valeur)
+    elif isinstance(valeur, list):
+        valeur = [html.unescape(v) if isinstance(v, str) else v for v in valeur]
+
+    if field is None or field.options is None:
+        return valeur
+    options = field.options if isinstance(field.options, list) else [
+        o for liste in field.options.values() for o in liste]
+    canoniques = {_cle_option(o): o for o in options}
+
+    def recaler(v):
+        return canoniques.get(_cle_option(v), v) if isinstance(v, str) else v
+
+    if isinstance(valeur, list):
+        return [recaler(v) for v in valeur]
+    return recaler(valeur)
 
 
 def _normaliser(texte: str) -> str:
@@ -685,7 +717,7 @@ class CollecteToolHandler:
 
     def save_answer(self, tool_input: dict) -> dict:
         champ_id = tool_input["champ_id"]
-        valeur = tool_input["valeur"]
+        valeur = _canonicaliser_valeur(get_field(champ_id), tool_input["valeur"])
         confidentiel = bool(tool_input.get("confidentiel", False))
         if champ_id.startswith("libre::"):
             # Question collée par un admin (campagne prioritaire), hors
