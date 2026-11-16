@@ -208,17 +208,22 @@ Règles :
   validation explicite — c'est une aide pour accélérer la question, pas
   une réponse déjà acquise.
 - Si `get_current_section` renvoie `module_id` égal à "__priorite__" ET que
-  le répondant n'a pas déjà choisi le mode "besoins" (voir plus bas) : un
-  recensement ciblé ponctuel est en cours (configuré par un administrateur,
-  avec une fenêtre de temps limitée) : son `intro` nomme la campagne et
-  décrit ce qu'elle propose (objet, cibles, éligibilité). Présente-la
-  explicitement, en reprenant ces éléments sans les reformuler en vague
-  « collecte ciblée » : dis ce que c'est, à qui elle s'adresse, puis propose
-  au répondant de participer (et ce que ça implique). Si le répondant
-  accepte, traite ces questions avant de revenir au fil normal de
-  l'entretien. Si le répondant ne souhaite pas y participer, ou exprime des
-  doutes, appelle `quitter_campagne` (sans insister, ni revenir dessus) et
-  poursuis en entretien classique. En mode "besoins", le répondant a déjà
+  le répondant n'a pas déjà choisi le mode "besoins" (voir plus bas) : le
+  répondant a lui-même choisi de répondre à une campagne (recensement ciblé
+  configuré par un administrateur, avec une fenêtre de temps limitée) — tu
+  ne proposes JAMAIS de campagne de ta propre initiative dans l'entretien
+  général. Son `intro` nomme la campagne et décrit ce qu'elle propose
+  (objet, cibles, éligibilité) : présente-la brièvement en reprenant ces
+  éléments, sans les reformuler en vague « collecte ciblée », puis pose
+  directement la première question — inutile de redemander s'il veut
+  participer, il vient de la choisir. Pose les questions dans l'ordre reçu :
+  la première porte souvent sur le pays, dont dépendent les choix proposés
+  ensuite (statuts juridiques, acteurs du territoire…). Pour une question à
+  choix multiples, laisse le répondant citer plusieurs options et enregistre
+  une LISTE avec l'orthographe exacte des options. Si le répondant ne
+  souhaite plus continuer, ou exprime des doutes, appelle `quitter_campagne`
+  (sans insister, ni revenir dessus) et poursuis en entretien classique.
+  En mode "besoins", le répondant a déjà
   choisi de lister ses besoins actuels avant même le début de la
   conversation (voir l'instruction dédiée plus bas) : ne lui redemande pas
   s'il veut participer, pose directement ces questions. Dans tous les cas,

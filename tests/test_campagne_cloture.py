@@ -113,10 +113,16 @@ def main():
         section3 = handler3.get_current_section({})
         check("mode besoins : section prioritaire aussi proposée en premier",
               section3["section_id"] == PRIORITY_MODULE_ID)
+        # Répond jusqu'à épuisement, y compris aux questions qui ne se
+        # débloquent qu'après une réponse (soutiens_prioritaires n'apparaît
+        # qu'une fois types_soutien_souhaites répondu).
         r_besoins = None
-        for f in list(section3["fields"]):
-            valeur = ["Autre"] if f["type"] == "multi_choice" else "texte de test"
-            r_besoins = handler3.execute("save_answer", {"champ_id": f["id"], "valeur": valeur})
+        champs = list(section3["fields"])
+        while champs:
+            for f in champs:
+                valeur = ["Autre"] if f["type"] == "multi_choice" else "texte de test"
+                r_besoins = handler3.execute("save_answer", {"champ_id": f["id"], "valeur": valeur})
+            champs = [] if "next_section" in r_besoins else handler3.get_current_section({})["fields"]
         check("mode besoins : next_section renvoyé directement sur le dernier champ",
               "next_section" in r_besoins)
         cloture_besoins = r_besoins["next_section"]

@@ -11,6 +11,7 @@ reprise exacte après interruption — voir `db.store.SessionEntretien`.
 from __future__ import annotations
 
 import html
+import re
 import unicodedata
 from typing import Optional
 
@@ -23,7 +24,9 @@ from ..questionnaire.resolver import (
     resolve_section_fields,
     section_is_complete,
 )
-from ..questionnaire.schema import QUESTIONNAIRE, Role, all_fields, get_field, get_module, get_section
+from ..questionnaire.schema import (
+    QUESTIONNAIRE, FieldType, Role, all_fields, get_field, get_module, get_section,
+)
 
 PRIORITY_MODULE_ID = "__priorite__"
 
@@ -97,20 +100,61 @@ def _cle_option(texte: str) -> str:
     return " ".join(texte.split()).casefold()
 
 
-def _canonicaliser_valeur(field, valeur):
-    """Nettoie une valeur avant enregistrement : entités HTML décodées (vécu :
-    l'agent a écrit "&gt; 75%" au lieu de "> 75%" pour un choix unique, valeur
-    alors invisible pour tout filtre sur les options), puis, pour un champ à
-    choix, recalage sur l'orthographe exacte de l'option quand seuls la casse
-    ou les espaces diffèrent. Une valeur qui ne correspond à aucune option est
-    gardée telle quelle (réponse "Autre" précisée, par ex.) — jamais rejetée,
-    pour ne pas bloquer l'entretien."""
-    if isinstance(valeur, str):
-        valeur = html.unescape(valeur)
-    elif isinstance(valeur, list):
-        valeur = [html.unescape(v) if isinstance(v, str) else v for v in valeur]
+_UNICODE_ECHAPPE = re.compile(r"\\u([0-9a-fA-F]{4})")
 
-    if field is None or field.options is None:
+
+def _nettoyer_texte(texte: str) -> str:
+    """Entités HTML ("&gt;") et séquences unicode échappées ("Propri\\u00e9taire")
+    décodées — deux formes vues en base, écrites telles quelles par l'agent."""
+    texte = html.unescape(texte)
+    return _UNICODE_ECHAPPE.sub(lambda m: chr(int(m.group(1), 16)), texte)
+
+
+def _decouper_choix_multiples(texte: str, canoniques: dict) -> list:
+    """Un choix multiple arrivé en texte ("Location, Prestations") plutôt
+    qu'en liste. On ne découpe pas bêtement sur les virgules : plusieurs
+    options en contiennent elles-mêmes ("… (production, transformation,
+    distribution)"). On repère d'abord chaque option présente dans le texte
+    (la plus longue d'abord), puis le reste éventuel devient un élément libre."""
+    reste = _cle_option(texte)
+    trouvees = []
+    for cle in sorted(canoniques, key=len, reverse=True):
+        if cle and cle in reste:
+            trouvees.append(canoniques[cle])
+            reste = reste.replace(cle, " ")
+    ordre = list(canoniques.values())
+    trouvees.sort(key=ordre.index)
+    reste = re.sub(r"^[\s,;/\-–•]+|[\s,;/\-–•]+$", "", re.sub(r"(\s*[,;]\s*)+", ", ", reste)).strip()
+    if not trouvees:
+        return [texte.strip()]
+    if reste and re.search(r"\w{3,}", reste):
+        trouvees.append(reste)
+    return trouvees
+
+
+def _canonicaliser_valeur(field, valeur):
+    """Nettoie une valeur avant enregistrement, pour qu'elle soit stockée sous
+    la forme attendue par son type de champ :
+    - texte : entités HTML et unicode échappé décodés (vécu : "&gt; 75%" au
+      lieu de "> 75%", "Propri\\u00e9taire" au lieu de "Propriétaire") ;
+    - choix unique / multiple : recalage sur l'orthographe exacte de l'option
+      quand seuls la casse ou les espaces diffèrent ;
+    - choix multiple reçu en texte : converti en liste ; choix unique reçu en
+      liste d'un élément : ramené à cet élément ;
+    - échelle 1-5 reçue en texte ("4") : convertie en entier.
+    Une valeur qui ne correspond à aucune option est gardée telle quelle
+    (réponse "Autre" précisée, par ex.) — jamais rejetée, pour ne pas bloquer
+    l'entretien."""
+    if isinstance(valeur, str):
+        valeur = _nettoyer_texte(valeur)
+    elif isinstance(valeur, list):
+        valeur = [_nettoyer_texte(v) if isinstance(v, str) else v for v in valeur]
+
+    if field is None:
+        return valeur
+    if field.type == FieldType.SCALE_1_5 and isinstance(valeur, str) and valeur.strip().isdigit():
+        return int(valeur.strip())
+    if field.options is None:
         return valeur
     options = field.options if isinstance(field.options, list) else [
         o for liste in field.options.values() for o in liste]
@@ -119,6 +163,10 @@ def _canonicaliser_valeur(field, valeur):
     def recaler(v):
         return canoniques.get(_cle_option(v), v) if isinstance(v, str) else v
 
+    if field.type == FieldType.MULTI_CHOICE and isinstance(valeur, str):
+        valeur = _decouper_choix_multiples(valeur, canoniques)
+    if field.type == FieldType.SINGLE_CHOICE and isinstance(valeur, list) and len(valeur) == 1:
+        valeur = valeur[0]
     if isinstance(valeur, list):
         return [recaler(v) for v in valeur]
     return recaler(valeur)
@@ -448,6 +496,14 @@ class CollecteToolHandler:
         return actives
 
     def _compute_priority_field_ids(self) -> list:
+        # Seul le mode "campagne" (choix explicite du répondant : bouton,
+        # liste des campagnes en cours ou lien direct) pousse des questions
+        # de campagne. L'entretien général ("histoire") et le mode "besoins"
+        # n'en poussent aucune — avant, toutes les campagnes actives étaient
+        # glissées en tête de l'entretien général, ce qui imposait une
+        # campagne à quelqu'un qui n'avait rien demandé.
+        if self.mode_entretien != "campagne":
+            return []
         ids: list = []
         for campagne in self._campagnes_actives_pertinentes():
             for champ_id in campagne.champ_ids:
@@ -624,7 +680,8 @@ class CollecteToolHandler:
             "module_optional": False,
             "section_id": PRIORITY_MODULE_ID,
             "section_title": "Informations prioritaires du moment",
-            "intro": self._intro_campagnes_actives(),
+            "intro": (self._intro_campagnes_actives() if self.mode_entretien == "campagne"
+                      else "Besoins actuels du lieu, choisis par le répondant en début d'entretien."),
             "fields": fields,
         }
         # Signal redondant, au niveau de la section plutôt que caché dans un

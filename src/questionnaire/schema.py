@@ -291,6 +291,9 @@ section_localisation_identite = Section(
         Field("milieu", "Le lieu se situe plutôt en milieu...", FieldType.SINGLE_CHOICE,
               options=["Rural", "Semi-rural", "Urbain"], required=True),
         Field("date_ouverture", "Date (ou année) d'ouverture du lieu", FieldType.DATE),
+        Field("laureat_appel_rw", "Le lieu fait-il partie des 23 lauréats de l'appel à projets tiers-lieux "
+              "de la Région wallonne ?", FieldType.BOOLEAN,
+              condition=Condition("pays", "eq", "Belgique")),
         Field("description_courte", "En une phrase, comment décririez-vous ce lieu ?", FieldType.TEXTAREA),
         Field("avantages_localisation", "Quels avantages trouvez-vous à cette localisation ?", FieldType.TEXTAREA),
         Field("inconvenients_localisation", "Quels inconvénients trouvez-vous à cette localisation ?", FieldType.TEXTAREA),
@@ -879,14 +882,89 @@ module_impact = Module(
 # Module 3 — Diagnostic & besoins (optionnel)
 # ---------------------------------------------------------------------------
 
+# Fonctions du lieu, par grande famille — grille du formulaire d'autodiagnostic
+# Trois-Tiers (campagne "Autodiagnostic"). Une question à choix multiples par
+# famille plutôt qu'une seule liste de 30 options : plus lisible à l'écran
+# comme à l'oral, et "Aucune" explicite pour qu'une famille sans objet soit
+# une vraie réponse (sinon le choix multiple resterait vide, donc non répondu).
+AUCUNE_FONCTION = "Aucune de ces fonctions"
+FONCTIONS_PAR_FAMILLE = [
+    ("fonctions_vie_sociale", "Espace de vie sociale et communautaire", [
+        "Accueil / événementiel / auberge / bar-café / tourisme (partage et découverte)",
+        "Habitat partagé / co-living résidentiel / hébergement (logement)",
+    ]),
+    ("fonctions_fabrication", "Création, artisanat et fabrication", [
+        "Fablab / makerspace / hackerspace / ateliers numériques (fabrication)",
+        "Ateliers artisanaux partagés (artisanat)",
+        "Repair café / repair vélo (réparation)",
+    ]),
+    ("fonctions_transmission", "Transmission", [
+        "EduHub / transmission & école / campus (éducation)",
+        "LivingLab / recherche-action / laboratoire d'innovation sociale (innovation)",
+        "Lieu d'autonomie et « symbiotique », en lien au vivant / éco-construction (permaculture)",
+        "Établissement public numérique",
+    ]),
+    ("fonctions_culture", "Culture et arts", [
+        "Création artistique (résidences, centre de création, accompagnement)",
+        "Arts scéniques (salle de spectacle, diffusion théâtre, danse, musique, performances)",
+        "Arts plastiques (espace d'expo, installations)",
+        "Bibliothèque / librairie (littérature)",
+        "Festivals et activités festives",
+    ]),
+    ("fonctions_sante", "Santé et soins", [
+        "Espace santé / maison médicale (soins et médical)",
+        "Espaces pour personnes âgées / petite enfance / interactions intergénérationnelles",
+        "Médecines douces, yoga, sport collectif (santé et bien-être)",
+    ]),
+    ("fonctions_alimentation", "Alimentation et circularité", [
+        "Ressourcerie / donnerie (circularité)",
+        "Espace test d'économie circulaire pour producteurs/transformateurs (entrepreneuriat soutenable)",
+        "Tiers-lieu nourricier / ferme productive / maraîchage (production alimentaire)",
+        "Cuisine partagée / foodlab / restauration / horeca (transformation alimentaire)",
+        "Point de vente / épicerie / magasin coopératif (distribution)",
+    ]),
+    ("fonctions_services", "Services et infrastructures partagés", [
+        "Agora / services publics de proximité (poste, écrivain public…) (faire cité)",
+        "Bureaux partagés / coworking (travail)",
+        "Inclusion sociale et numérique, mixité et accueil (inclusion)",
+        "Infrastructures (mobilité partagée, outillothèque…) / logistique collective (mutualisation)",
+    ]),
+]
+
+section_diagnostic_fonctions = Section(
+    id="diagnostic_fonctions",
+    title="Diagnostic — fonctions du lieu",
+    intro="Multifonctionnalité oblige : pour chaque grande famille, cochez toutes les fonctions présentes.",
+    fields=[
+        Field(champ_id, f"{titre} — quelles fonctions le lieu accueille-t-il ?", FieldType.MULTI_CHOICE,
+              options=options + [AUCUNE_FONCTION])
+        for champ_id, titre, options in FONCTIONS_PAR_FAMILLE
+    ] + [
+        Field("fonctions_autres", "D'autres fonctions, non reprises dans ces familles ?", FieldType.TEXTAREA),
+    ],
+)
+
 section_diagnostic_vision = Section(
     id="diagnostic_vision",
     title="Diagnostic — vision et positionnement",
     fields=[
-        Field("raison_etre", "Quelle est la raison d'être du projet ? À quels besoins du territoire répond-il ?", FieldType.TEXTAREA),
-        Field("vision_5_ans", "Quelle est votre vision du lieu dans 5 ans ?", FieldType.TEXTAREA),
+        Field("raison_etre", "Quelle est la raison d'être du projet ? À quels besoins du territoire répond-il ?", FieldType.TEXTAREA,
+              help_text="Besoins spécifiques identifiés, comment ils ont été validés (consultations, "
+                        "enquêtes…), initiatives similaires et ce qui distingue le projet."),
+        Field("besoin_aide_vision", "À quel point une aide sur la raison d'être du projet ou l'identification "
+              "des besoins du territoire vous serait-elle utile ?", FieldType.SCALE_1_5),
+        Field("porteurs_motivations", "Qui sont les fondateurs et porteurs du lieu, et quelles sont leurs "
+              "motivations principales ?", FieldType.TEXTAREA,
+              help_text="Rôles et collaboration actuelle, alignement des motivations avec les objectifs, "
+                        "divergences éventuelles et comment elles sont gérées."),
+        Field("besoin_aide_equipe", "À quel point une aide sur votre équipe et l'alignement de sa vision "
+              "vous serait-elle utile ?", FieldType.SCALE_1_5),
+        Field("vision_5_ans", "Quelle est votre vision du lieu dans 5 ans ?", FieldType.TEXTAREA,
+              help_text="Réalisations espérées à 1, 3 et 5 ans, évolution des rôles, vision formalisée "
+                        "ou non et partagée avec qui."),
         Field("obstacles_anticipes", "Quels obstacles anticipez-vous pour réaliser cette vision ?", FieldType.TEXTAREA),
-        Field("besoin_aide_vision", "À quel point une aide sur la vision/le positionnement vous serait-elle utile ?", FieldType.SCALE_1_5),
+        Field("besoin_aide_feuille_de_route", "À quel point une aide sur un plan d'action et une feuille de "
+              "route vous serait-elle utile ?", FieldType.SCALE_1_5),
         Field("stade_developpement", "Parmi ces étapes, lesquelles considérez-vous comme déjà franchies par le lieu ?",
               FieldType.MULTI_CHOICE,
               options=["Vision et raison d'être établies", "Foncier acquis ou occupé", "Budget consolidé",
@@ -904,16 +982,90 @@ section_diagnostic_gouvernance = Section(
         Field("equite_repartition", "La répartition des responsabilités est-elle perçue comme équitable ?", FieldType.SINGLE_CHOICE,
               options=["Oui", "Plutôt oui", "Plutôt non", "Non", "Je ne sais pas"]),
         Field("besoin_aide_gouvernance", "À quel point une aide sur la gouvernance vous serait-elle utile ?", FieldType.SCALE_1_5),
+        Field("parties_prenantes_engagement", "Qui sont les parties prenantes impliquées dans le lieu, et quel "
+              "est leur niveau d'engagement ?", FieldType.TEXTAREA,
+              help_text="Comment elles s'impliquent (temps, expertise, financement, activités), santé des "
+                        "relations humaines, gestion des conflits, manques qui freinent le projet, "
+                        "façon d'évaluer leur engagement."),
+        Field("besoin_aide_parties_prenantes", "À quel point une aide sur l'engagement des parties prenantes "
+              "vous serait-elle utile ?", FieldType.SCALE_1_5),
+        Field("communication_interne", "Comment s'organise la communication interne ?", FieldType.TEXTAREA,
+              help_text="Outils (réunions, messageries, plateformes) et leur efficacité, problèmes déjà "
+                        "rencontrés, intégration des retours des membres dans les décisions."),
+        Field("besoin_aide_communication_interne", "À quel point une aide sur la communication interne ou "
+              "ses outils vous serait-elle utile ?", FieldType.SCALE_1_5),
+        Field("communication_externe", "Comment s'organise la communication externe ?", FieldType.TEXTAREA,
+              help_text="Médias et outils utilisés, problèmes rencontrés, notoriété, diversité du public, "
+                        "fréquentation générée par les activités."),
+        Field("besoin_aide_communication_externe", "À quel point une aide sur la communication externe ou "
+              "ses outils vous serait-elle utile ?", FieldType.SCALE_1_5),
     ],
 )
 
 section_diagnostic_swot = Section(
     id="diagnostic_swot",
-    title="Diagnostic — atouts, faiblesses, opportunités, menaces",
+    title="Diagnostic — contexte, atouts, faiblesses, opportunités, menaces",
     fields=[
+        Field("besoin_aide_partenariats", "À quel point une aide pour nouer des partenariats ou des "
+              "collaborations avec d'autres acteurs vous serait-elle utile ?", FieldType.SCALE_1_5),
+        Field("swot_realise", "Avez-vous déjà réalisé une analyse AFOM/SWOT (atouts, faiblesses, "
+              "opportunités, menaces) ?", FieldType.BOOLEAN),
         Field("atouts", "Quels sont les principaux atouts du projet ?", FieldType.TEXTAREA),
-        Field("menaces", "Quelles menaces pourraient compromettre sa pérennité ?", FieldType.TEXTAREA),
+        Field("menaces", "Quelles menaces pourraient compromettre sa pérennité ?", FieldType.TEXTAREA,
+              help_text="Et comment exploitez-vous vos opportunités pour renforcer votre positionnement ?"),
         Field("besoin_aide_analyse", "À quel point une aide sur cette analyse vous serait-elle utile ?", FieldType.SCALE_1_5),
+    ],
+)
+
+section_diagnostic_economie = Section(
+    id="diagnostic_economie",
+    title="Diagnostic — modèle économique et financement",
+    fields=[
+        Field("revenus_suffisance_risques", "Vos revenus actuels ou prévus couvrent-ils vos dépenses de base, "
+              "et quels en sont les principaux risques ?", FieldType.TEXTAREA,
+              help_text="Sources alternatives explorées, élargissement envisagé des services ou activités."),
+        Field("besoin_aide_modele_economique", "À quel point une aide sur la consolidation du modèle "
+              "économique vous serait-elle utile ?", FieldType.SCALE_1_5),
+        Field("besoins_financiers_termes", "Quels sont vos besoins financiers à court, moyen et long terme ?",
+              FieldType.TEXTAREA,
+              help_text="Postes de dépenses prioritaires (salaires, équipements, locaux), budget "
+                        "prévisionnel respecté ou non, imprévus financiers récents."),
+        Field("financement_equipements_collectifs", "Comment prévoyez-vous de financer les espaces et "
+              "équipements collectifs ?", FieldType.TEXTAREA,
+              help_text="Participation des parties prenantes au financement ou à l'entretien, aides "
+                        "publiques ou privées sollicitées et résultats, besoins d'amélioration."),
+    ],
+)
+
+section_diagnostic_amenagement = Section(
+    id="diagnostic_amenagement",
+    title="Diagnostic — lieu et aménagement",
+    fields=[
+        Field("besoins_spatiaux", "Quels sont les besoins spatiaux du lieu ?", FieldType.TEXTAREA,
+              help_text="Adéquation des espaces aux activités, organisation et gestion des espaces "
+                        "mutualisés, améliorations ou extensions envisagées, contraintes du bâti ou du "
+                        "site et solutions testées."),
+        Field("besoin_aide_amenagement", "À quel point une aide sur la conception architecturale ou le design "
+              "des espaces vous serait-elle utile ?", FieldType.SCALE_1_5),
+    ],
+)
+
+section_diagnostic_suivi = Section(
+    id="diagnostic_suivi",
+    title="Diagnostic — suivi et évaluation",
+    fields=[
+        Field("systeme_evaluation", "Disposez-vous d'un système d'évaluation pour suivre l'évolution du projet ?",
+              FieldType.TEXTAREA,
+              help_text="Indicateurs suivis, analyse des retours des usagers et parties prenantes, bilans "
+                        "ou temps de réflexion collectifs récents."),
+        Field("temps_prise_de_recul", "Prévoyez-vous des temps réguliers pour ajuster votre organisation et "
+              "votre vision ?", FieldType.TEXTAREA,
+              help_text="Temps consacré à la prise de recul, outils ou méthodes, adaptations concrètes "
+                        "qui en sont sorties."),
+        Field("besoins_formation_equipe", "Quelles formations ou quels accompagnements pourraient aider "
+              "votre équipe ?", FieldType.TEXTAREA,
+              help_text="Compétences manquantes, formations ou coaching déjà envisagés, freins ou besoins "
+                        "non exprimés."),
     ],
 )
 
@@ -923,7 +1075,12 @@ section_diagnostic_besoins_futurs = Section(
     fields=[
         Field("types_soutien_souhaites", "De quels types de soutien auriez-vous besoin ces 3 prochaines années ?",
               FieldType.MULTI_CHOICE, options=OPTIONS_SOUTIEN_ACCOMPAGNEMENT),
+        Field("soutiens_prioritaires", "Parmi ces besoins, lesquels sont prioritaires ? (5 maximum)",
+              FieldType.MULTI_CHOICE, options=OPTIONS_SOUTIEN_ACCOMPAGNEMENT, max_choices=5,
+              condition=Condition("types_soutien_souhaites", "truthy")),
         Field("priorites_principales", "Parmi ces besoins, quelles sont vos 2 à 3 priorités ?", FieldType.TEXTAREA),
+        Field("demande_specifique", "Si nécessaire, précisez votre demande : qu'est-ce qui vous serait le plus "
+              "utile ?", FieldType.TEXTAREA),
         # Distinct de "Mise en réseau avec d'autres tiers-lieux" (une
         # catégorie de besoin générale, ci-dessus) : une opportunité concrète
         # et bornée dans le temps, utile pour effectivement organiser la
@@ -983,9 +1140,13 @@ module_diagnostic = Module(
     title="Diagnostic et besoins d'accompagnement",
     optional=True,
     sections=[
+        section_diagnostic_fonctions,
         section_diagnostic_vision,
         section_diagnostic_gouvernance,
         section_diagnostic_swot,
+        section_diagnostic_economie,
+        section_diagnostic_amenagement,
+        section_diagnostic_suivi,
         section_diagnostic_besoins_futurs,
         section_expedition_ka122,
     ],

@@ -384,6 +384,25 @@ def _campagne_en_cours_pour_lieu(store, nom_lieu: str, campagnes_actives: list):
     return None, None
 
 
+def _contexte_court_campagne(campagne) -> str:
+    """Petit mot de contexte sous chaque campagne proposée : première phrase
+    de sa description (tronquée), suivie de la date de clôture."""
+    import re
+    description = (campagne.description or "").strip()
+    phrase = re.split(r"(?<=[.!?])\s|\n", description, maxsplit=1)[0].strip() if description else ""
+    if len(phrase) > 160:
+        phrase = phrase[:157].rsplit(" ", 1)[0] + "…"
+    fin = ""
+    if campagne.date_fin:
+        try:
+            from datetime import date
+            d = date.fromisoformat(str(campagne.date_fin)[:10])
+            fin = t("entretien.campagne_jusquau", date=d.strftime("%d/%m/%Y"))
+        except ValueError:
+            pass
+    return " · ".join(p for p in (phrase, fin) if p)
+
+
 def _selecteur_campagnes(campagnes_actives: list, mode_key: str, campagne_id_key: str) -> None:
     """Choix explicite parmi PLUSIEURS campagnes actives en parallèle — un
     simple bouton ne suffit plus à distinguer laquelle rejoindre. Le
@@ -392,10 +411,16 @@ def _selecteur_campagnes(campagnes_actives: list, mode_key: str, campagne_id_key
     _campagnes_actives_pertinentes dans collecte_tools.py) plutôt que de les
     fusionner toutes, comme c'était le cas avant quand une seule campagne à
     la fois pouvait être active."""
-    titres = [c.titre for c in campagnes_actives]
-    choix = st.selectbox(t("entretien.choisir_campagne_label"), options=titres, label_visibility="collapsed")
-    if st.button(t("entretien.commencer_campagne_btn"), use_container_width=True):
-        campagne = next(c for c in campagnes_actives if c.titre == choix)
+    ids = [c.id for c in campagnes_actives]
+    par_id = {c.id: c for c in campagnes_actives}
+    choix = st.radio(
+        t("entretien.choisir_campagne_label"), options=ids, index=None,
+        format_func=lambda cid: par_id[cid].titre,
+        captions=[_contexte_court_campagne(c) for c in campagnes_actives],
+        key=f"choix_campagne::{mode_key}",
+    )
+    if st.button(t("entretien.commencer_campagne_btn"), use_container_width=True, disabled=choix is None):
+        campagne = par_id[choix]
         st.session_state[mode_key] = "campagne"
         st.session_state[campagne_id_key] = campagne.id
         st.rerun()
@@ -865,20 +890,15 @@ def entretien_tab(store, user_id: str):
                     if autres_campagnes:
                         with st.expander(t("entretien.autre_campagne_expander")):
                             _selecteur_campagnes(autres_campagnes, mode_key, campagne_id_key)
-                elif len(campagnes_actives) >= 2:
-                    # Plusieurs campagnes en parallèle, aucune encore
-                    # entamée : un simple bouton ne suffit plus à distinguer
-                    # laquelle rejoindre — voir _selecteur_campagnes.
+                elif campagnes_actives:
+                    # Aucune campagne encore entamée : toutes les campagnes
+                    # en cours sont listées, chacune avec un mot de contexte,
+                    # et le répondant choisit — voir _selecteur_campagnes.
+                    st.markdown(f"**{t('entretien.mode_campagne_btn')}**")
+                    st.caption(t("entretien.mode_campagne_caption"))
                     _selecteur_campagnes(campagnes_actives, mode_key, campagne_id_key)
                 else:
-                    label_campagne = (t("entretien.mode_campagne_btn") if campagnes_actives
-                                       else t("entretien.mode_campagne_btn_vide"))
-                    if st.button(label_campagne, use_container_width=True, disabled=not campagnes_actives):
-                        st.session_state[mode_key] = "campagne"
-                        if campagnes_actives:
-                            st.session_state[campagne_id_key] = campagnes_actives[0].id
-                        st.rerun()
-                    st.caption(t("entretien.mode_campagne_caption"))
+                    st.button(t("entretien.mode_campagne_btn_vide"), use_container_width=True, disabled=True)
             with col3:
                 if st.button(t("entretien.mode_besoins_btn"), use_container_width=True):
                     st.session_state[mode_key] = "besoins"

@@ -273,6 +273,7 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
     },
     "entretien.choisir_campagne_label": {"fr": "Quelle campagne ?", "en": "Which campaign?"},
     "entretien.commencer_campagne_btn": {"fr": "Commencer", "en": "Start"},
+    "entretien.campagne_jusquau": {"fr": "jusqu'au {date}", "en": "until {date}"},
     "entretien.lien_campagne_expire": {
         "fr": "Le lien de campagne utilisé n'est plus valide (campagne terminée ou inconnue) — "
               "vous pouvez quand même contribuer ci-dessous.",
