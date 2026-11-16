@@ -1905,10 +1905,12 @@ def _tableau_repondants_campagne(admin_store, champ_ids: list, vue_partenaire: b
         return isinstance(valeur, str) and valeur.strip().lower().startswith("oui")
 
     if campagne_id:
-        # Critère strict (vue partenaire) : seuls ceux qui ont réellement
-        # répondu DANS cette campagne — sans lui, l'Autodiagnostic affichait
-        # avant même son ouverture les répondants KA122 (pays, statut,
-        # contact... sont communs aux deux campagnes).
+        # Critère strict (admin et partenaire) : seuls ceux qui ont réellement
+        # répondu DANS cette campagne (reponses.campagne_id) — sans lui,
+        # l'Autodiagnostic affichait avant même son ouverture les répondants
+        # KA122 (pays, statut, contact... sont communs aux deux campagnes).
+        # Le filtre heuristique ci-dessous ne sert plus qu'en repli, sans
+        # campagne précise.
         repondants = admin_store.get_repondants_campagne(campagne_id)
         par_repondant = {cle: reponses for cle, reponses in par_repondant.items() if cle in repondants}
     else:
@@ -1991,6 +1993,10 @@ def _tableau_repondants_campagne(admin_store, champ_ids: list, vue_partenaire: b
         "Exporter en .xlsx", data=tampon.getvalue(),
         file_name=nom_fichier,
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        # Clé propre à chaque campagne : sans elle, deux campagnes listées
+        # dans Administration produisaient deux boutons identiques (même
+        # libellé, même nom de fichier) → StreamlitDuplicateElementId.
+        key=f"export_repondants_{campagne_id or nom_fichier}_{'p' if vue_partenaire else 'a'}",
     )
 
 
@@ -2193,7 +2199,8 @@ def administration_tab(store, user_id: str) -> None:
                         key=f"export_campagne_{c.id}",
                     )
                 with st.expander(f"Voir les répondants — {c.titre}"):
-                    _tableau_repondants_campagne(admin_store, c.champ_ids)
+                    _tableau_repondants_campagne(admin_store, c.champ_ids, campagne_id=c.id,
+                                                 nom_fichier=f"repondants_{c.code or c.id}.xlsx")
                 with st.expander(f"Accès partenaires — {c.titre}"):
                     _formulaire_acces_partenaires(admin_store, c)
                 # Édition de la description seule (pas du reste de la

@@ -22,5 +22,7 @@ beautifulsoup4>=4.12.0
 reportlab>=4.2.0
 folium>=0.20.0
 streamlit-folium>=0.25.0
-# touché pour forcer un redéploiement complet côté Streamlit Cloud (incident
-# ImportError transitoire sur app.py après le commit 759030e)
+# touché pour forcer un redéploiement complet côté Streamlit Cloud (incidents :
+# ImportError transitoire sur app.py après le commit 759030e ; schema.py
+# resté en mémoire dans son ancienne version après 85ee7f7/3b3bc20 —
+# libellés et champs de la campagne Autodiagnostic inconnus en prod)
