@@ -3176,13 +3176,21 @@ def partenaire_tab(store, user_id: str) -> None:
     if admin_store is None:
         return
     email = st.session_state.get("user_email") or ""
-    visibles = campagnes_visibles(admin_store, email, _est_admin(store, user_id))
+    est_admin = _est_admin(store, user_id)
+    visibles = campagnes_visibles(admin_store, email, est_admin)
 
     col_titre, col_compte = st.columns([5, 1])
     with col_compte:
         st.caption(email)
         if st.button(t("sidebar.logout"), key="partenaire_logout", use_container_width=True):
             _deconnecter()
+        # Un admin voit par défaut la vue complète (email de compte des
+        # répondants, réponses confidentielles, contributeurs bloqués) ;
+        # l'option lui permet de vérifier exactement ce que voit un partenaire.
+        voir_comme_partenaire = est_admin and st.toggle(
+            "Voir comme un partenaire", key="admin_voir_comme_partenaire",
+        )
+    vue_partenaire = not est_admin or voir_comme_partenaire
 
     code = st.query_params.get("partenaire")
     campagne = campagne_demandee(visibles, code)
@@ -3217,10 +3225,18 @@ def partenaire_tab(store, user_id: str) -> None:
 
     onglet_repondants, onglet_questions = st.tabs(["Répondants et réponses", "Questions"])
     with onglet_repondants:
-        st.caption("Une ligne par personne ayant répondu dans le cadre de cette campagne. Les réponses "
-                   "marquées confidentielles par les répondants ne sont pas affichées.")
+        if vue_partenaire:
+            st.caption("Une ligne par personne ayant répondu dans le cadre de cette campagne. Les réponses "
+                       "marquées confidentielles par les répondants ne sont pas affichées.")
+        else:
+            acces = admin_store.list_acces_partenaires(campagne.id)
+            st.info(
+                "Vue complète (admin) : email de compte des répondants et réponses confidentielles "
+                "inclus. Partenaires ayant accès : " + (", ".join(acces) if acces else "aucun pour l'instant")
+                + "."
+            )
         _tableau_repondants_campagne(
-            admin_store, campagne.champ_ids, vue_partenaire=True,
+            admin_store, campagne.champ_ids, vue_partenaire=vue_partenaire,
             nom_fichier=f"repondants_{campagne.code or 'campagne'}.xlsx", campagne_id=campagne.id,
         )
     with onglet_questions:
