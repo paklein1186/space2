@@ -395,7 +395,14 @@ section_services_detailles = Section(
                        "Service de restauration", "Fablab / makerspace / hackerspace", "Atelier(s) pour artisans",
                        "Domiciliation d'entreprises", "Accompagnement d'entreprises / accueil de structures d'accompagnement",
                        "Accueil d'associations", "Événements culturels", "Événements professionnels",
-                       "Formations (para)professionnelles", "Aucun de ceux-ci", "Autre"]),
+                       "Formations (para)professionnelles",
+                       # Lignes ajoutées par la version « tiers-lieux ruraux » du
+                       # questionnaire gestionnaires ULiège (campagne_gestionnaires.py).
+                       "Ateliers et formations (grand public)",
+                       "Espaces de bien-être (yoga, sport, médecine alternative)",
+                       "Espaces de santé et de soin (maison médicale, petite enfance, personnes âgées)",
+                       "Production alimentaire (maraîchage, transformation, distribution, cuisine ou jardins partagés)",
+                       "Aucun de ceux-ci", "Autre"]),
         Field("nombre_entreprises_domiciliees", "Combien d'entreprises sont domiciliées au lieu ?", FieldType.NUMBER,
               condition=Condition("services_proposes", "contains", "Domiciliation d'entreprises")),
         Field("nombre_associations_accueillies", "Combien d'associations sont accueillies au lieu ?", FieldType.NUMBER,
@@ -491,8 +498,10 @@ section_foncier = Section(
               condition=Condition("statut_occupation", "ne", "Propriétaire"), roles=ROLES_INTERNES,
               options=["Collectivité publique", "Bailleur social", "Propriétaire privé", "Opérateur public", "Autre"]),
         Field("lieu_inoccupe_avant", "Ce lieu était-il inoccupé juste avant votre arrivée ?", FieldType.BOOLEAN),
-        Field("ancienne_occupation", "Quelle était son occupation précédente ?", FieldType.TEXT,
-              condition=Condition("lieu_inoccupe_avant", "eq", False)),
+        # Sans condition : même inoccupé à l'arrivée, un lieu a une ancienne
+        # occupation (école désaffectée, ancienne gare...) — le questionnaire
+        # gestionnaires ULiège la demande dans tous les cas.
+        Field("ancienne_occupation", "Quelle était l'ancienne occupation du lieu ?", FieldType.TEXT),
     ],
 )
 
@@ -674,10 +683,11 @@ section_modele_economique = Section(
         Field("difficulte_financiere_actuelle", "Le lieu traverse-t-il actuellement une difficulté financière ?",
               FieldType.BOOLEAN, roles=ROLES_INTERNES),
         Field("chiffre_affaires_annuel", "Quel est le chiffre d'affaires annuel approximatif du lieu (€) ?",
-              FieldType.NUMBER, roles=ROLES_INTERNES),
+              FieldType.NUMBER, roles=ROLES_INTERNES,
+              help_text="HTVA, sur l'année écoulée — celui du lieu lui-même, pas celui des usagers qu'il héberge."),
         Field("resultat_annuel", "Quel est le résultat annuel approximatif (bénéfice ou perte, en €) ?",
               FieldType.NUMBER, roles=ROLES_INTERNES,
-              help_text="Un nombre négatif pour une perte."),
+              help_text="Sur l'année écoulée, celui du lieu lui-même (pas des usagers). Un nombre négatif pour une perte."),
         Field("pourcentage_subside_rentrees", "Quelle part (%) des rentrées du lieu provient de subsides ?",
               FieldType.NUMBER, roles=ROLES_INTERNES,
               help_text="Aide à situer si le modèle atteint l'équilibre sans subside ou non."),
@@ -1156,8 +1166,209 @@ module_diagnostic = Module(
 QUESTIONNAIRE = [module_socle, module_impact, module_diagnostic]
 
 
+# ---------------------------------------------------------------------------
+# Questions propres aux enquêtes (campagnes uniquement)
+# ---------------------------------------------------------------------------
+# Grilles détaillées du questionnaire gestionnaires ULiège (versions
+# « coworkings » et « tiers-lieux ruraux », voir campagne_gestionnaires.py) :
+# une question par ligne de grille, pour que l'export donne une colonne par
+# ligne, comme le questionnaire papier. Trop détaillées pour l'entretien
+# général : ce module n'est PAS dans QUESTIONNAIRE (jamais proposé dans le
+# parcours, absent du taux de complétion), mais ses champs sont connus de
+# get_field / field_label / all_fields, donc utilisables par les campagnes.
+
+OUI_NON_EVENTUELLEMENT = ["Oui", "Non", "Éventuellement"]
+TENDANCE_3_ANS = ["Augmente", "Se maintient", "Baisse"]
+PART_COMPAREE_3_ANS = ["Davantage", "La même part", "Moins"]
+
+# (champ_id, fréquence de venue) — parts en %, qui somment à ~100.
+PARTS_FREQUENCE_VENUE = [
+    ("part_usagers_quotidiens", "quotidienne"),
+    ("part_usagers_2_4_par_semaine", "deux à quatre fois par semaine"),
+    ("part_usagers_hebdomadaires", "une fois par semaine"),
+    ("part_usagers_quelques_fois_par_mois", "quelques fois par mois"),
+    ("part_usagers_mensuels_ou_moins", "une fois par mois ou moins"),
+]
+
+# (champ_id, statut) — la ligne « riverains » n'existe que dans la version
+# tiers-lieux ruraux.
+STATUTS_USAGERS_PARTS = [
+    ("part_statut_independant_principal", "indépendants à titre principal"),
+    ("part_statut_independant_complementaire", "indépendants à titre complémentaire"),
+    ("part_statut_freelance", "freelances"),
+    ("part_statut_salarie", "salariés"),
+    ("part_statut_etudiant", "étudiants"),
+    ("part_statut_sans_emploi", "sans emploi"),
+    ("part_statut_membre_association", "membres d'une association"),
+    ("part_statut_dirigeant_entreprise", "dirigeants d'entreprise (avec salariés)"),
+    ("part_statut_riverain", "riverains"),
+]
+
+EVOLUTION_PROVENANCE_3_ANS = [
+    ("evolution_part_usagers_commune", "de la même commune"),
+    ("evolution_part_usagers_limitrophes", "des communes limitrophes"),
+    ("evolution_part_usagers_plus_loin", "de plus loin"),
+]
+
+EVOLUTION_PROFIL_3_ANS = [
+    ("evolution_part_salaries", "de salariés"),
+    ("evolution_part_freelances", "de freelances"),
+    ("evolution_part_independants_principal", "d'indépendants à titre principal"),
+    ("evolution_part_independants_complementaire", "d'indépendants à titre complémentaire"),
+]
+
+# (champ_id, raison de venue) — les 11 premières sont communes aux deux
+# versions ; les suivantes propres à l'une ou l'autre (voir
+# campagne_gestionnaires.py).
+MOTIFS_VENUE = [
+    ("motif_pas_de_place_domicile", "parce qu'ils n'ont pas de place à domicile"),
+    ("motif_ambiance_contacts", "pour l'ambiance et les contacts sociaux"),
+    ("motif_teletravail", "pour télétravailler"),
+    ("motif_soutien_lieu", "par soutien au lieu (au coworking, au tiers-lieu)"),
+    ("motif_collaborer", "pour collaborer avec d'autres personnes qui fréquentent le lieu"),
+    ("motif_recevoir_collaborateurs", "pour recevoir des collaborateurs externes"),
+    ("motif_recevoir_clients", "pour recevoir des clients"),
+    ("motif_installer_activite", "pour y installer leur activité ou leur entreprise"),
+    ("motif_reunions", "pour y mener des réunions"),
+    ("motif_domicilier_activite", "pour y domicilier leur activité"),
+    ("motif_eviter_domiciliation_domicile", "pour ne pas domicilier leur activité à leur domicile"),
+    ("motif_animations_extraprofessionnelles", "pour les animations extraprofessionnelles"),
+    ("motif_formations_professionnelles", "pour des formations (para)professionnelles"),
+    ("motif_evenements_recreatifs", "pour les événements ou autres activités (ré)créatives"),
+    ("motif_ateliers_formations", "pour des ateliers et formations"),
+    ("motif_acheter_produits", "pour acheter des produits"),
+    ("motif_boire_manger", "pour prendre un verre ou manger"),
+]
+
+METIERS_TIERS_LIEU = [
+    "Chargé·e de communication", "Facilitateur·rice / coordinateur·rice",
+    "Assistant·e / responsable administratif·ve et financier·e", "Chef·fe / responsable de projet",
+    "Chargé·e de programmation et de la vie du lieu", "Chargé·e d'accueil et conciergerie",
+    "Maintenance / entretien des locaux", "Médiateur·rice (culturel, numérique…)",
+    "Fabmanager / chef·fe d'atelier / animateur·rice maker", "Support informatique / numérique",
+    "Chargé·e de l'aménagement des espaces / jardinier·e", "Régisseur·se", "Autre",
+]
+
+
+def _options_evolution_frequentation(periode: str) -> list:
+    return [
+        f"Les usagers viennent plus souvent par {periode}",
+        f"Les usagers viennent moins souvent par {periode}",
+        "Hausse réelle du nombre d'usagers",
+        "Baisse réelle du nombre d'usagers",
+        f"Venues moins fréquentes par {periode}, compensées par davantage d'usagers : fréquentation plutôt stable",
+        f"Venues plus fréquentes par {periode}, compensées par moins d'usagers : fréquentation plutôt stable",
+        "Pas de changement notable (ni nombre d'usagers, ni fréquence de venue)",
+        "Autre",
+    ]
+
+
+_EXISTAIT_3_ANS = Condition("lieu_existait_3_ans", "eq", True)
+
+section_enquete_lieu = Section(
+    id="enquete_lieu",
+    title="Enquête gestionnaires — le lieu",
+    fields=[
+        Field("initiateurs_projet", "Qui est à l'origine du projet ? (plusieurs réponses possibles)",
+              FieldType.MULTI_CHOICE,
+              options=["Citoyens", "Association existante", "Entrepreneur(s)", "Entreprise", "Collectif",
+                       "Collectivité publique (commune, province, région)", "Université / haute école", "Autre"]),
+        Field("lieu_existait_3_ans", "Le lieu existait-il déjà il y a trois ans ?", FieldType.BOOLEAN,
+              help_text="Les questions d'évolution sur trois ans ne sont posées que si oui."),
+        Field("partenariats_acteurs_locaux", "Le lieu a-t-il des partenariats, ou organise-t-il des événements, "
+              "avec d'autres institutions ou acteurs locaux ?", FieldType.BOOLEAN),
+        Field("partenariats_acteurs_locaux_detail", "Lesquels ?", FieldType.TEXTAREA,
+              condition=Condition("partenariats_acteurs_locaux", "eq", True)),
+    ],
+)
+
+section_enquete_usagers = Section(
+    id="enquete_usagers",
+    title="Enquête gestionnaires — usagers",
+    fields=[
+        *[Field(champ_id, f"Quelle part de vos usagers vient de façon {frequence} (en %) ?", FieldType.NUMBER,
+                help_text="Estimation arrondie ; les cinq parts (quotidienne, 2 à 4 fois par semaine, "
+                          "hebdomadaire, quelques fois par mois, mensuelle ou moins) font environ 100 %.")
+          for champ_id, frequence in PARTS_FREQUENCE_VENUE],
+        Field("frequence_usagers_commentaire", "Un commentaire sur la fréquence de venue de vos usagers ? "
+              "(facultatif)", FieldType.TEXTAREA),
+        Field("usagers_mode_autre", "Vos usagers utilisent-ils un autre mode de déplacement ? Lequel, et pour "
+              "quelle part (nulle, limitée, peu élevée, assez élevée, très élevée) ?", FieldType.TEXT),
+        *[Field(champ_id, f"Par rapport à il y a trois ans, la part d'usagers venant {origine}…",
+                FieldType.SINGLE_CHOICE, options=TENDANCE_3_ANS, condition=_EXISTAIT_3_ANS)
+          for champ_id, origine in EVOLUTION_PROVENANCE_3_ANS],
+        *[Field(champ_id, f"Quelle part de vos usagers vient en tant que {statut} ?", FieldType.SINGLE_CHOICE,
+                options=BANDE_INTENSITE)
+          for champ_id, statut in STATUTS_USAGERS_PARTS],
+        Field("part_statut_autre", "D'autres statuts sont-ils représentés parmi vos usagers ? Lesquels, et "
+              "pour quelle part ?", FieldType.TEXT),
+        *[Field(champ_id, f"Par rapport à il y a trois ans, y a-t-il davantage, la même part ou moins {profil} "
+                          "parmi vos usagers ?", FieldType.SINGLE_CHOICE,
+                options=PART_COMPAREE_3_ANS, condition=_EXISTAIT_3_ANS)
+          for champ_id, profil in EVOLUTION_PROFIL_3_ANS],
+        *[Field(champ_id, f"Vos usagers viennent-ils {motif} ?", FieldType.SINGLE_CHOICE,
+                options=OUI_NON_EVENTUELLEMENT,
+                help_text="« Oui » si cette raison vous a été mentionnée, ou si vous l'avez constatée, à "
+                          "plusieurs reprises.")
+          for champ_id, motif in MOTIFS_VENUE],
+        Field("motif_autre", "D'autres raisons de venue reviennent-elles ? Lesquelles (oui ou éventuellement) ?",
+              FieldType.TEXT),
+        Field("frequentation_mois_type",
+              "Sur un mois moyen, combien de passages estimez-vous (une même personne comptée à chaque "
+              "jour où elle vient) ?", FieldType.NUMBER),
+        Field("evolution_frequentation_semaine",
+              "Par rapport à il y a trois ans, qu'est-ce qui décrit le mieux l'évolution de la fréquentation ?",
+              FieldType.MULTI_CHOICE, options=_options_evolution_frequentation("semaine"),
+              condition=_EXISTAIT_3_ANS),
+        Field("evolution_frequentation_mois",
+              "Par rapport à il y a trois ans, qu'est-ce qui décrit le mieux l'évolution de la fréquentation ?",
+              FieldType.MULTI_CHOICE, options=_options_evolution_frequentation("mois"),
+              condition=_EXISTAIT_3_ANS),
+    ],
+)
+
+section_enquete_economie = Section(
+    id="enquete_economie_emploi",
+    title="Enquête gestionnaires — impact économique et emploi",
+    fields=[
+        Field("ca_activites_hebergees", "Quel est le chiffre d'affaires HTVA annuel total, sur l'année écoulée, "
+              "de toutes les activités (usagers fixes) présentes dans le lieu (€) ?", FieldType.NUMBER,
+              roles=ROLES_INTERNES),
+        Field("resultat_activites_hebergees", "Quel est le résultat annuel total, sur l'année écoulée, de toutes "
+              "les activités (usagers fixes) présentes dans le lieu (€) ?", FieldType.NUMBER,
+              roles=ROLES_INTERNES, help_text="Un nombre négatif pour une perte."),
+        Field("ca_resultat_par_activite", "Pouvez-vous préciser le chiffre d'affaires HTVA et le résultat de "
+              "l'année écoulée pour chaque activité ou usager fixe hébergé ?", FieldType.TEXTAREA,
+              roles=ROLES_INTERNES),
+        Field("metiers_tiers_lieu", "Parmi ces métiers, lesquels sont exercés dans le lieu ? "
+              "(plusieurs réponses possibles)", FieldType.MULTI_CHOICE, options=METIERS_TIERS_LIEU,
+              roles=ROLES_INTERNES),
+        Field("metiers_tiers_lieu_autre", "Quel(s) autre(s) métier(s) ?", FieldType.TEXT, roles=ROLES_INTERNES,
+              condition=Condition("metiers_tiers_lieu", "contains", "Autre")),
+        Field("nombre_structures_hebergees", "Combien d'entreprises, d'associations ou de projets sont hébergés "
+              "dans le lieu ?", FieldType.NUMBER, roles=ROLES_INTERNES),
+        Field("etp_activites_hebergees", "Combien d'équivalents temps plein (ETP) comptent, au total, toutes les "
+              "activités / usagers fixes hébergés dans le lieu ?", FieldType.NUMBER, roles=ROLES_INTERNES),
+        Field("nombre_benevoles_annee", "Combien de bénévoles se sont engagés dans le lieu au cours de l'année "
+              "écoulée ?", FieldType.NUMBER, roles=ROLES_INTERNES),
+        Field("nombre_adherents_actuels", "Combien d'adhérents ou de coopérateurs le lieu compte-t-il "
+              "actuellement ?", FieldType.NUMBER, roles=ROLES_INTERNES, help_text="0 s'il n'y en a pas."),
+    ],
+)
+
+module_enquetes = Module(
+    id="enquetes",
+    title="Questions propres aux enquêtes (campagnes uniquement)",
+    optional=True,
+    sections=[section_enquete_lieu, section_enquete_usagers, section_enquete_economie],
+)
+
+# Hors parcours : voir le commentaire en tête de cette partie.
+MODULES_CAMPAGNES = [module_enquetes]
+
+
 def all_fields():
-    for module in QUESTIONNAIRE:
+    for module in QUESTIONNAIRE + MODULES_CAMPAGNES:
         for section in module.sections:
             for f in section.fields:
                 yield module, section, f

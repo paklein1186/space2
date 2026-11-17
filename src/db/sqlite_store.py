@@ -811,6 +811,16 @@ class SqliteStore(Store):
         ).fetchall()
         return {(r["tiers_lieu_id"], r["contributeur_id"]) for r in rows}
 
+    def get_champs_repondus_en_campagne(self, tiers_lieu_id: str, campagne_ids: list) -> set:
+        if not campagne_ids:
+            return set()
+        marques = ",".join("?" for _ in campagne_ids)
+        rows = self.conn.execute(
+            f"select distinct champ_id from reponses where tiers_lieu_id = ? and campagne_id in ({marques})",
+            (tiers_lieu_id, *campagne_ids),
+        ).fetchall()
+        return {r["champ_id"] for r in rows}
+
     def campagne_ids_pour_partenaire(self, email: str) -> list:
         cible = normaliser_emails([email])
         if not cible:

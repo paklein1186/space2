@@ -529,6 +529,14 @@ class Store(ABC):
         ...
 
     @abstractmethod
+    def get_champs_repondus_en_campagne(self, tiers_lieu_id: str, campagne_ids: list) -> set:
+        """Champs de CE lieu ayant reçu une réponse dans l'une de ces
+        campagnes (reponses.campagne_id), tous contributeurs confondus —
+        sert à savoir si une donnée préexistante a déjà été confirmée dans la
+        campagne (voir CollecteToolHandler, champs à confirmer)."""
+        ...
+
+    @abstractmethod
     def campagne_ids_pour_partenaire(self, email: str) -> list:
         """Ids des campagnes que cet email est autorisé à consulter."""
         ...

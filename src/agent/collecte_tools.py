@@ -24,6 +24,7 @@ from ..questionnaire.resolver import (
     resolve_section_fields,
     section_is_complete,
 )
+from ..questionnaire.campagne_gestionnaires import CHAMPS_A_CONFIRMER_PAR_CODE
 from ..questionnaire.schema import (
     QUESTIONNAIRE, FieldType, Role, all_fields, get_field, get_module, get_section,
 )
@@ -73,6 +74,26 @@ CODA_CLOTURE_BESOINS = (
     "— ça nous aide à mieux cerner vos obstacles et à vous orienter vers les bonnes ressources. "
     "Vous préférez continuer maintenant, ou on s'arrête là pour l'instant ?"
 )
+
+
+TYPES_CHOIX_RAPIDE = {"boolean", "single_choice", "multi_choice", "scale_1_5"}
+
+
+def champs_choix_rapide(section: Optional[dict]) -> list:
+    """Questions à proposer dans le panneau de sélection rapide (cases à
+    cocher, boutons) pour une section renvoyée par get_current_section.
+
+    En mode campagne, l'agent pose les questions dans l'ordre reçu : le
+    panneau ne montre que la PREMIÈRE question restante, et seulement si
+    c'est une question à choix. Avant, il montrait la première question à
+    choix de la liste, même quand l'agent posait une question ouverte placée
+    avant elle — le répondant voyait alors les cases d'une question pas
+    encore posée (fréquent dans une enquête qui alterne questions ouvertes
+    et grilles)."""
+    fields = (section or {}).get("fields", [])
+    if (section or {}).get("module_id") == PRIORITY_MODULE_ID:
+        return fields[:1] if fields and fields[0]["type"] in TYPES_CHOIX_RAPIDE else []
+    return [f for f in fields if f["type"] in TYPES_CHOIX_RAPIDE]
 
 
 def texte_intro_campagne(campagne) -> str:
@@ -461,6 +482,20 @@ class CollecteToolHandler:
         # structurées), donc rien d'autre ne marque qu'elles sont déjà
         # traitées d'un appel à l'autre.
         self._libres_repondues: set = set()
+        # Champs déjà connus pour le lieu (import, entretien précédent) que
+        # la campagne fait CONFIRMER plutôt que sauter (voir
+        # CHAMPS_A_CONFIRMER_PAR_CODE) : ils restent à poser tant qu'aucune
+        # réponse n'a été donnée DANS la campagne — y compris lors d'une
+        # session précédente, d'où la lecture en base.
+        self._champs_a_confirmer: set = set()
+        self._champs_confirmes: set = set()
+        if self.mode_entretien == "campagne":
+            campagnes = self._campagnes_actives_pertinentes()
+            for c in campagnes:
+                self._champs_a_confirmer |= set(CHAMPS_A_CONFIRMER_PAR_CODE.get(c.code or "", ()))
+            if self._champs_a_confirmer:
+                self._champs_confirmes = self.store.get_champs_repondus_en_campagne(
+                    self.tiers_lieu_id, [c.id for c in campagnes])
 
     def campagne_completion(self) -> Optional[dict]:
         """% de complétion du formulaire de campagne prioritaire en cours —
@@ -531,6 +566,11 @@ class CollecteToolHandler:
         fiable, explicitement validé par un répondant), puis en repli dans le
         résumé synthétisé (lieu_derive.donnees['resume'], génération
         automatique moins sûre mais mieux que rien)."""
+        if champ_id in self._champs_a_confirmer and champ_id not in self._champs_confirmes:
+            valeur = answers.get(champ_id)
+            if valeur not in (None, "", []):
+                return ", ".join(map(str, valeur)) if isinstance(valeur, list) else str(valeur)
+            return None
         champ_source = CHAMPS_AVEC_BROUILLON_CONNU.get(champ_id)
         if not champ_source:
             return None
@@ -578,6 +618,8 @@ class CollecteToolHandler:
         pour la session en cours seulement (voir _libres_repondues)."""
         if champ_id.startswith("libre::"):
             return champ_id in self._libres_repondues
+        if champ_id in self._champs_a_confirmer and champ_id not in self._champs_confirmes:
+            return False
         return answers.get(champ_id) is not None
 
     def _section_cloture_priorite(self) -> dict:
@@ -802,6 +844,8 @@ class CollecteToolHandler:
                 self.tiers_lieu_id, self.contributeur_id, champ_id, valeur, confidentiel,
                 campagne_id=self.campagne_id if self.mode_entretien == "campagne" else None,
             )
+            if champ_id in self._champs_a_confirmer:
+                self._champs_confirmes.add(champ_id)
             if champ_id in ("pays", "region") and valeur:
                 # Synchronise vers la fiche du lieu elle-même (tiers_lieux.pays/
                 # region), pas seulement la réponse structurée — sans ça, un lieu

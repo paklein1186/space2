@@ -747,6 +747,16 @@ class SupabaseStore(Store):
             return set()  # colonne campagne_id absente (avant migration_017)
         return {(l["tiers_lieu_id"], l["contributeur_id"]) for l in lignes}
 
+    def get_champs_repondus_en_campagne(self, tiers_lieu_id: str, campagne_ids: list) -> set:
+        if not campagne_ids:
+            return set()
+        try:
+            result = (self.client.table("reponses").select("champ_id")
+                      .eq("tiers_lieu_id", tiers_lieu_id).in_("campagne_id", list(campagne_ids)).execute())
+        except Exception:
+            return set()  # colonne campagne_id absente (avant migration_017)
+        return {r["champ_id"] for r in result.data}
+
     def campagne_ids_pour_partenaire(self, email: str) -> list:
         cible = normaliser_emails([email])
         if not cible:

@@ -33,6 +33,7 @@ from src.agent.collecte_tools import (
     CODA_CLOTURE_CAMPAGNE,
     MESSAGE_CLOTURE_GENERIQUE,
     CollecteToolHandler,
+    champs_choix_rapide,
     texte_intro_campagne,
 )
 from src.annuaire import (
@@ -53,7 +54,7 @@ from src.db.store import Litige
 from src.donnees_observatoire import donnees_annuaire, prechargement_annuaire, prechargement_observatoire
 from src.i18n import language_toggle, t, t_categorie
 from src.questionnaire.resolver import campagne_completion_stats, completion_stats, country_code_for
-from src.questionnaire.schema import QUESTIONNAIRE, CATEGORIES_POSSIBLES, FieldType, Role, all_fields, get_field
+from src.questionnaire.schema import MODULES_CAMPAGNES, QUESTIONNAIRE, CATEGORIES_POSSIBLES, FieldType, Role, all_fields, get_field
 from src.theme import apply_theme
 from src.voice_input import bouton_dictee, consume_voice_transcript
 
@@ -543,8 +544,6 @@ def _transmettre_source_entretien(store, state: dict, nom_lieu: str, texte_brut:
     st.rerun()
 
 
-TYPES_CHOIX_RAPIDE = {"boolean", "single_choice", "multi_choice", "scale_1_5"}
-
 
 def _soumettre_reponse_rapide(store, state: dict, champ_id: str, label: str, valeur) -> None:
     """Enregistre directement (comme le ferait l'agent via save_answer, sans
@@ -622,7 +621,7 @@ def _panneau_choix_rapide(store, state: dict) -> None:
         section = state["agent"].tool_handler.execute("get_current_section", {})
     except Exception:
         return
-    champs = [f for f in (section or {}).get("fields", []) if f["type"] in TYPES_CHOIX_RAPIDE]
+    champs = champs_choix_rapide(section)
     if not champs:
         return
     # Plus d'expander : ce panneau vit désormais dans la colonne d'outils à
@@ -1944,7 +1943,12 @@ def _tableau_repondants_campagne(admin_store, champ_ids: list, vue_partenaire: b
     # même s'il franchit par coïncidence le seuil de 3 champs ci-dessus.
     from src.db.migrate_sqlite_to_supabase import SERVICE_ACCOUNTS_EMAIL_DOMAIN
 
+    from src.questionnaire.export import colonnes_par_option
+
     lignes_tableau = []
+    # Même contenu, mais chaque choix multiple éclaté en une colonne par
+    # option — seconde feuille de l'export Excel, pour l'analyse.
+    lignes_detail = []
     for (tlid, cid), reponses in par_repondant.items():
         contributeur = contributeurs_par_lieu.get(cid)
         email = emails.get(contributeur.user_id, "—") if contributeur else "—"
@@ -1958,6 +1962,7 @@ def _tableau_repondants_campagne(admin_store, champ_ids: list, vue_partenaire: b
         }
         if not vue_partenaire:
             ligne["Email"] = email
+        ligne_detail = dict(ligne)
         for champ_id in champs_schema:
             valeur = reponses.get(champ_id)
             if valeur is None:
@@ -1971,7 +1976,13 @@ def _tableau_repondants_campagne(admin_store, champ_ids: list, vue_partenaire: b
             else:
                 texte = str(valeur) if valeur not in (None, "") else "—"
             ligne[field_label(champ_id)] = texte
+            eclatees = colonnes_par_option(champ_id, valeur)
+            if eclatees is None:
+                ligne_detail[field_label(champ_id)] = texte
+            else:
+                ligne_detail.update(eclatees)
         lignes_tableau.append(ligne)
+        lignes_detail.append(ligne_detail)
 
     if not lignes_tableau:
         if campagne_id:
@@ -1989,6 +2000,7 @@ def _tableau_repondants_campagne(admin_store, champ_ids: list, vue_partenaire: b
     tampon = io.BytesIO()
     with pd.ExcelWriter(tampon, engine="openpyxl") as writer:
         df_repondants.to_excel(writer, index=False, sheet_name="Répondants")
+        pd.DataFrame(lignes_detail).to_excel(writer, index=False, sheet_name="Une colonne par choix")
     st.download_button(
         "Exporter en .xlsx", data=tampon.getvalue(),
         file_name=nom_fichier,
@@ -2784,8 +2796,10 @@ def administration_tab(store, user_id: str) -> None:
             )
 
     with st.expander("Schéma de l'entretien (lecture seule)", expanded=False):
-        for module in QUESTIONNAIRE:
-            st.markdown(f"#### {module.title} {'· optionnel' if module.optional else '· obligatoire'}")
+        for module in QUESTIONNAIRE + MODULES_CAMPAGNES:
+            statut = ("· hors entretien, campagnes uniquement" if module in MODULES_CAMPAGNES
+                      else "· optionnel" if module.optional else "· obligatoire")
+            st.markdown(f"#### {module.title} {statut}")
             for section in module.sections:
                 cond = _condition_text(section.condition)
                 titre_section = f"{section.title}" + (f" — actif si {cond}" if cond else "")

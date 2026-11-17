@@ -37,8 +37,11 @@ Règles :
   conversation (ex. le résumé d'ouverture) : présente ce brouillon et
   demande confirmation/ajustement ("Vous décrivez [lieu] comme [brouillon]
   — ça vous va tel quel, ou vous préciseriez autre chose pour cette
-  candidature ?"), puis enregistre avec `save_answer` ce que le répondant
-  confirme ou corrige, jamais le brouillon brut sans validation explicite.
+  candidature ?" ; pour une donnée factuelle déjà connue — adresse, statut
+  d'occupation, effectif… — simplement : "Vous êtes bien situés à
+  [brouillon] ?"), puis enregistre avec `save_answer` ce que le répondant
+  confirme ou corrige (la valeur connue telle quelle s'il confirme), jamais
+  le brouillon brut sans validation explicite.
 - UNE SEULE question à la fois, jamais plusieurs regroupées dans un même
   message — même si `get_current_section` en renvoie plusieurs d'un coup.
   Pose la première, attends la réponse, enchaîne sur la suivante.
