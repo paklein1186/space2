@@ -396,7 +396,7 @@ section_services_detailles = Section(
                        "Domiciliation d'entreprises", "Accompagnement d'entreprises / accueil de structures d'accompagnement",
                        "Accueil d'associations", "Événements culturels", "Événements professionnels",
                        "Formations (para)professionnelles",
-                       # Lignes ajoutées par la version « tiers-lieux ruraux » du
+                       # Lignes ajoutées par la version « tiers-lieux » du
                        # questionnaire gestionnaires ULiège (campagne_gestionnaires.py).
                        "Ateliers et formations (grand public)",
                        "Espaces de bien-être (yoga, sport, médecine alternative)",
@@ -1170,7 +1170,7 @@ QUESTIONNAIRE = [module_socle, module_impact, module_diagnostic]
 # Questions propres aux enquêtes (campagnes uniquement)
 # ---------------------------------------------------------------------------
 # Grilles détaillées du questionnaire gestionnaires ULiège (versions
-# « coworkings » et « tiers-lieux ruraux », voir campagne_gestionnaires.py) :
+# « coworkings » et « tiers-lieux », voir campagne_gestionnaires.py) :
 # une question par ligne de grille, pour que l'export donne une colonne par
 # ligne, comme le questionnaire papier. Trop détaillées pour l'entretien
 # général : ce module n'est PAS dans QUESTIONNAIRE (jamais proposé dans le
@@ -1191,7 +1191,7 @@ PARTS_FREQUENCE_VENUE = [
 ]
 
 # (champ_id, statut) — la ligne « riverains » n'existe que dans la version
-# tiers-lieux ruraux.
+# tiers-lieux.
 STATUTS_USAGERS_PARTS = [
     ("part_statut_independant_principal", "indépendants à titre principal"),
     ("part_statut_independant_complementaire", "indépendants à titre complémentaire"),

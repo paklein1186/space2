@@ -1,7 +1,7 @@
 """Campagnes « Enquête gestionnaires » — reprise conversationnelle du
 questionnaire gestionnaires (version du 11/08/2026, fichier « Questionnaire
 gestionnaires_v11082026_ELA.docx »), en deux versions :
-coworkings et tiers-lieux ruraux, plus le bloc « impact économique et emploi »
+coworkings et tiers-lieux, plus le bloc « impact économique et emploi »
 proposé en annexe du document.
 
 Une campagne n'est qu'une liste ordonnée de champs du schéma. Les questions
@@ -14,7 +14,7 @@ vivent dans le module hors parcours `module_enquetes` de schema.py.
 Différences entre les deux versions : lignes propres à chacune dans l'offre
 du lieu (options communes, voir services_proposes), les statuts (riverains),
 les raisons de venue, et la fréquentation (par semaine pour un coworking, par
-mois pour un tiers-lieu rural).
+mois pour un tiers-lieu).
 
 `python3 -m src.questionnaire.campagne_gestionnaires --debut AAAA-MM-JJ --fin
 AAAA-MM-JJ` crée les deux campagnes en base (ou les met à jour, par code)."""
@@ -144,16 +144,18 @@ COWORKINGS = DefinitionCampagne(
                                "frequentation_semaine_type", "evolution_frequentation_semaine")),
 )
 
-TIERS_LIEUX_RURAUX = DefinitionCampagne(
+TIERS_LIEUX = DefinitionCampagne(
+    # Code d'origine conservé : le lien ?campagne=gestionnaires-tiers-lieux-ruraux
+    # a déjà été diffusé avant que l'enquête ne s'adresse à tous les tiers-lieux.
     code="gestionnaires-tiers-lieux-ruraux",
-    titre="Enquête gestionnaires — tiers-lieux ruraux",
-    description=_DESCRIPTION_COMMUNE.format(objet="les tiers-lieux ruraux", cible="de tiers-lieux ruraux"),
-    message_cloture=_MESSAGE_CLOTURE.format(objet="tiers-lieux ruraux"),
+    titre="Enquête gestionnaires — tiers-lieux",
+    description=_DESCRIPTION_COMMUNE.format(objet="les tiers-lieux", cible="de tiers-lieux"),
+    message_cloture=_MESSAGE_CLOTURE.format(objet="tiers-lieux"),
     champ_ids=tuple(_champ_ids(STATUTS_TIERS_LIEU, MOTIFS_TIERS_LIEU,
                                "frequentation_mois_type", "evolution_frequentation_mois")),
 )
 
-CAMPAGNES = (COWORKINGS, TIERS_LIEUX_RURAUX)
+CAMPAGNES = (COWORKINGS, TIERS_LIEUX)
 
 # Données souvent déjà connues (imports : nom et adresse pour presque tous
 # les lieux) qu'on fait valider plutôt que sauter : sans ça, une adresse

@@ -1,4 +1,4 @@
-"""Campagnes « Enquête gestionnaires » (coworkings / tiers-lieux ruraux,
+"""Campagnes « Enquête gestionnaires » (coworkings / tiers-lieux,
 src/questionnaire/campagne_gestionnaires.py), sans réseau ni appel LLM :
 - toutes leurs questions existent, sans doublon ni libellé en double ;
 - les grilles détaillées restent hors de l'entretien général ;
@@ -57,16 +57,16 @@ def main():
               d.champ_ids.index("lieu_existait_3_ans")
               < min(d.champ_ids.index(c) for c in d.champ_ids if c.startswith("evolution_")))
 
-    cw, tl = set(cg.COWORKINGS.champ_ids), set(cg.TIERS_LIEUX_RURAUX.champ_ids)
+    cw, tl = set(cg.COWORKINGS.champ_ids), set(cg.TIERS_LIEUX.champ_ids)
     check("coworkings : fréquentation par semaine", "frequentation_semaine_type" in cw - tl)
-    check("tiers-lieux ruraux : fréquentation par mois", "frequentation_mois_type" in tl - cw)
-    check("riverains : tiers-lieux ruraux seulement", "part_statut_riverain" in tl - cw)
-    check("acheter des produits / prendre un verre : tiers-lieux ruraux seulement",
+    check("tiers-lieux : fréquentation par mois", "frequentation_mois_type" in tl - cw)
+    check("riverains : tiers-lieux seulement", "part_statut_riverain" in tl - cw)
+    check("acheter des produits / prendre un verre : tiers-lieux seulement",
           {"motif_acheter_produits", "motif_boire_manger"} <= tl - cw)
     check("animations extraprofessionnelles : coworkings seulement", "motif_animations_extraprofessionnelles" in cw - tl)
     check("bloc économie et emploi dans les deux", set(cg.BLOC_ECONOMIE_EMPLOI) <= cw & tl)
     check("table ronde en dernière question",
-          cg.COWORKINGS.champ_ids[-1] == cg.TIERS_LIEUX_RURAUX.champ_ids[-1] == "interet_table_ronde_gestionnaires")
+          cg.COWORKINGS.champ_ids[-1] == cg.TIERS_LIEUX.champ_ids[-1] == "interet_table_ronde_gestionnaires")
     check("métiers : choix multiple", get_field("metiers_tiers_lieu").type == FieldType.MULTI_CHOICE)
     check("raisons de venue : oui / non / éventuellement",
           get_field("motif_teletravail").options == ["Oui", "Non", "Éventuellement"])
@@ -96,8 +96,8 @@ def main():
         cg.creer_ou_mettre_a_jour(store, cg.COWORKINGS, debut, fin)
         check("deux campagnes créées, relance sans doublon", len(store.list_campagnes_prioritaires()) == 2)
         tl_campagne = campagnes["gestionnaires-tiers-lieux-ruraux"]
-        check("campagne tiers-lieux ruraux : code et titre",
-              tl_campagne.titre == cg.TIERS_LIEUX_RURAUX.titre and len(tl_campagne.champ_ids) == len(tl))
+        check("campagne tiers-lieux : code et titre",
+              tl_campagne.titre == cg.TIERS_LIEUX.titre and len(tl_campagne.champ_ids) == len(tl))
 
         lieu, contributeur, h = _handler(store, "Ferme Test", tl_campagne.id)
         s = h.get_current_section({})
