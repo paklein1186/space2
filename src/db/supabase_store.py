@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -40,10 +41,30 @@ PAGE = 1000  # plafond de lignes par requête PostgREST
 # tiers_lieu_ids a dépassé ce qu'un seul .in_(...) pouvait porter.
 _IN_CHUNK = 200
 
+# Lots envoyés de front à PostgREST dans _lire_tout_en_lots/_executer_par_lots :
+# en série, un lot par lot, le flux /lieux de Changethegame a cessé de répondre
+# dès l'import BDTFL (3960 lieux, ~20 lots par appel, x5 appels dans
+# flux_lieux -> une centaine de requêtes HTTP enchaînées en série, largement
+# au-delà des délais côté appelant). Le client HTTP/1.1 (voir creer_client)
+# est déjà mesuré sûr en accès concurrent ; borné pour ne pas marteler
+# PostgREST pour autant.
+_PARALLELISME_LOTS = 8
+
 
 def _chunks(valeurs: list, taille: int = _IN_CHUNK):
     for debut in range(0, len(valeurs), taille):
         yield valeurs[debut:debut + taille]
+
+
+def _pour_chaque_lot(ids: list, par_lot) -> list:
+    """Applique `par_lot` (reçoit un lot, renvoie ses lignes) à chaque lot de
+    `ids` en parallèle (jusqu'à _PARALLELISME_LOTS de front), résultats
+    concaténés dans l'ordre des lots."""
+    lignes = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=_PARALLELISME_LOTS) as executor:
+        for resultat in executor.map(par_lot, _chunks(ids)):
+            lignes.extend(resultat)
+    return lignes
 
 
 def creer_client(url: str, key: str) -> Client:
@@ -77,22 +98,17 @@ def _lire_tout_en_lots(ids: list, fabrique_requete_pour_lot) -> list:
     """Comme _lire_tout, pour une requête filtrée par .in_(...) sur `ids` —
     découpe `ids` en lots d'au plus _IN_CHUNK (sans quoi un seul .in_(...)
     sur un millier d'ids dépasse ce que PostgREST accepte dans l'URL, voir
-    _IN_CHUNK), et pagine chaque lot normalement. `fabrique_requete_pour_lot
-    (lot)` doit renvoyer une requête NEUVE, triée, filtrée sur ce lot."""
-    lignes = []
-    for lot in _chunks(ids):
-        lignes.extend(_lire_tout(lambda lot=lot: fabrique_requete_pour_lot(lot)))
-    return lignes
+    _IN_CHUNK), et pagine chaque lot normalement, plusieurs lots de front
+    (voir _PARALLELISME_LOTS). `fabrique_requete_pour_lot(lot)` doit renvoyer
+    une requête NEUVE, triée, filtrée sur ce lot."""
+    return _pour_chaque_lot(ids, lambda lot: _lire_tout(lambda: fabrique_requete_pour_lot(lot)))
 
 
 def _executer_par_lots(ids: list, fabrique_requete_pour_lot) -> list:
     """Comme _lire_tout_en_lots, pour une requête dont on sait qu'un lot ne
     renvoie jamais plus de PAGE lignes (pas besoin de paginer en plus de
     découper) — juste découpée sur `ids` pour la même raison."""
-    lignes = []
-    for lot in _chunks(ids):
-        lignes.extend(fabrique_requete_pour_lot(lot).execute().data)
-    return lignes
+    return _pour_chaque_lot(ids, lambda lot: fabrique_requete_pour_lot(lot).execute().data)
 
 
 class SupabaseStore(Store):
