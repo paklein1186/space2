@@ -116,7 +116,10 @@ def main():
 
         check("get_lieux_avec_confidentiel", store.get_lieux_avec_confidentiel([normal.id, sensible.id]) == {sensible.id})
 
-        profils = ProfilSearch(store, embedder=FauxEmbedder(), ttl=0)
+        # TTL long : sinon chaque recherche lance un rafraîchissement en arrière-plan
+        # qui touche le même SqliteStore pendant que le test continue (course et
+        # segfault). Le TTL n'est abaissé que pour la section d'expiration.
+        profils = ProfilSearch(store, embedder=FauxEmbedder(), ttl=3600)
         outils = OutilsComplets(store, profils, ttl=0, vectorstore=FauxVectorStore([]))
 
         # --- réponses détaillées ---
@@ -155,13 +158,20 @@ def main():
             tiers_lieu_id=normal.id, donnees={**complet}, profil_semantique_texte="profil modifié numérique",
             prompt_version="v", model="m", source_hash="h2"))
         # TTL expiré : la recherche sert l'ancien index et rafraîchit en arrière-plan.
+        profils.ttl = 0
         ancien = outils.execute("search_knowledge_base", {"query": "numérique"})["results"]
         check("recherche après expiration du TTL : servie avec l'index existant, sans attendre",
               len(ancien) >= 1 and "profil modifié" not in str(ancien))
-        for _ in range(50):
-            if profils._embedder.appels_documents[-1] == 1 and not profils._en_cours:
+        # Attendre la fin du rafraîchissement (il lit le store) avant toute autre
+        # opération sur le store ; puis rétablir le TTL pour que les recherches
+        # suivantes ne relancent pas de thread.
+        for _ in range(200):
+            if not profils._en_cours:
                 break
             time.sleep(0.05)
+        profils.ttl = 3600
+        check("rafraîchissement en arrière-plan : terminé",
+              not profils._en_cours)
         check("rafraîchissement en arrière-plan : seul le profil modifié est recalculé",
               profils._embedder.appels_documents[-1] == 1)
         check("l'index à jour contient le nouveau profil",
