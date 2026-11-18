@@ -26,7 +26,10 @@ from ..questionnaire.schema import champ_public, get_field  # noqa: F401 (champ_
 # passe quand même. Sans ce filtre, un import en masse de lieux à peine
 # renseignés (ex. recensement national BDTFL, nom/adresse seulement)
 # inonderait Changethegame de fiches creuses dès sa prochaine synchronisation.
-SEUIL_COMPLETION_CTG = 20
+# Abaissé de 20 à 10 le 18/11 (demande P-A) : un lieu à 10 % a déjà de quoi
+# afficher une fiche minimale côté ctg plutôt que d'attendre arbitrairement
+# le double de réponses avant d'exister pour eux.
+SEUIL_COMPLETION_CTG = 10
 
 TTL_SECONDES = 300
 
