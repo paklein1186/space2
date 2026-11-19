@@ -105,7 +105,8 @@ def verifier_secret(x_webhook_secret: Optional[str] = Header(default=None)) -> N
 
 def verifier_lecture(x_webhook_secret: Optional[str] = Header(default=None)) -> None:
     """Lecture seule : accepte le secret de ctg OU la clé du site Trois-Tiers (SITE_READ_SECRET).
-    La clé du site n'ouvre que les routes qui utilisent cette vérification (GET /lieux),
+    La clé du site n'ouvre que les routes qui utilisent cette vérification
+    (GET /lieux, /observatoire, /campagnes),
     jamais l'écriture (/access, /events, /lieux/{id}/link, /ctg/objects) ni /ask."""
     recu = (x_webhook_secret or "").encode()
     acceptes = [os.environ.get(k, "") for k in ("CTG_WEBHOOK_SECRET", "SITE_READ_SECRET")]
@@ -211,6 +212,23 @@ def ask(requete: AskRequest, request: Request):
 @app.get("/lieux", dependencies=[Depends(verifier_lecture)])
 def lieux(updated_since: Optional[str] = None) -> dict:
     return {"lieux": flux_lieux(get_store(), updated_since)}
+
+
+@app.get("/observatoire", dependencies=[Depends(verifier_lecture)])
+def observatoire(pays: Optional[str] = None, region: Optional[str] = None) -> dict:
+    """Agrégats de l'Observatoire (jamais une ligne par lieu). `pays` : liste séparée
+    par des virgules (ex. "Belgique,Belgium") ; `region` : une région."""
+    from src.api import observatoire as obs
+    df_lieux, df_reponses = obs.donnees(get_store())
+    liste_pays = [p.strip() for p in pays.split(",") if p.strip()] if pays else None
+    return obs.agregats(df_lieux, df_reponses, pays=liste_pays, region=region)
+
+
+@app.get("/campagnes", dependencies=[Depends(verifier_lecture)])
+def campagnes() -> dict:
+    """Enquêtes actives, pour un bouton « répondre » vers le lien direct ?campagne=<code>."""
+    from src.api import observatoire as obs
+    return {"campagnes": obs.campagnes_publiques(get_store())}
 
 
 class LienCtg(BaseModel):
