@@ -370,6 +370,10 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
 
     "annuaire.aucun_lieu": {"fr": "Aucun lieu recensé pour l'instant.", "en": "No spaces recorded yet."},
     "annuaire.rechercher_placeholder": {"fr": "🔍 Nom, ville, région...", "en": "🔍 Name, city, region..."},
+    "annuaire.recherche_approchee": {
+        "fr": "Aucun lieu ne correspond exactement à « {recherche} » : voici les plus proches.",
+        "en": "No place matches “{recherche}” exactly: here are the closest ones.",
+    },
     "annuaire.filtre_pays": {"fr": "Pays", "en": "Country"},
     "annuaire.filtre_region": {"fr": "Région", "en": "Region"},
     "annuaire.filtre_categorie": {"fr": "Catégorie", "en": "Category"},

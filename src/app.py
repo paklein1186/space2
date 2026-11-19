@@ -53,6 +53,7 @@ from src.db.factory import get_admin_store, get_store
 from src.db.store import Litige
 from src.donnees_observatoire import donnees_annuaire, prechargement_annuaire, prechargement_observatoire
 from src.i18n import language_toggle, t, t_categorie
+from src.recherche_lieux import lieu_au_nom_exact, rechercher_lieux
 from src.questionnaire.resolver import campagne_completion_stats, completion_stats, country_code_for
 from src.questionnaire.schema import MODULES_CAMPAGNES, QUESTIONNAIRE, CATEGORIES_POSSIBLES, FieldType, Role, all_fields, get_field
 from src.theme import apply_theme
@@ -1581,17 +1582,16 @@ def annuaire_tab(store, est_admin: bool, user_id: str):
     # les lieux recensés — sans ça, filtrer par pays ne faisait rien à la
     # carte alors que la grille en dessous, elle, se filtrait bien (signalé
     # comme un bug : "si on filtre sur un pays, la carte ne s'adapte pas").
-    # selectbox + accept_new_options plutôt qu'un simple text_input : les
-    # lieux dont le nom correspond à ce qui est tapé apparaissent aussitôt en
-    # menu déroulant (filtrage instantané côté navigateur, lettre après
-    # lettre, sans aller-retour serveur) — pratique pour repérer/ouvrir un
-    # lieu déjà recensé plutôt que de parcourir toute la grille. Taper une
-    # ville ou une région ne correspond à aucune suggestion mais reste
-    # accepté comme texte libre une fois validé, et alimente le même filtre
-    # nom/région/pays que par le passé.
-    recherche = st.selectbox(
-        "Rechercher", options=sorted(l.nom for l in lieux), index=None,
-        accept_new_options=True, placeholder=t("annuaire.rechercher_placeholder"), label_visibility="collapsed",
+    # Champ texte, recherche côté serveur (src/recherche_lieux.py) : nom,
+    # commune, code postal, région, pays, sans tenir compte des accents ni de
+    # la casse, tolérante aux fautes de frappe. Remplace un selectbox
+    # « accept_new_options » dont le filtre (navigateur, sensible aux accents,
+    # par lettres dans l'ordre) retenait à l'Entrée la première suggestion
+    # venue : « Liège » ouvrait « Fab Lab Sud31-Val d'Ariège », et une ville ou
+    # une région ne filtrait jamais rien.
+    recherche = st.text_input(
+        "Rechercher", key="annuaire_recherche", placeholder=t("annuaire.rechercher_placeholder"),
+        label_visibility="collapsed",
     ) or ""
     col_pays, col_region, col_categories = st.columns(3)
     with col_pays:
@@ -1604,27 +1604,22 @@ def annuaire_tab(store, est_admin: bool, user_id: str):
         filtre_categories = st.multiselect(t("annuaire.filtre_categorie"), options=CATEGORIES_POSSIBLES,
                                             format_func=t_categorie)
 
-    # Sélectionner un nom EXACT dans le menu (plutôt que taper un texte libre
-    # qui ne correspond à aucune suggestion) ouvre directement sa fiche —
-    # jusqu'ici le champ ne faisait que filtrer la grille/la carte, il
-    # fallait ensuite cliquer le lieu une seconde fois. Garde-fou sur
-    # "annuaire_derniere_recherche_ouverte" : sans lui, la fiche se
-    # rouvrirait à CHAQUE rerun tant que ce nom reste sélectionné dans le
+    # Taper le nom EXACT d'un lieu (accents et casse ignorés) ouvre
+    # directement sa fiche, sans devoir ensuite cliquer le lieu dans la
+    # grille. Garde-fou sur "annuaire_derniere_recherche_ouverte" : sans lui,
+    # la fiche se rouvrirait à CHAQUE rerun tant que ce nom reste dans le
     # champ (impossible de la refermer).
     if recherche.strip() and st.session_state.get("annuaire_derniere_recherche_ouverte") != recherche:
-        lieu_exact = next((l for l in lieux if l.nom == recherche), None)
+        lieu_exact = lieu_au_nom_exact(lieux, recherche)
         if lieu_exact:
             st.session_state["annuaire_derniere_recherche_ouverte"] = recherche
             st.session_state["annuaire_open_lieu_id"] = lieu_exact.id
             st.rerun()
 
     lieux_affiches = lieux
+    recherche_approchee = False
     if recherche.strip():
-        q = recherche.strip().lower()
-        lieux_affiches = [
-            l for l in lieux_affiches
-            if q in l.nom.lower() or q in (l.region or "").lower() or q in (l.pays or "").lower()
-        ]
+        lieux_affiches, recherche_approchee = rechercher_lieux(lieux_affiches, recherche)
     if filtre_pays:
         lieux_affiches = [l for l in lieux_affiches if l.pays in filtre_pays]
     if filtre_region:
@@ -1636,6 +1631,8 @@ def annuaire_tab(store, est_admin: bool, user_id: str):
                 derive_par_lieu.get(l.id)
             )
         ]
+    if recherche_approchee and lieux_affiches:
+        st.caption(t("annuaire.recherche_approchee", recherche=recherche.strip()))
     st.caption(t("annuaire.lieux_affiches", n=len(lieux_affiches)))
 
     coords = lieux_avec_coordonnees(lieux_affiches)
