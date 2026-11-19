@@ -47,8 +47,7 @@ def main():
     check("clé du site refusée sur POST /lieux/L1/link",
           http.post("/lieux/L1/link", json={"ctg_entity_id": "E1"}, headers=site).status_code == 401)
     check("clé du site refusée sur PUT /ctg/objects", http.put("/ctg/objects", json={}, headers=site).status_code == 401)
-    check("clé du site refusée sur POST /ask",
-          http.post("/ask", json={"messages": [{"role": "user", "content": "x"}]}, headers=site).status_code == 401)
+    # POST /ask accepte la clé du site, avec son propre agent : voir tests/test_api_ask_site.py.
     check("clé du site refusée sur /diagnostic", http.get("/diagnostic", headers=site).status_code == 401)
 
     os.environ["CTG_WEBHOOK_SECRET"] = ""
