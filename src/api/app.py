@@ -103,6 +103,21 @@ def verifier_secret(x_webhook_secret: Optional[str] = Header(default=None)) -> N
         raise HTTPException(status_code=401, detail="unauthorized")
 
 
+def verifier_lecture(x_webhook_secret: Optional[str] = Header(default=None)) -> None:
+    """Lecture seule : accepte le secret de ctg OU la clé du site Trois-Tiers (SITE_READ_SECRET).
+    La clé du site n'ouvre que les routes qui utilisent cette vérification (GET /lieux),
+    jamais l'écriture (/access, /events, /lieux/{id}/link, /ctg/objects) ni /ask."""
+    recu = (x_webhook_secret or "").encode()
+    acceptes = [os.environ.get(k, "") for k in ("CTG_WEBHOOK_SECRET", "SITE_READ_SECRET")]
+    # Fail closed : une clé non configurée n'ouvre rien ; on compare à chaque clé (pas de court-circuit).
+    ok = False
+    for attendu in acceptes:
+        if attendu and recu and hmac.compare_digest(recu, attendu.encode()):
+            ok = True
+    if not ok:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+
 def limiter_debit() -> None:
     maintenant = time.monotonic()
     with _appels_lock:
@@ -193,7 +208,7 @@ def ask(requete: AskRequest, request: Request):
 
 # -- Flux lieux ------------------------------------------------------------
 
-@app.get("/lieux", dependencies=[Depends(verifier_secret)])
+@app.get("/lieux", dependencies=[Depends(verifier_lecture)])
 def lieux(updated_since: Optional[str] = None) -> dict:
     return {"lieux": flux_lieux(get_store(), updated_since)}
 

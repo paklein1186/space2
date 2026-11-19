@@ -14,6 +14,9 @@ services:
         value: 3.11.9
       - key: CTG_WEBHOOK_SECRET
         sync: false
+      # Clé de lecture seule du site troistiers.space (GET /lieux uniquement).
+      - key: SITE_READ_SECRET
+        sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: VOYAGE_API_KEY
