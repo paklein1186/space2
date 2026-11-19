@@ -25,6 +25,9 @@ services:
         value: claude-sonnet-5
       - key: CTG_ASK_FULL_ACCESS
         value: "true"
+      # Agent des questions venues du site Trois-Tiers : public (false, défaut) ou complet hors confidentiel (true).
+      - key: SITE_ASK_FULL_ACCESS
+        value: "false"
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_KEY

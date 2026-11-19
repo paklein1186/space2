@@ -379,10 +379,17 @@ class AskAgent:
         return contenu
 
 
-def creer_agent(store, model: Optional[str] = None, client: Optional[Anthropic] = None) -> AskAgent:
-    """Agent selon CTG_ASK_FULL_ACCESS : complet sans confidentiel (défaut) ou public."""
+def acces_complet_site() -> bool:
+    """Mode de l'agent pour le site Trois-Tiers (clé SITE_READ_SECRET) : public par défaut.
+    SITE_ASK_FULL_ACCESS=true l'ouvre au mode complet (hors confidentiel), comme ctg."""
+    return os.environ.get("SITE_ASK_FULL_ACCESS", "false").strip().lower() in ("1", "true", "yes", "oui")
+
+
+def creer_agent(store, model: Optional[str] = None, client: Optional[Anthropic] = None,
+                complet: Optional[bool] = None) -> AskAgent:
+    """Agent complet sans confidentiel ou public. `complet` None = selon CTG_ASK_FULL_ACCESS (défaut : complet)."""
     model = model or modele_configure()
-    if acces_complet_actif():
+    if acces_complet_actif() if complet is None else complet:
         return AskAgent(OutilsComplets(store, ProfilSearch(store)), tools=_tools_complet(),
                         system_prompt=SYSTEM_PROMPT_COMPLET, client=client, model=model, store=store)
     return AskAgent(OutilsPublics(DonneesPubliques(store)), client=client, model=model, store=store)

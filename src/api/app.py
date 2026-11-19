@@ -35,7 +35,7 @@ from pydantic import BaseModel, Field, field_validator
 load_dotenv()
 
 from ..db.factory import get_admin_store  # noqa: E402
-from .ask_agent import acces_complet_actif, creer_agent, modele_configure  # noqa: E402
+from .ask_agent import acces_complet_actif, acces_complet_site, creer_agent, modele_configure  # noqa: E402
 from .ctg_objects import traiter_objets  # noqa: E402
 from .manifest import construire_manifest  # noqa: E402
 from .public_data import flux_lieux  # noqa: E402
@@ -62,9 +62,13 @@ async def lifespan(_app):
 app = FastAPI(title="Space2 API", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
 
 _agent: Optional[AskAgent] = None
+_agent_site: Optional[AskAgent] = None   # agent des questions venues du site Trois-Tiers
 _agent_lock = threading.Lock()
 _appels: list = []
+_appels_site: list = []
 _appels_lock = threading.Lock()
+# Le site a son propre plafond, pour ne jamais priver ctg de ses 30 questions par minute.
+RATE_LIMIT_SITE_PAR_MINUTE = 10
 
 
 class Message(BaseModel):
@@ -106,7 +110,7 @@ def verifier_secret(x_webhook_secret: Optional[str] = Header(default=None)) -> N
 def verifier_lecture(x_webhook_secret: Optional[str] = Header(default=None)) -> None:
     """Lecture seule : accepte le secret de ctg OU la clé du site Trois-Tiers (SITE_READ_SECRET).
     La clé du site n'ouvre que les routes qui utilisent cette vérification
-    (GET /lieux, /observatoire, /campagnes),
+    (GET /lieux, /observatoire, /campagnes ; et POST /ask via verifier_ask, avec son propre agent),
     jamais l'écriture (/access, /events, /lieux/{id}/link, /ctg/objects) ni /ask."""
     recu = (x_webhook_secret or "").encode()
     acceptes = [os.environ.get(k, "") for k in ("CTG_WEBHOOK_SECRET", "SITE_READ_SECRET")]
@@ -119,18 +123,37 @@ def verifier_lecture(x_webhook_secret: Optional[str] = Header(default=None)) -> 
         raise HTTPException(status_code=401, detail="unauthorized")
 
 
-def limiter_debit() -> None:
+def limiter_debit(appelant: str = "ctg") -> None:
     maintenant = time.monotonic()
+    appels, plafond = (_appels_site, RATE_LIMIT_SITE_PAR_MINUTE) if appelant == "site" else (_appels, RATE_LIMIT_PAR_MINUTE)
     with _appels_lock:
-        _appels[:] = [t for t in _appels if maintenant - t < 60]
-        if len(_appels) >= RATE_LIMIT_PAR_MINUTE:
+        appels[:] = [t for t in appels if maintenant - t < 60]
+        if len(appels) >= plafond:
             raise HTTPException(status_code=429, detail="rate limit")
-        _appels.append(maintenant)
+        appels.append(maintenant)
 
 
-def get_agent() -> AskAgent:
-    global _agent
+def verifier_ask(x_webhook_secret: Optional[str] = Header(default=None)) -> str:
+    """/ask : le secret de ctg (agent selon CTG_ASK_FULL_ACCESS) ou la clé du site Trois-Tiers
+    (agent selon SITE_ASK_FULL_ACCESS, public par défaut). Renvoie l'appelant : "ctg" ou "site"."""
+    recu = (x_webhook_secret or "").encode()
+    trouve = None
+    for appelant, cle in (("ctg", "CTG_WEBHOOK_SECRET"), ("site", "SITE_READ_SECRET")):
+        attendu = os.environ.get(cle, "")
+        if attendu and recu and hmac.compare_digest(recu, attendu.encode()) and trouve is None:
+            trouve = appelant
+    if trouve is None:
+        raise HTTPException(status_code=401, detail="unauthorized")
+    return trouve
+
+
+def get_agent(appelant: str = "ctg") -> AskAgent:
+    global _agent, _agent_site
     with _agent_lock:
+        if appelant == "site":
+            if _agent_site is None:
+                _agent_site = creer_agent(get_admin_store(), model=modele_configure(), complet=acces_complet_site())
+            return _agent_site
         if _agent is None:
             _agent = creer_agent(get_admin_store(), model=modele_configure())
         return _agent
@@ -191,14 +214,15 @@ def _sse(agent, messages: list, context: Optional[dict]):
         yield evenement({"type": "error", "message": "upstream error"})
 
 
-@app.post("/ask", dependencies=[Depends(verifier_secret)])
-def ask(requete: AskRequest, request: Request):
+@app.post("/ask")
+def ask(requete: AskRequest, request: Request, appelant: str = Depends(verifier_ask)):
     """Réponse JSON `{content}` par défaut ; flux SSE si l'appelant envoie
-    `Accept: text/event-stream`."""
-    limiter_debit()
+    `Accept: text/event-stream`. Le site Trois-Tiers a son agent (public par défaut)
+    et son propre plafond de débit."""
+    limiter_debit(appelant)
     messages = [m.model_dump() for m in requete.messages]
     try:
-        agent = get_agent()
+        agent = get_agent(appelant)
         if "text/event-stream" in request.headers.get("accept", "").lower():
             return StreamingResponse(_sse(agent, messages, requete.context), media_type="text/event-stream",
                                      headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
