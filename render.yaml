@@ -28,6 +28,12 @@ services:
       # Agent des questions venues du site Trois-Tiers : public (false, défaut) ou complet hors confidentiel (true).
       - key: SITE_ASK_FULL_ACCESS
         value: "false"
+      # Connexion unique depuis troistiers.space : Auth de ChangeTheGame, pour vérifier le jeton
+      # de la personne (POST /sso/ticket). La clé anon de ChangeTheGame est publique.
+      - key: CTG_SUPABASE_URL
+        value: https://anzeimppqytonfxrnqxp.supabase.co
+      - key: CTG_SUPABASE_ANON_KEY
+        sync: false
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_KEY
