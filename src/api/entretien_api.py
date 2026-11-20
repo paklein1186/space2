@@ -199,10 +199,26 @@ def _completion(agent) -> Optional[dict]:
         return None
 
 
-def _vue(conv: dict, nom_lieu: Optional[str] = None, completion: Optional[dict] = None) -> dict:
+def choix_rapide(agent) -> Optional[dict]:
+    """La prochaine question à choix de la section en cours (oui/non, choix unique, choix multiple,
+    échelle 1-5), comme le panneau « Réponse rapide » de l'app — ou None s'il n'y en a pas."""
+    from src.agent.collecte_tools import champs_choix_rapide
+    try:
+        champs = champs_choix_rapide(agent.tool_handler.execute("get_current_section", {}))
+    except Exception:
+        return None
+    if not champs:
+        return None
+    f = champs[0]
+    return {"champ_id": f["id"], "label": f["label"], "type": f["type"],
+            "options": list(f.get("options") or []), "max_choices": f.get("max_choices")}
+
+
+def _vue(conv: dict, nom_lieu: Optional[str] = None, completion: Optional[dict] = None,
+         choix: Optional[dict] = None) -> dict:
     return {"id": conv["id"], "tiers_lieu_id": conv["tiers_lieu_id"], "nom_lieu": nom_lieu, "role": conv["role"],
             "mode": conv["mode"], "campagne_id": conv.get("campagne_id"),
-            "historique": conv.get("historique") or [], "completion": completion}
+            "historique": conv.get("historique") or [], "completion": completion, "choix_rapide": choix}
 
 
 def ouvrir(store, email: str, user_id: str, *, lieu_id: Optional[str] = None, nouveau_lieu: Optional[str] = None,
@@ -258,7 +274,7 @@ def ouvrir(store, email: str, user_id: str, *, lieu_id: Optional[str] = None, no
     historique = [{"role": "assistant", "texte": ouverture}]
     depot.maj(conv["id"], {"messages": agent.messages, "historique": historique})
     conv.update(messages=agent.messages, historique=historique)
-    return _vue(conv, lieu.nom, _completion(agent))
+    return _vue(conv, lieu.nom, _completion(agent), choix_rapide(agent))
 
 
 def _conversation_a_soi(store, user_id: str, conv_id: str) -> dict:
@@ -268,10 +284,11 @@ def _conversation_a_soi(store, user_id: str, conv_id: str) -> dict:
     return conv
 
 
-def lire(store, user_id: str, conv_id: str) -> dict:
+def lire(store, user_id: str, conv_id: str, fabrique_agent: Callable = _agent_par_defaut) -> dict:
     conv = _conversation_a_soi(store, user_id, conv_id)
     lieu = _lieu_par_id(store, conv["tiers_lieu_id"])
-    return _vue(conv, lieu.nom if lieu else None)
+    agent = fabrique_agent(store, conv, user_id)  # sans appel à Claude : seulement pour la question à choix
+    return _vue(conv, lieu.nom if lieu else None, _completion(agent), choix_rapide(agent))
 
 
 def repondre(store, user_id: str, conv_id: str, texte: str, fabrique_agent: Callable = _agent_par_defaut) -> dict:
@@ -286,7 +303,7 @@ def repondre(store, user_id: str, conv_id: str, texte: str, fabrique_agent: Call
     conversations_du_store(store).maj(conv_id, {"messages": agent.messages, "historique": historique})
     conv.update(historique=historique)
     lieu = _lieu_par_id(store, conv["tiers_lieu_id"])
-    return _vue(conv, lieu.nom if lieu else None, _completion(agent))
+    return _vue(conv, lieu.nom if lieu else None, _completion(agent), choix_rapide(agent))
 
 
 def lister(store, user_id: str) -> list:
@@ -296,3 +313,47 @@ def lister(store, user_id: str) -> list:
         sortie.append({"id": c["id"], "nom_lieu": lieu.nom if lieu else None, "role": c["role"], "mode": c["mode"],
                        "campagne_id": c.get("campagne_id"), "maj_le": c.get("maj_le")})
     return sortie
+
+
+def _valeur_valide(champ: dict, valeur):
+    """La valeur proposée, si elle correspond au type et aux options de la question ; sinon ValueError."""
+    t, options = champ["type"], champ.get("options") or []
+    if t == "boolean" and isinstance(valeur, bool):
+        return valeur
+    if t == "single_choice" and isinstance(valeur, str) and valeur in options:
+        return valeur
+    if t == "multi_choice" and isinstance(valeur, list) and valeur and all(isinstance(v, str) and v in options for v in valeur):
+        valeur = list(dict.fromkeys(valeur))
+        if champ.get("max_choices") and len(valeur) > champ["max_choices"]:
+            raise ValueError("trop de choix")
+        return valeur
+    if t == "scale_1_5" and isinstance(valeur, int) and not isinstance(valeur, bool) and 1 <= valeur <= 5:
+        return valeur
+    raise ValueError("réponse invalide pour cette question")
+
+
+def repondre_choix(store, user_id: str, conv_id: str, champ_id: str, valeur,
+                   fabrique_agent: Callable = _agent_par_defaut) -> dict:
+    """Réponse rapide (cases, boutons) à LA question à choix en attente — et à aucune autre :
+    enregistrée directement, puis l'agent est prévenu pour réagir et enchaîner, exactement comme
+    le panneau « Réponse rapide » de l'app (la règle de son prompt évite qu'il la réenregistre)."""
+    conv = _conversation_a_soi(store, user_id, conv_id)
+    agent = fabrique_agent(store, conv, user_id)
+    attendu = choix_rapide(agent)
+    if not attendu or attendu["champ_id"] != champ_id:
+        raise ValueError("cette question n'est plus en attente")
+    valeur = _valeur_valide(attendu, valeur)
+    agent.tool_handler.execute("save_answer", {"champ_id": champ_id, "valeur": valeur})
+    if isinstance(valeur, list):
+        affiche = ", ".join(valeur)
+    elif isinstance(valeur, bool):
+        affiche = "Oui" if valeur else "Non"
+    else:
+        affiche = str(valeur)
+    reponse = agent.send(f"[Réponse via sélection rapide — déjà enregistrée] {attendu['label']} : {affiche}")
+    historique = list(conv.get("historique") or []) + [{"role": "user", "texte": f"{attendu['label']} : {affiche}"},
+                                                      {"role": "assistant", "texte": reponse}]
+    conversations_du_store(store).maj(conv_id, {"messages": agent.messages, "historique": historique})
+    conv.update(historique=historique)
+    lieu = _lieu_par_id(store, conv["tiers_lieu_id"])
+    return _vue(conv, lieu.nom if lieu else None, _completion(agent), choix_rapide(agent))

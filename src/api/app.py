@@ -362,6 +362,19 @@ def entretien_repondre(conv_id: str, message: MessageEntretien, qui: tuple = Dep
     return _erreurs_entretien(lambda: ent.repondre(get_store(), qui[1], conv_id, message.texte))
 
 
+class ChoixEntretien(BaseModel):
+    champ_id: str = Field(min_length=1, max_length=100)
+    valeur: Any
+
+
+@app.post("/entretien/conversations/{conv_id}/choix", dependencies=[Depends(verifier_lecture)])
+def entretien_choix(conv_id: str, choix: ChoixEntretien, qui: tuple = Depends(personne_ctg)) -> dict:
+    """Réponse rapide à la question à choix en attente (cases, boutons, échelle)."""
+    from src.api import entretien_api as ent
+    limiter_debit("site")
+    return _erreurs_entretien(lambda: ent.repondre_choix(get_store(), qui[1], conv_id, choix.champ_id, choix.valeur))
+
+
 class LienCtg(BaseModel):
     ctg_entity_id: str = Field(min_length=1, max_length=200)
 
