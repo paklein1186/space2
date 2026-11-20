@@ -108,11 +108,45 @@ def _supabase_client():
     return st.session_state["supabase_client"]
 
 
+def _connexion_par_ticket(ticket: str) -> bool:
+    """Connexion unique depuis troistiers.space (voir src/sso.py) : le ticket, délivré par
+    l'API après vérification du jeton ChangeTheGame, est échangé UNE fois contre une session
+    Space2 pour le même email — sans code par e-mail. Le ticket est retiré de l'adresse dans
+    tous les cas. En cas d'échec (expiré, déjà utilisé), on retombe sur l'écran habituel."""
+    st.query_params.pop("ticket", None)
+    if not SUPABASE_CONFIGURED:
+        return False
+    try:
+        from src import sso
+        admin = get_admin_store()
+        email = sso.consommer_ticket(sso.tickets_du_store(admin), ticket)
+        if not email:
+            st.info(t("auth.ticket_expire"))
+            return False
+        result = sso.ouvrir_session_space2(admin.client, _supabase_client(), email)
+    except Exception as exc:  # jamais bloquant : l'écran de connexion reste disponible
+        st.warning(f"{t('auth.ticket_erreur')} ({exc})")
+        return False
+    if not getattr(result, "user", None):
+        return False
+    st.session_state["user_id"] = result.user.id
+    st.session_state["user_email"] = result.user.email
+    if getattr(result, "session", None) and result.session.refresh_token:
+        save_session_cookie(result.session.refresh_token)
+    from src.notifications import notifier_connexion
+    notifier_connexion(result.user.email)
+    return True
+
+
 def auth_screen() -> str | None:
     """Renvoie l'identifiant utilisateur une fois authentifié, sinon None
     (et affiche l'écran de connexion)."""
     if "user_id" in st.session_state:
         return st.session_state["user_id"]
+
+    if st.query_params.get("ticket"):
+        if _connexion_par_ticket(st.query_params.get("ticket")):
+            st.rerun()
 
     if LOCAL_DEV_AUTOLOGIN:
         # Connexion admin immédiate, sans passer par Supabase Auth — utilise
@@ -674,7 +708,8 @@ def _notifier_reponse_prete() -> None:
 # cet habillage dure toute la session, le répondant n'a plus accès à la
 # navigation standard tant qu'il reste sur cette page.
 _CSS_ENTREE_DIRECTE = """<style>
-[data-testid="stSidebar"], [data-testid="stSidebarCollapseButton"] { display: none !important; }
+[data-testid="stSidebar"], [data-testid="stSidebarCollapseButton"], [data-testid="stSidebarNav"],
+[data-testid="stToolbar"], [data-testid="stMainMenu"], #MainMenu { display: none !important; }
 
 @keyframes sp-pulse-glow {
   0%, 100% { opacity: 0.55; transform: scale(1); }
@@ -3314,11 +3349,15 @@ def main():
         ]
 
     sur_page_partenaire = _sur_page_partenaire()
+    # Lien direct vers l'entretien ou une enquête (ex. depuis troistiers.space) : aucun menu de
+    # navigation, ni barre latérale — la personne ne voit que l'entretien.
+    entree_directe = bool(st.query_params.get("campagne") or st.query_params.get("entretien") == "general"
+                          or st.session_state.get("_mode_entree_directe"))
     if sur_page_partenaire:
         pg = st.navigation([st.Page(page_partenaire, title="Espace partenaire", icon="🤝", default=True)],
                            position="hidden")
     else:
-        pg = st.navigation(pages)
+        pg = st.navigation(pages, position="hidden" if entree_directe else "sidebar")
     # Détecte un changement d'onglet (pas juste un rerun causé par un widget
     # à l'intérieur du même onglet) : sert à repartir d'une Bibliothèque
     # vierge à chaque fois qu'on y revient depuis un autre onglet, plutôt que
@@ -3348,7 +3387,7 @@ def main():
     # instant sans bouton "Se déconnecter" ni email, le temps d'un rerun de
     # rattrapage (LOCAL_DEV_AUTOLOGIN notamment, qui ne force pas de rerun).
     user_id = st.session_state.get("user_id")
-    if user_id and not sur_page_partenaire:
+    if user_id and not sur_page_partenaire and not st.session_state.get("_mode_entree_directe"):
         with st.sidebar:
             if st.session_state.get("use_admin_store"):
                 st.warning(t("sidebar.admin_local_mode"))

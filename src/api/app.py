@@ -110,7 +110,7 @@ def verifier_secret(x_webhook_secret: Optional[str] = Header(default=None)) -> N
 def verifier_lecture(x_webhook_secret: Optional[str] = Header(default=None)) -> None:
     """Lecture seule : accepte le secret de ctg OU la clé du site Trois-Tiers (SITE_READ_SECRET).
     La clé du site n'ouvre que les routes qui utilisent cette vérification
-    (GET /lieux, /observatoire, /campagnes ; et POST /ask via verifier_ask, avec son propre agent),
+    (GET /lieux, /observatoire, /campagnes, POST /sso/ticket ; et POST /ask via verifier_ask),
     jamais l'écriture (/access, /events, /lieux/{id}/link, /ctg/objects) ni /ask."""
     recu = (x_webhook_secret or "").encode()
     acceptes = [os.environ.get(k, "") for k in ("CTG_WEBHOOK_SECRET", "SITE_READ_SECRET")]
@@ -253,6 +253,26 @@ def campagnes() -> dict:
     """Enquêtes actives, pour un bouton « répondre » vers le lien direct ?campagne=<code>."""
     from src.api import observatoire as obs
     return {"campagnes": obs.campagnes_publiques(get_store())}
+
+
+class DemandeTicket(BaseModel):
+    ctg_token: str = Field(min_length=10, max_length=8000)
+
+
+@app.post("/sso/ticket", dependencies=[Depends(verifier_lecture)])
+def sso_ticket(demande: DemandeTicket) -> dict:
+    """Connexion unique depuis troistiers.space : le jeton ChangeTheGame de la personne est
+    vérifié ICI, auprès de ChangeTheGame ; on renvoie un ticket à usage unique (2 minutes)
+    que l'app échange contre une session Space2 pour le même email. La clé du site seule
+    ne permet de connecter personne."""
+    from src import sso
+    limiter_debit("site")
+    try:
+        email, ctg_id = sso.verifier_jeton_ctg(demande.ctg_token)
+    except sso.JetonInvalide:
+        raise HTTPException(status_code=401, detail="ctg token refused")
+    ticket = sso.creer_ticket(sso.tickets_du_store(get_store()), email, ctg_id)
+    return {"ticket": ticket, "expire_dans": sso.TTL_TICKET}
 
 
 class LienCtg(BaseModel):
