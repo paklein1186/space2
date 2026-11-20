@@ -12,7 +12,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 MODULES = ["src.api.app", "src.api.entretien_api", "src.api.observatoire", "src.sso",
-           "src.agent.collecte_agent", "src.agent.collecte_tools", "src.agent.web_crawl"]
+           "src.agent.collecte_agent", "src.agent.collecte_tools", "src.agent.web_crawl",
+           "src.api.bibliotheque_api", "src.ingest.chunking", "src.agent.embeddings", "src.agent.vectorstore"]
 
 
 def main():
