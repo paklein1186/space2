@@ -102,8 +102,14 @@ def _supabase_client():
     active (un client recréé à chaque rerun repartirait anonyme, et les
     policies RLS `auth.role() = 'authenticated'` rejetteraient tout)."""
     if "supabase_client" not in st.session_state:
-        from supabase import create_client
-        st.session_state["supabase_client"] = create_client(
+        # creer_client (HTTP/1.1) et pas create_client (HTTP/2 par défaut) :
+        # ce client sert à toutes les lectures d'un utilisateur connecté, y
+        # compris les outils de la Bibliothèque exécutés en parallèle — en
+        # HTTP/2, ces lectures concurrentes échouaient (RemoteProtocolError,
+        # « 400 Bad Request » HTML), et l'assistant répondait « problème
+        # technique », voire qu'il n'y avait aucun lieu en Belgique.
+        from src.db.supabase_store import creer_client
+        st.session_state["supabase_client"] = creer_client(
             os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"]
         )
     return st.session_state["supabase_client"]
