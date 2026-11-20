@@ -13,7 +13,9 @@ import os
 from anthropic import Anthropic
 from dotenv import load_dotenv
 
-from ..annuaire import field_label
+# field_label vient du schéma (et non de ..annuaire, qui charge Streamlit) : l'agent tourne aussi
+# dans l'API, où Streamlit n'est pas installé.
+from ..questionnaire.schema import field_label
 from ..db.factory import get_admin_store
 from ..questionnaire.schema import Role
 from .caching import apply_single_cache_breakpoint, cached_system, to_plain_content
