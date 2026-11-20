@@ -110,7 +110,8 @@ def verifier_secret(x_webhook_secret: Optional[str] = Header(default=None)) -> N
 def verifier_lecture(x_webhook_secret: Optional[str] = Header(default=None)) -> None:
     """Lecture seule : accepte le secret de ctg OU la clé du site Trois-Tiers (SITE_READ_SECRET).
     La clé du site n'ouvre que les routes qui utilisent cette vérification
-    (GET /lieux, /observatoire, /campagnes, POST /sso/ticket ; et POST /ask via verifier_ask),
+    (GET /lieux, /observatoire, /campagnes, POST /sso/ticket, /entretien/* avec en plus le jeton ctg
+    de la personne ; et POST /ask via verifier_ask),
     jamais l'écriture (/access, /events, /lieux/{id}/link, /ctg/objects) ni /ask."""
     recu = (x_webhook_secret or "").encode()
     acceptes = [os.environ.get(k, "") for k in ("CTG_WEBHOOK_SECRET", "SITE_READ_SECRET")]
@@ -273,6 +274,82 @@ def sso_ticket(demande: DemandeTicket) -> dict:
         raise HTTPException(status_code=401, detail="ctg token refused")
     ticket = sso.creer_ticket(sso.tickets_du_store(get_store()), email, ctg_id)
     return {"ticket": ticket, "expire_dans": sso.TTL_TICKET}
+
+
+# -- Entretien depuis troistiers.space ----------------------------------------
+# Clé du site (verifier_lecture) ET jeton ChangeTheGame de la personne (en-tête X-CTG-Token),
+# vérifié par Space2 auprès de ChangeTheGame : voir src/api/entretien_api.py.
+
+def personne_ctg(x_ctg_token: Optional[str] = Header(default=None)) -> tuple:
+    from src import sso
+    from src.api import entretien_api as ent
+    try:
+        email = ent.identite(x_ctg_token or "")
+    except sso.JetonInvalide:
+        raise HTTPException(status_code=401, detail="ctg token refused")
+    return email, ent.utilisateur_space2(get_store(), email)
+
+
+def _erreurs_entretien(f):
+    from src.api import entretien_api as ent
+    try:
+        return f()
+    except ent.Introuvable as exc:
+        raise HTTPException(status_code=404, detail=f"{exc} introuvable")
+    except ent.AccesRefuse as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=502, detail="upstream error")
+
+
+class OuvertureEntretien(BaseModel):
+    lieu_id: Optional[str] = Field(default=None, max_length=100)
+    nouveau_lieu: Optional[str] = Field(default=None, max_length=200)
+    role: str = Field(max_length=30)
+    mode: str = Field(default="histoire", max_length=30)
+    campagne: Optional[str] = Field(default=None, max_length=100)
+
+
+class MessageEntretien(BaseModel):
+    texte: str = Field(min_length=1, max_length=MAX_CARACTERES)
+
+
+@app.get("/entretien/lieux", dependencies=[Depends(verifier_lecture)])
+def entretien_lieux(q: str = "", qui: tuple = Depends(personne_ctg)) -> dict:
+    from src.api import entretien_api as ent
+    return {"lieux": ent.chercher_lieux(get_store(), q[:100])}
+
+
+@app.get("/entretien/conversations", dependencies=[Depends(verifier_lecture)])
+def entretien_conversations(qui: tuple = Depends(personne_ctg)) -> dict:
+    from src.api import entretien_api as ent
+    return {"conversations": ent.lister(get_store(), qui[1])}
+
+
+@app.post("/entretien/conversations", dependencies=[Depends(verifier_lecture)])
+def entretien_ouvrir(demande: OuvertureEntretien, qui: tuple = Depends(personne_ctg)) -> dict:
+    from src.api import entretien_api as ent
+    limiter_debit("site")
+    return _erreurs_entretien(lambda: ent.ouvrir(
+        get_store(), qui[0], qui[1], lieu_id=demande.lieu_id, nouveau_lieu=demande.nouveau_lieu,
+        role=demande.role, mode=demande.mode, campagne=demande.campagne))
+
+
+@app.get("/entretien/conversations/{conv_id}", dependencies=[Depends(verifier_lecture)])
+def entretien_lire(conv_id: str, qui: tuple = Depends(personne_ctg)) -> dict:
+    from src.api import entretien_api as ent
+    return _erreurs_entretien(lambda: ent.lire(get_store(), qui[1], conv_id))
+
+
+@app.post("/entretien/conversations/{conv_id}/messages", dependencies=[Depends(verifier_lecture)])
+def entretien_repondre(conv_id: str, message: MessageEntretien, qui: tuple = Depends(personne_ctg)) -> dict:
+    from src.api import entretien_api as ent
+    limiter_debit("site")
+    return _erreurs_entretien(lambda: ent.repondre(get_store(), qui[1], conv_id, message.texte))
 
 
 class LienCtg(BaseModel):
