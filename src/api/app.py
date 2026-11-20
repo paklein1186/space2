@@ -7,6 +7,7 @@
   POST /events                    événements publics ctg (RAG de Space2)
   PUT  /ctg/objects               objets ctg : lieux -> galerie/portfolio, reste -> connaissance
   PUT  /access                    membres de guilde / loueurs ayant accès
+  /bibliotheque/*                 bibliothèque du site Trois-Tiers (clé du site + jeton CTG)
 
 Lancement : `uvicorn src.api.app:app --host 0.0.0.0 --port $PORT`
 Variables : CTG_WEBHOOK_SECRET (obligatoire — sans lui l'API refuse tout),
@@ -110,7 +111,7 @@ def verifier_secret(x_webhook_secret: Optional[str] = Header(default=None)) -> N
 def verifier_lecture(x_webhook_secret: Optional[str] = Header(default=None)) -> None:
     """Lecture seule : accepte le secret de ctg OU la clé du site Trois-Tiers (SITE_READ_SECRET).
     La clé du site n'ouvre que les routes qui utilisent cette vérification
-    (GET /lieux, /observatoire, /campagnes, POST /sso/ticket, /entretien/* avec en plus le jeton ctg
+    (GET /lieux, /observatoire, /campagnes, POST /sso/ticket, /entretien/* et /bibliotheque/* avec en plus le jeton ctg
     de la personne ; et POST /ask via verifier_ask),
     jamais l'écriture (/access, /events, /lieux/{id}/link, /ctg/objects) ni /ask."""
     recu = (x_webhook_secret or "").encode()
@@ -373,6 +374,92 @@ def entretien_choix(conv_id: str, choix: ChoixEntretien, qui: tuple = Depends(pe
     from src.api import entretien_api as ent
     limiter_debit("site")
     return _erreurs_entretien(lambda: ent.repondre_choix(get_store(), qui[1], conv_id, choix.champ_id, choix.valeur))
+
+
+# -- Bibliothèque menée depuis le site Trois-Tiers ----------------------------------
+# Profondeur au choix, historique partagé avec l'onglet Bibliothèque de l'app, contributions
+# des membres versées à la base de connaissances. Même identité que l'entretien (X-CTG-Token).
+
+def _erreurs_bibliotheque(f):
+    from src.api import bibliotheque_api as bib
+    try:
+        return f()
+    except bib.Introuvable as exc:
+        raise HTTPException(status_code=404, detail=f"{exc} introuvable")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)[:300])
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logging.getLogger("space2.bibliotheque").exception("Erreur bibliothèque")
+        raise HTTPException(status_code=502, detail=f"upstream error: {type(exc).__name__}")
+
+
+class QuestionBibliotheque(BaseModel):
+    question: str = Field(min_length=3, max_length=MAX_CARACTERES)
+    profondeur: Literal["rapide", "equilibre", "approfondi"] = "equilibre"
+    conversation_id: Optional[str] = Field(default=None, max_length=100)
+
+
+class ContributionBibliotheque(BaseModel):
+    nature: Literal["texte", "lien", "document", "echange"]
+    titre: Optional[str] = Field(default=None, max_length=200)
+    texte: Optional[str] = Field(default=None, max_length=200_000)
+    url: Optional[str] = Field(default=None, max_length=1000)
+    fichier_nom: Optional[str] = Field(default=None, max_length=200)
+    fichier_base64: Optional[str] = Field(default=None, max_length=12_000_000)
+    conversation_id: Optional[str] = Field(default=None, max_length=100)
+    message_index: Optional[int] = Field(default=None, ge=0, le=1000)
+
+
+@app.get("/bibliotheque/conversations", dependencies=[Depends(verifier_lecture)])
+def bibliotheque_conversations(qui: tuple = Depends(personne_ctg)) -> dict:
+    from src.api import bibliotheque_api as bib
+    return {"conversations": _erreurs_bibliotheque(lambda: bib.lister(get_store(), qui[1]))}
+
+
+@app.get("/bibliotheque/conversations/{conv_id}", dependencies=[Depends(verifier_lecture)])
+def bibliotheque_lire(conv_id: str, qui: tuple = Depends(personne_ctg)) -> dict:
+    from src.api import bibliotheque_api as bib
+    return _erreurs_bibliotheque(lambda: bib.lire(get_store(), qui[1], conv_id))
+
+
+@app.delete("/bibliotheque/conversations/{conv_id}", dependencies=[Depends(verifier_lecture)])
+def bibliotheque_supprimer(conv_id: str, qui: tuple = Depends(personne_ctg)) -> dict:
+    from src.api import bibliotheque_api as bib
+    _erreurs_bibliotheque(lambda: bib.supprimer(get_store(), qui[1], conv_id))
+    return {"supprime": conv_id}
+
+
+@app.post("/bibliotheque/questions", dependencies=[Depends(verifier_lecture)])
+def bibliotheque_question(demande: QuestionBibliotheque, qui: tuple = Depends(personne_ctg)) -> dict:
+    from src.api import bibliotheque_api as bib
+    limiter_debit("site")
+    return _erreurs_bibliotheque(lambda: bib.demander(
+        get_store(), get_agent("site"), qui[1], demande.question, demande.profondeur, demande.conversation_id))
+
+
+@app.get("/bibliotheque/contributions", dependencies=[Depends(verifier_lecture)])
+def bibliotheque_contributions(qui: tuple = Depends(personne_ctg)) -> dict:
+    from src.api import bibliotheque_api as bib
+    return {"contributions": _erreurs_bibliotheque(lambda: bib.mes_contributions(qui[1]))}
+
+
+@app.post("/bibliotheque/contributions", dependencies=[Depends(verifier_lecture)])
+def bibliotheque_contribuer(c: ContributionBibliotheque, qui: tuple = Depends(personne_ctg)) -> dict:
+    from src.api import bibliotheque_api as bib
+    limiter_debit("site")
+    return _erreurs_bibliotheque(lambda: bib.contribuer(
+        get_store(), qui[1], nature=c.nature, titre=c.titre, texte=c.texte, url=c.url,
+        fichier_nom=c.fichier_nom, fichier_base64=c.fichier_base64,
+        conversation_id=c.conversation_id, message_index=c.message_index))
+
+
+@app.delete("/bibliotheque/contributions/{ident}", dependencies=[Depends(verifier_lecture)])
+def bibliotheque_retirer(ident: str, qui: tuple = Depends(personne_ctg)) -> dict:
+    from src.api import bibliotheque_api as bib
+    n = _erreurs_bibliotheque(lambda: bib.retirer_contribution(qui[1], ident[:64]))
+    return {"retire": ident, "passages": n}
 
 
 class LienCtg(BaseModel):

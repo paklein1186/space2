@@ -133,3 +133,14 @@ class ChromaStore:
         result = self.collection.get(where=chroma_where, include=["documents", "metadatas"])
         return [{"id": i, "text": d, "metadata": m} for i, d, m in
                 zip(result["ids"], result["documents"], result["metadatas"])]
+
+
+def supprimer_ids(magasin, ids: list) -> None:
+    """Supprime des documents par identifiant (pgvector ou Chroma)."""
+    if not ids:
+        return
+    if isinstance(magasin, SupabaseVectorStore):
+        for debut in range(0, len(ids), BATCH):
+            magasin.client.table(magasin.TABLE).delete().in_("id", ids[debut:debut + BATCH]).execute()
+    else:
+        magasin.collection.delete(ids=list(ids))
