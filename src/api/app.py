@@ -272,7 +272,11 @@ def sso_ticket(demande: DemandeTicket) -> dict:
         email, ctg_id = sso.verifier_jeton_ctg(demande.ctg_token)
     except sso.JetonInvalide:
         raise HTTPException(status_code=401, detail="ctg token refused")
-    ticket = sso.creer_ticket(sso.tickets_du_store(get_store()), email, ctg_id)
+    try:
+        ticket = sso.creer_ticket(sso.tickets_du_store(get_store()), email, ctg_id)
+    except Exception as exc:
+        logging.getLogger("space2.sso").exception("Création du ticket impossible")
+        raise HTTPException(status_code=500, detail=f"ticket error: {type(exc).__name__}")
     return {"ticket": ticket, "expire_dans": sso.TTL_TICKET}
 
 
@@ -287,7 +291,11 @@ def personne_ctg(x_ctg_token: Optional[str] = Header(default=None)) -> tuple:
         email = ent.identite(x_ctg_token or "")
     except sso.JetonInvalide:
         raise HTTPException(status_code=401, detail="ctg token refused")
-    return email, ent.utilisateur_space2(get_store(), email)
+    try:
+        return email, ent.utilisateur_space2(get_store(), email)
+    except Exception as exc:
+        logging.getLogger("space2.entretien").exception("Compte Space2 introuvable ou impossible à créer")
+        raise HTTPException(status_code=502, detail=f"account error: {type(exc).__name__}")
 
 
 def _erreurs_entretien(f):
@@ -302,8 +310,10 @@ def _erreurs_entretien(f):
         raise HTTPException(status_code=400, detail=str(exc))
     except HTTPException:
         raise
-    except Exception:
-        raise HTTPException(status_code=502, detail="upstream error")
+    except Exception as exc:
+        # Trace complète dans les logs Render ; seul le type d'erreur repart vers le site.
+        logging.getLogger("space2.entretien").exception("Erreur entretien")
+        raise HTTPException(status_code=502, detail=f"upstream error: {type(exc).__name__}")
 
 
 class OuvertureEntretien(BaseModel):

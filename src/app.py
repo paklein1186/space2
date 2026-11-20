@@ -125,7 +125,9 @@ def _connexion_par_ticket(ticket: str) -> bool:
             return False
         result = sso.ouvrir_session_space2(admin.client, _supabase_client(), email)
     except Exception as exc:  # jamais bloquant : l'écran de connexion reste disponible
-        st.warning(f"{t('auth.ticket_erreur')} ({exc})")
+        import logging
+        logging.getLogger("space2.sso").exception("Connexion par ticket impossible")
+        st.warning(f"{t('auth.ticket_erreur')} ({type(exc).__name__}: {exc})")
         return False
     if not getattr(result, "user", None):
         return False
