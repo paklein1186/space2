@@ -123,16 +123,38 @@ def agregats(df_lieux: pd.DataFrame, df_reponses: pd.DataFrame,
     return resultat
 
 
+# Seules colonnes et questions lues par agregats() : le cache n'en garde pas
+# plus (les textes complets des fiches pesaient des dizaines de Mo pour rien
+# sur une instance Render limitée à 512 Mo).
+COLONNES_LIEUX = ["pays", "region", "categories", "mots_cles"]
+COLONNES_REPONSES = ["tiers_lieu", "pays", "region", "champ_id", "valeur"]
+CHAMPS_AGREGES = {
+    "surface_batie_m2", "etp_geres", "frequentation_semaine_type", "date_ouverture", "milieu",
+    "statut_juridique", "evolution_frequentation_3ans",
+    *(f"usagers_mode_{m}" for m in ("voiture", "velo", "pied", "transport_commun")),
+    *(f"provenance_usagers_{p}" for p in ("commune", "limitrophe", "plus_loin")),
+}
+
+
+def _alleger(df_lieux: pd.DataFrame, df_reponses: pd.DataFrame) -> tuple:
+    lieux = df_lieux[[c for c in COLONNES_LIEUX if c in df_lieux.columns]].copy()
+    if not df_reponses.empty:
+        df_reponses = df_reponses[df_reponses["champ_id"].isin(CHAMPS_AGREGES)]
+    reponses = df_reponses[[c for c in COLONNES_REPONSES if c in df_reponses.columns]].copy()
+    return lieux, reponses
+
+
 def donnees(store) -> tuple:
-    """(df_lieux, df_reponses), gardés TTL_SECONDES en mémoire : la lecture complète est lourde."""
+    """(df_lieux, df_reponses) allégés, gardés TTL_SECONDES en mémoire : la lecture complète est
+    lourde. Construits une seule fois même si plusieurs requêtes arrivent en même temps."""
     from src.agent.rag_tools import lieux_enrichis_dataframe, reponses_long_dataframe
     with _cache_lock:
         if _cache.get("quand", 0) + TTL_SECONDES > time.monotonic():
             return _cache["valeur"]
-    valeur = (lieux_enrichis_dataframe(store), reponses_long_dataframe(store))
-    with _cache_lock:
+        _cache.clear()
+        valeur = _alleger(lieux_enrichis_dataframe(store), reponses_long_dataframe(store))
         _cache.update(quand=time.monotonic(), valeur=valeur)
-    return valeur
+        return valeur
 
 
 def campagnes_publiques(store) -> list:

@@ -204,19 +204,31 @@ class OutilsComplets(RagToolHandler):
         return self._vectorstore
 
     def _load_dataframe(self, dataset_name: str):
+        # Un verrou par jeu : plusieurs outils lancés en parallèle sur le même
+        # jeu attendent le premier chargement au lieu de lire chacun toute la
+        # base (3 copies simultanées de lieux_enrichis : +150 Mo de pic, de quoi
+        # dépasser les 512 Mo de l'instance Render).
         with self._lock:
-            entree = self._cache.get(dataset_name)
-            if entree and time.monotonic() - entree[0] < self.ttl:
-                return entree[1]
-        if dataset_name == "reponses_tiers_lieux":
-            df = reponses_sans_confidentiel(self.store)
-        elif dataset_name == "lieux_enrichis":
-            df = lieux_enrichis_sans_confidentiel(self.store)
-        else:
-            df = super()._load_dataframe(dataset_name)
-        with self._lock:
-            self._cache[dataset_name] = (time.monotonic(), df)
-        return df
+            verrou = self.__dict__.setdefault("_verrous_jeux", {}).setdefault(dataset_name, threading.Lock())
+        with verrou:
+            with self._lock:
+                entree = self._cache.get(dataset_name)
+                if entree and time.monotonic() - entree[0] < self.ttl:
+                    return entree[1]
+                # L'ancienne version est libérée avant d'en construire une
+                # nouvelle, plutôt que de garder les deux en mémoire.
+                self._cache.pop(dataset_name, None)
+            if dataset_name == "reponses_tiers_lieux":
+                df = reponses_sans_confidentiel(self.store)
+            elif dataset_name == "lieux_enrichis":
+                df = lieux_enrichis_sans_confidentiel(self.store)
+            else:
+                # _construire_dataframe et pas _load_dataframe : ce dernier
+                # garderait une seconde copie dans le cache de la classe mère.
+                df = self._construire_dataframe(dataset_name)
+            with self._lock:
+                self._cache[dataset_name] = (time.monotonic(), df)
+            return df
 
     def _chercher(self, requete: str, top_k: int, doc_type: Optional[str]) -> list:
         embedding = self.profils.embedder.embed_query(requete)   # un seul appel Voyage
@@ -385,11 +397,21 @@ def acces_complet_site() -> bool:
     return os.environ.get("SITE_ASK_FULL_ACCESS", "false").strip().lower() in ("1", "true", "yes", "oui")
 
 
+def _magasin_supabase():
+    """Magasin pgvector dont ProfilSearch reprend les vecteurs déjà calculés ;
+    None hors Supabase (Chroma local : rien à reprendre)."""
+    url, cle = os.environ.get("SUPABASE_URL"), os.environ.get("SUPABASE_SERVICE_KEY")
+    if not (url and cle):
+        return None
+    from ..agent.vectorstore import SupabaseVectorStore
+    return SupabaseVectorStore(url, cle)
+
+
 def creer_agent(store, model: Optional[str] = None, client: Optional[Anthropic] = None,
                 complet: Optional[bool] = None) -> AskAgent:
     """Agent complet sans confidentiel ou public. `complet` None = selon CTG_ASK_FULL_ACCESS (défaut : complet)."""
     model = model or modele_configure()
     if acces_complet_actif() if complet is None else complet:
-        return AskAgent(OutilsComplets(store, ProfilSearch(store)), tools=_tools_complet(),
+        return AskAgent(OutilsComplets(store, ProfilSearch(store, magasin=_magasin_supabase())), tools=_tools_complet(),
                         system_prompt=SYSTEM_PROMPT_COMPLET, client=client, model=model, store=store)
     return AskAgent(OutilsPublics(DonneesPubliques(store)), client=client, model=model, store=store)

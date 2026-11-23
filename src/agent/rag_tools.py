@@ -291,14 +291,20 @@ class RagToolHandler:
         peuvent viser le même dataset_name en même temps."""
         cache = self.__dict__.setdefault("_df_cache", {})
         verrou = self.__dict__.setdefault("_df_cache_lock", threading.Lock())
+        # Un verrou par jeu en plus : deux outils parallèles sur le même jeu
+        # attendent un seul chargement au lieu d'en lancer deux.
         with verrou:
-            entree = cache.get(dataset_name)
-            if entree and time.monotonic() - entree[0] < TTL_DATASETS:
-                return entree[1]
-        df = self._construire_dataframe(dataset_name)
-        with verrou:
-            cache[dataset_name] = (time.monotonic(), df)
-        return df
+            verrou_jeu = self.__dict__.setdefault("_df_verrous_jeux", {}).setdefault(dataset_name, threading.Lock())
+        with verrou_jeu:
+            with verrou:
+                entree = cache.get(dataset_name)
+                if entree and time.monotonic() - entree[0] < TTL_DATASETS:
+                    return entree[1]
+                cache.pop(dataset_name, None)
+            df = self._construire_dataframe(dataset_name)
+            with verrou:
+                cache[dataset_name] = (time.monotonic(), df)
+            return df
 
     def _construire_dataframe(self, dataset_name: str) -> Optional[pd.DataFrame]:
         if dataset_name == "reponses_tiers_lieux":

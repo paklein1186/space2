@@ -7,14 +7,22 @@
 - "objet_ctg" : objets Changethegame de connaissance (organisations, quêtes,
   entités, posts ; voir agent/objets_ctg.py).
 
-Les embeddings Voyage sont gardés en mémoire et ne sont recalculés que pour les
-documents modifiés. Une fois l'index construit, l'expiration du TTL relance le
+Les embeddings Voyage sont gardés en mémoire (float32 : ~16 Mo pour 4 000
+documents) et ne sont recalculés que pour les documents modifiés. Au démarrage,
+un profil dont le texte est identique à celui déjà vectorisé par l'app dans
+`documents_vectoriels` (même id, même contenu) reprend ce vecteur au lieu d'un
+nouvel appel Voyage : sans ça, chaque redémarrage recalculait ~4 000
+embeddings, gardés en listes Python (~130 Mo) — de quoi dépasser les 512 Mo de
+l'instance Render. Un profil au texte différent (lieu avec réponses
+confidentielles, synthèse publique) est toujours recalculé : le vecteur stocké
+encode le texte complet. Une fois l'index construit, l'expiration du TTL relance le
 rafraîchissement en arrière-plan : les questions continuent d'être servies avec
 l'index existant, sans payer le calcul dans leur budget de temps."""
 
 from __future__ import annotations
 
 import hashlib
+import logging
 import threading
 import time
 from typing import Optional
@@ -26,12 +34,31 @@ from ..db.store import Store
 from .donnees_completes import texte_profil_partageable
 
 TTL_SECONDES = 1800
+LOT_EMBEDDINGS = 64   # textes vectorisés par appel, convertis en float32 aussitôt
+LOT_LECTURE = 100     # vecteurs stockés relus par requête Supabase
+
+_log = logging.getLogger("space2.api")
+
+
+def _vecteur(brut) -> np.ndarray:
+    """Vecteur normalisé en float32 ; pgvector arrive par PostgREST sous forme de chaîne « [x,y,...] »."""
+    if isinstance(brut, str):
+        brut = brut.strip("[] ").split(",")
+    v = np.asarray(brut, dtype=np.float32)
+    return v / (np.linalg.norm(v) or 1.0)
+
+
+def _hash(texte: str) -> str:
+    return hashlib.sha256(texte.encode("utf-8")).hexdigest()
 
 
 class ProfilSearch:
-    def __init__(self, store: Store, embedder=None, ttl: float = TTL_SECONDES):
+    def __init__(self, store: Store, embedder=None, ttl: float = TTL_SECONDES, magasin=None):
+        """`magasin` : SupabaseVectorStore dont reprendre les vecteurs déjà
+        calculés (voir docstring du module) ; None = tout calculer."""
         self.store, self.ttl = store, ttl
         self._embedder = embedder
+        self._magasin = magasin
         self._lock = threading.Lock()
         self._vecteurs: dict = {}   # doc_id -> (hash, vecteur normalisé)
         self._docs: dict = {}       # doc_id -> (doc_type, nom, texte)
@@ -64,18 +91,39 @@ class ProfilSearch:
             if not force and self._charge_a is not None and time.monotonic() - self._charge_a < self.ttl:
                 return
             docs = self._collecter()
-            hashes = {i: hashlib.sha256(t.encode("utf-8")).hexdigest() for i, (_, _, t) in docs.items()}
+            hashes = {i: _hash(t) for i, (_, _, t) in docs.items()}
             # Copie puis échange : une recherche en cours continue de lire
             # l'ancien index, jamais un dictionnaire modifié sous ses pieds.
             vecteurs = {i: x for i, x in self._vecteurs.items() if i in docs}
             a_calculer = [i for i in docs if vecteurs.get(i, (None,))[0] != hashes[i]]
-            if a_calculer:
-                calcules = self.embedder.embed_documents([docs[i][2] for i in a_calculer])
-                for i, v in zip(a_calculer, calcules):
-                    v = np.asarray(v, dtype=float)
-                    vecteurs[i] = (hashes[i], v / (np.linalg.norm(v) or 1.0))
+            if a_calculer and self._magasin is not None:
+                repris = self._reprendre_stockes(a_calculer, hashes)
+                vecteurs.update(repris)
+                a_calculer = [i for i in a_calculer if i not in repris]
+            for debut in range(0, len(a_calculer), LOT_EMBEDDINGS):
+                lot = a_calculer[debut:debut + LOT_EMBEDDINGS]
+                for i, v in zip(lot, self.embedder.embed_documents([docs[i][2] for i in lot])):
+                    vecteurs[i] = (hashes[i], _vecteur(v))
             self._vecteurs, self._docs = vecteurs, docs
             self._charge_a = time.monotonic()
+
+    def _reprendre_stockes(self, ids: list, hashes: dict) -> dict:
+        """Vecteurs déjà stockés pour ces ids, uniquement si le texte stocké est
+        exactement celui à vectoriser. En cas d'échec : {} (tout sera calculé)."""
+        repris = {}
+        try:
+            client, table = self._magasin.client, self._magasin.TABLE
+            for debut in range(0, len(ids), LOT_LECTURE):
+                lignes = (client.table(table).select("id,contenu,embedding")
+                          .in_("id", ids[debut:debut + LOT_LECTURE]).execute().data)
+                for ligne in lignes:
+                    if ligne.get("contenu") is not None and _hash(ligne["contenu"]) == hashes.get(ligne["id"]):
+                        repris[ligne["id"]] = (hashes[ligne["id"]], _vecteur(ligne["embedding"]))
+        except Exception:
+            _log.exception("[profils] reprise des vecteurs stockés impossible, calcul complet")
+            return {}
+        _log.info("[profils] %d vecteurs repris sur %d à calculer", len(repris), len(ids))
+        return repris
 
     def _rafraichir_en_arriere_plan(self) -> None:
         def _tache():
@@ -100,8 +148,7 @@ class ProfilSearch:
         ids = [i for i in vecteurs if doc_type is None or docs[i][0] == doc_type]
         if not ids:
             return []
-        q = np.asarray(embedding if embedding is not None else self.embedder.embed_query(query), dtype=float)
-        q = q / (np.linalg.norm(q) or 1.0)
+        q = _vecteur(embedding if embedding is not None else self.embedder.embed_query(query))
         scores = np.array([float(vecteurs[i][1] @ q) for i in ids])
         hits = []
         for idx in np.argsort(-scores)[:max(1, top_k)]:
