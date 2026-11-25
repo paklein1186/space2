@@ -50,8 +50,51 @@ def prechargement_observatoire() -> threading.Thread:
     return fil
 
 
-@st.cache_resource(ttl=1800, show_spinner=False)
+@st.cache_data(ttl=60, show_spinner=False)
+def _signature_lieux():
+    """(nombre de lieux, date de création du plus récent) : une seule requête
+    d'une ligne, relue au plus une fois par minute. Sert de clé au cache de
+    donnees_annuaire() — un lieu ajouté ou supprimé, depuis l'entretien,
+    l'API ou un import, change la clé et la grille est relue dans la minute.
+    Sans elle, un lieu fraîchement créé restait invisible dans l'Annuaire
+    jusqu'à 30 min (TTL du cache), d'autant plus depuis que la visite
+    keep-awake garde le serveur — donc ce cache — en vie (constaté le
+    25/11/2026 : « Orangeries de Bierbais » ajouté, absent de /lieux-hybrides).
+    Une simple modification (nom, coordonnées…) ne change pas la signature :
+    elle attend le TTL, ou invalider_annuaire() quand elle vient de l'app."""
+    store = _store_pour_agregats()
+    try:
+        client = getattr(store, "client", None)
+        if client is None:   # store local (SQLite)
+            lieux = store.list_tiers_lieux()
+            return len(lieux), max((getattr(l, "cree_le", "") or "" for l in lieux), default="")
+        r = (client.table("tiers_lieux").select("cree_le", count="exact")
+             .order("cree_le", desc=True).limit(1).execute())
+        return r.count, (r.data[0]["cree_le"] if r.data else "")
+    except Exception:
+        return None   # en panne : on garde le comportement d'avant (TTL seul)
+
+
 def donnees_annuaire():
+    """Lieux et synthèses de la grille, relus dès que la signature de la table
+    change (voir _signature_lieux) et au plus tard toutes les 30 min."""
+    return _donnees_annuaire(_signature_lieux())
+
+
+def invalider_annuaire() -> None:
+    """À appeler après une modification de lieu faite dans l'app (admin) :
+    la grille et les compteurs de l'accueil sont relus à la prochaine visite."""
+    _signature_lieux.clear()
+    _donnees_annuaire.clear()
+    stats_reseau.clear()
+
+
+# Paramètre « signature » sans tiret bas : Streamlit ignore dans la clé de
+# cache les paramètres préfixés par « _ ». max_entries=1 : quand elle change,
+# l'ancienne grille (~4000 lieux) est libérée aussitôt au lieu de rester en
+# mémoire jusqu'à son TTL.
+@st.cache_resource(ttl=1800, max_entries=1, show_spinner=False)
+def _donnees_annuaire(signature):
     """Grille de l'Annuaire (liste + synthèses) — sans ce cache, CHAQUE
     interaction (recherche, filtre, ouverture d'une fiche) relisait les
     ~4000 lieux et rejouait get_lieu_derive_batch, pas seulement un vrai

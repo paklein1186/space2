@@ -51,7 +51,8 @@ from src.annuaire import (
 from src.auth_session import clear_session_cookie, read_session_cookie, save_session_cookie
 from src.db.factory import get_admin_store, get_store
 from src.db.store import Litige
-from src.donnees_observatoire import donnees_annuaire, prechargement_annuaire, prechargement_observatoire
+from src.donnees_observatoire import (donnees_annuaire, invalider_annuaire, prechargement_annuaire,
+                                      prechargement_observatoire)
 from src.i18n import language_toggle, t, t_categorie
 from src.recherche_lieux import lieu_au_nom_exact, rechercher_lieux
 from src.questionnaire.resolver import campagne_completion_stats, completion_stats, country_code_for
@@ -1224,6 +1225,7 @@ def _fiche_dialog(store, fiche, est_admin: bool, user_id: str):
                                                 value=derive.photo_url or "")
                 if st.form_submit_button(t("fiche_dialog.enregistrer")):
                     store.update_lieu_derive_liens(lieu.id, nouveau_lien or None, nouvelle_photo or None)
+                    invalider_annuaire()
                     st.rerun()
 
     if est_admin and (lieu.latitude is None or lieu.longitude is None):
@@ -2189,6 +2191,7 @@ def administration_tab(store, user_id: str) -> None:
                         lieu_gestion.id, nom=nouveau_nom.strip(),
                         pays=nouveau_pays.strip() or None, region=nouvelle_region.strip() or None,
                     )
+                    invalider_annuaire()
                     st.success("Lieu mis à jour.")
                     st.rerun()
 
@@ -2208,6 +2211,7 @@ def administration_tab(store, user_id: str) -> None:
                     if st.button("Oui, supprimer définitivement", key=f"suppr_lieu_ok_{lieu_gestion.id}",
                                  type="primary", use_container_width=True):
                         admin_store.delete_tiers_lieu(lieu_gestion.id)
+                        invalider_annuaire()
                         st.session_state.pop(cle_confirmation, None)
                         st.success(f"« {lieu_gestion.nom} » supprimé.")
                         st.rerun()
