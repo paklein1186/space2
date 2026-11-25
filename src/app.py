@@ -57,7 +57,7 @@ from src.i18n import language_toggle, t, t_categorie
 from src.recherche_lieux import lieu_au_nom_exact, rechercher_lieux
 from src.questionnaire.resolver import campagne_completion_stats, completion_stats, country_code_for
 from src.questionnaire.schema import MODULES_CAMPAGNES, QUESTIONNAIRE, CATEGORIES_POSSIBLES, FieldType, Role, all_fields, get_field
-from src.theme import CSS_SANS_MENU, apply_theme
+from src.theme import apply_theme
 from src.voice_input import bouton_dictee, consume_voice_transcript
 
 ROLES_INTERNES = {"fondateur", "equipe", "steward"}
@@ -3184,7 +3184,12 @@ def page_administration() -> None:
     _rendre_isole("Administration", administration_tab, store, user_id)
 
 
-_CSS_SANS_MENU = CSS_SANS_MENU   # voir src/theme.py (partagé avec la page Fiche)
+# Même CSS que src/pages/3_Fiche.py. Volontairement dupliqué, pas importé
+# d'un module : voir la note dans 3_Fiche.py.
+_CSS_SANS_MENU = """<style>
+[data-testid="stSidebar"], [data-testid="stSidebarCollapseButton"], [data-testid="stSidebarNav"],
+[data-testid="stSidebarCollapsedControl"], [data-testid="stExpandSidebarButton"] { display: none !important; }
+</style>"""
 
 
 def _sur_page_partenaire() -> bool:

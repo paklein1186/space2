@@ -24,7 +24,6 @@ from src.annuaire import render_fiche_header, render_fiche_sections
 from src.auth_session import read_session_cookie
 from src.db.factory import get_admin_store, get_store
 from src.i18n import t
-from src.theme import CSS_SANS_MENU
 
 
 def _store_pour_lecture_publique():
@@ -41,6 +40,15 @@ def _store_pour_lecture_publique():
     except RuntimeError:
         return get_store()
 
+
+# Défini ici plutôt qu'importé de src/theme.py : sur Streamlit Cloud, un push
+# ne recharge que les scripts (app.py, pages), pas les modules déjà importés.
+# Un nouveau nom importé d'un module existant faisait planter toute l'app
+# (ImportError) jusqu'au redémarrage manuel, constaté le 25/11/2026.
+CSS_SANS_MENU = """<style>
+[data-testid="stSidebar"], [data-testid="stSidebarCollapseButton"], [data-testid="stSidebarNav"],
+[data-testid="stSidebarCollapsedControl"], [data-testid="stExpandSidebarButton"] { display: none !important; }
+</style>"""
 
 # Visiteur non connecté (lien de partage reçu) : la fiche seule, sans le menu
 # de l'app. Connecté = session déjà ouverte dans cet onglet, ou cookie de

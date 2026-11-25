@@ -247,14 +247,6 @@ a[data-testid="stSidebarNavLink"][href$="/fiche"]{{ display: none; }}
 """
 
 
-# Masque toute la barre latérale (menu de navigation, bouton de langue,
-# flèche pour la rouvrir). Utilisé par l'espace partenaire et par la fiche
-# publique d'un lieu ouverte par un visiteur non connecté.
-CSS_SANS_MENU = """<style>
-[data-testid="stSidebar"], [data-testid="stSidebarCollapseButton"], [data-testid="stSidebarNav"],
-[data-testid="stSidebarCollapsedControl"], [data-testid="stExpandSidebarButton"] { display: none !important; }
-</style>"""
-
 def apply_theme() -> str:
     """Injecte le CSS du thème clair — seul thème disponible (mode sombre
     retiré du site à la demande explicite : plus de sélecteur, plus de cookie
