@@ -21,8 +21,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 import streamlit as st
 
 from src.annuaire import render_fiche_header, render_fiche_sections
+from src.auth_session import read_session_cookie
 from src.db.factory import get_admin_store, get_store
 from src.i18n import t
+from src.theme import CSS_SANS_MENU
 
 
 def _store_pour_lecture_publique():
@@ -39,6 +41,14 @@ def _store_pour_lecture_publique():
     except RuntimeError:
         return get_store()
 
+
+# Visiteur non connecté (lien de partage reçu) : la fiche seule, sans le menu
+# de l'app. Connecté = session déjà ouverte dans cet onglet, ou cookie de
+# connexion présent dans le navigateur (la fiche n'appelle pas auth_screen(),
+# donc un utilisateur qui ouvre le lien dans un nouvel onglet n'a pas encore
+# de user_id ; son cookie suffit à lui garder le menu).
+if not (st.session_state.get("user_id") or read_session_cookie()):
+    st.markdown(CSS_SANS_MENU, unsafe_allow_html=True)
 
 lieu_id = st.query_params.get("lieu")
 if not lieu_id:
