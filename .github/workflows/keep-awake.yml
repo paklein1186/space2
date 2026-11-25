@@ -2,8 +2,20 @@ name: Garder Space2 éveillé
 
 # Streamlit Community Cloud (palier gratuit) met l'app en veille après une
 # période d'inactivité — la visite suivante affiche alors "Your app is
-# waking up!" le temps d'un redémarrage à froid. Ce ping régulier simule une
-# visite pour que l'app ne retombe jamais en veille.
+# waking up!" le temps d'un redémarrage à froid. Cette visite régulière
+# empêche l'app de retomber en veille.
+#
+# Une VRAIE visite (Chromium sans écran, .github/scripts/visiter_space2.py),
+# pas un curl : un curl ne reçoit que la page HTML vide, sans ouvrir la
+# session Streamlit, et ne compte donc pas comme du trafic — l'app s'est
+# endormie le 25/11/2026 malgré le ping curl toutes les 6h. Si l'app dort
+# quand même, le script clique sur le bouton de réveil. Le workflow échoue
+# (email de GitHub) si l'accueil ne s'affiche pas : surveillance gratuite.
+#
+# Coût Supabase d'une visite : l'accueil ne lit que 3 compteurs
+# (stats_reseau) ; les lectures complètes (annuaire, observatoire) n'ont lieu
+# qu'une fois par démarrage du serveur. Garder l'app éveillée évite donc
+# aussi les relectures complètes de chaque réveil à froid.
 #
 # Ne résout que le délai de réveil à froid, pas la lenteur de calcul en
 # fonctionnement normal (ressources mutualisées du palier gratuit) — pour
@@ -31,8 +43,24 @@ on:
   workflow_dispatch: {}  # déclenchement manuel depuis l'onglet Actions
 
 jobs:
-  ping:
+  visite:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Installer Chromium (Playwright)
+        run: |
+          pip install playwright==1.49.1
+          python -m playwright install --with-deps chromium
       - name: Visiter Space2
-        run: curl -fsS --max-time 30 "https://space2.streamlit.app/" -o /dev/null
+        run: python .github/scripts/visiter_space2.py
+      - name: Capture d'écran en cas d'échec
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: space2-capture
+          path: space2.png
+          if-no-files-found: ignore
