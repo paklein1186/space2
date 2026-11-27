@@ -240,6 +240,29 @@ def lieux(updated_since: Optional[str] = None) -> dict:
     return {"lieux": flux_lieux(get_store(), updated_since)}
 
 
+@app.get("/lieux/{lieu_id}/interne", dependencies=[Depends(verifier_lecture)])
+def lieu_interne(lieu_id: str, x_ctg_token: Optional[str] = Header(default=None)) -> dict:
+    """Synthèse interne d'un lieu pour les membres actifs de troistiers.space (décision du 27/11).
+    Fermée tant que SITE_LIEUX_INTERNE n'est pas « true » sur le serveur. Exige la clé du site ET le jeton
+    ChangeTheGame de la personne (vérifié ici) : chaque lecture est journalisée avec son e-mail. C'est le site qui
+    vérifie le badge (actif ou plus) avant d'appeler ; la synthèse ne contient ni réponse brute ni source."""
+    from src import sso
+    from src.api import entretien_api as ent
+    from src.api.public_data import fiche_interne
+    if os.environ.get("SITE_LIEUX_INTERNE", "").lower() != "true":
+        raise HTTPException(status_code=403, detail="internal synthesis disabled")
+    try:
+        email = ent.identite(x_ctg_token or "")
+    except sso.JetonInvalide:
+        raise HTTPException(status_code=401, detail="ctg token refused")
+    limiter_debit("site")
+    fiche = fiche_interne(get_store(), lieu_id)
+    if fiche is None:
+        raise HTTPException(status_code=404, detail="not found")
+    logging.getLogger("space2.lieux_interne").info("synthèse interne de %s lue par %s via le site", lieu_id, email)
+    return fiche
+
+
 @app.get("/observatoire", dependencies=[Depends(verifier_lecture)])
 def observatoire(pays: Optional[str] = None, region: Optional[str] = None) -> dict:
     """Agrégats de l'Observatoire (jamais une ligne par lieu). `pays` : liste séparée

@@ -63,10 +63,17 @@ DATASETS = {
 
 
 CHAMPS_PROFIL = ["resume", "categories", "mots_cles", "activites", "publics", "territoire",
-                 "partenaires", "competences", "projets", "enjeux", "besoins"]
+                 "partenaires", "competences", "projets", "enjeux", "besoins",
+                 # Ajoutés le 27/11 (fiche du site Trois-Tiers) : version publique, comme les autres.
+                 "gouvernance", "ressources", "modele_economique"]
+
+# Sections de la synthèse INTERNE remises au site Trois-Tiers pour ses membres actifs (GET /lieux/{id}/interne) :
+# le texte de synthèse seulement — jamais les réponses brutes, les notes libres ni les « Sources ».
+SECTIONS_INTERNES = ["resume", "activites", "publics", "territoire", "gouvernance", "ressources", "besoins",
+                     "modele_economique", "partenaires", "competences", "projets", "enjeux"]
 
 
-def profil_public(lieu, derive, adresse=None) -> dict:
+def profil_public(lieu, derive, adresse=None, nombre_contributeurs=None) -> dict:
     """Vue publique d'un lieu, partagée entre le dataset `lieux` de l'agent et
     le flux GET /lieux. N'utilise que `donnees_publiques` — jamais `donnees`
     (synthèse interne, qui peut refléter des réponses confidentielles)."""
@@ -79,6 +86,7 @@ def profil_public(lieu, derive, adresse=None) -> dict:
         # géocodage (voir geocoding.py, migration_010).
         "adresse": adresse, "commune": lieu.commune, "code_postal": lieu.code_postal,
         "latitude": lieu.latitude, "longitude": lieu.longitude,
+        "nombre_contributeurs": nombre_contributeurs,
     }
     for cle in CHAMPS_PROFIL:
         profil[cle] = publiques.get(cle)
@@ -108,6 +116,9 @@ def construire_datasets(store: Store) -> dict:
     for lieu in lieux:
         profil = profil_public(lieu, derives.get(lieu.id), (reponses.get(lieu.id) or {}).get("adresse"))
         profil.pop("space2_id"), profil.pop("campagne"), profil.pop("updated_at")
+        # Ajouts du 27/11 réservés au flux du site : le jeu de données de l'agent public reste tel quel (manifest).
+        for cle in ("gouvernance", "ressources", "modele_economique", "nombre_contributeurs"):
+            profil.pop(cle, None)
         lignes_lieux.append(profil)
         base = {"tiers_lieu": lieu.nom, "pays": lieu.pays, "region": lieu.region}
         for champ_id, valeur in (reponses.get(lieu.id) or {}).items():
@@ -128,6 +139,43 @@ def construire_datasets(store: Store) -> dict:
         "activite_ctg": pd.DataFrame(
             lignes_evenements, columns=["tiers_lieu", "type", "titre", "texte", "url", "survenu_le"]),
     }
+
+
+def _publie(lieu, reponses_par_contributeur: dict, valides: set, toutes_campagnes: list) -> bool:
+    """Le lieu entre-t-il dans le flux GET /lieux ? (règle décrite dans flux_lieux)."""
+    # Une entité ctg déjà créée pour ce lieu (ctg l'a lui-même poussé via
+    # PUT /ctg/objects, ou une synchronisation précédente l'a déjà créée)
+    # continue toujours d'être tenue à jour, quelle que soit sa
+    # complétion — le seuil ne bloque que la CRÉATION de nouvelles
+    # entités pour des lieux jamais encore connus de ctg.
+    if lieu.ctg_entity_id or lieu.id in valides or lieu.ctg_opt_in:
+        return True
+    reponses: dict = {}
+    for rep in (reponses_par_contributeur.get(lieu.id) or {}).values():
+        reponses.update(rep)
+    if any((stats := campagne_completion_stats(reponses, c.champ_ids)) and stats["pourcentage"] == 100
+           for c in toutes_campagnes):
+        return True
+    return completion_stats(reponses, None, country_code_for(reponses.get("pays")))["pourcentage"] >= SEUIL_COMPLETION_CTG
+
+
+def fiche_interne(store: Store, lieu_id: str) -> Optional[dict]:
+    """Synthèse INTERNE d'un lieu (faite de toutes les réponses, confidentielles comprises), pour les membres
+    actifs du site Trois-Tiers (décision de PA du 27/11). Seulement pour un lieu déjà publié dans GET /lieux ;
+    seulement le texte de synthèse par section, jamais les réponses brutes, les notes ni les sources."""
+    lieu = next((l for l in store.list_tiers_lieux() if l.id == lieu_id), None)
+    if lieu is None:
+        return None
+    contrib = store.get_all_answers_by_contributeur_batch([lieu.id])
+    if not _publie(lieu, contrib, store.get_lieux_valides_par_contributeur([lieu.id]), store.list_campagnes_prioritaires()):
+        return None
+    derive = store.get_lieu_derive_batch([lieu.id]).get(lieu.id)
+    donnees = (derive.donnees if derive else None) or {}
+    sections = {cle: donnees.get(cle) for cle in SECTIONS_INTERNES if donnees.get(cle)}
+    if not sections:
+        return None
+    return {"space2_id": lieu.id, "tiers_lieu": lieu.nom, "sections": sections,
+            "genere_le": derive.genere_le if derive else None}
 
 
 def flux_lieux(store: Store, updated_since: Optional[str] = None) -> list:
@@ -155,24 +203,10 @@ def flux_lieux(store: Store, updated_since: Optional[str] = None) -> list:
 
     profils = []
     for lieu in lieux:
-        # Une entité ctg déjà créée pour ce lieu (ctg l'a lui-même poussé via
-        # PUT /ctg/objects, ou une synchronisation précédente l'a déjà créée)
-        # continue toujours d'être tenue à jour, quelle que soit sa
-        # complétion — le seuil ne bloque que la CRÉATION de nouvelles
-        # entités pour des lieux jamais encore connus de ctg.
-        if not lieu.ctg_entity_id and lieu.id not in valides and not lieu.ctg_opt_in:
-            reponses: dict = {}
-            for rep in (reponses_par_contributeur.get(lieu.id) or {}).values():
-                reponses.update(rep)
-            campagne_terminee = any(
-                (stats := campagne_completion_stats(reponses, c.champ_ids)) and stats["pourcentage"] == 100
-                for c in toutes_campagnes
-            )
-            if not campagne_terminee:
-                pourcentage = completion_stats(reponses, None, country_code_for(reponses.get("pays")))["pourcentage"]
-                if pourcentage < SEUIL_COMPLETION_CTG:
-                    continue
-        profils.append(profil_public(lieu, derives.get(lieu.id), (adresses.get(lieu.id) or {}).get("adresse")))
+        if not _publie(lieu, reponses_par_contributeur, valides, toutes_campagnes):
+            continue
+        profils.append(profil_public(lieu, derives.get(lieu.id), (adresses.get(lieu.id) or {}).get("adresse"),
+                                     len(reponses_par_contributeur.get(lieu.id) or {})))
     if updated_since:
         profils = [p for p in profils if not p["updated_at"] or str(p["updated_at"]) > updated_since]
     return profils
